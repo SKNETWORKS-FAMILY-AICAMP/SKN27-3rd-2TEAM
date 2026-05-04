@@ -72,9 +72,13 @@ class InteractionLogRepository:
         return params
 
     def _json_param(self, value):
-        if value is None or Json is None:
+        if value is None or Json is None or not self._uses_psycopg2_connection():
             return value
         return Json(value)
+
+    def _uses_psycopg2_connection(self):
+        connection_module = self._connection.__class__.__module__
+        return connection_module.startswith("psycopg2")
 
     def _cursor(self):
         # psycopg2 사용 시 dict 형태 결과를 반환하고, 테스트 대역에서는 기본 cursor를 사용한다.
