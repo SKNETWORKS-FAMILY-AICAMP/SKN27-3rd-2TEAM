@@ -1,0 +1,12 @@
+{
+  "status": "success",
+  "selected_recommendations": [
+    {
+      "content_id": "track_002",
+      "title": "Soft Orbit",
+      "artist": "Luna Field",
+      "recommendation_category": "discovery_candidate",
+      "display_reason": "기존 calm/night 분위기와 연결되면서 dream_pop 계열로 취향을 넓혀볼 수 있는 곡"
+    }
+  ]
+}

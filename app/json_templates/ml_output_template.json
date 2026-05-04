@@ -1,0 +1,30 @@
+{
+  "status": "success",
+  "user_id": "user_001",
+  "taste_profile": {
+    "preferred_genres": [
+      "rnb",
+      "indie"
+    ],
+    "preferred_artists": [
+      "artist_a",
+      "artist_b"
+    ],
+    "preferred_moods": [
+      "calm",
+      "night"
+    ],
+    "preferred_tempo": "medium"
+  },
+  "behavior_profile": {
+    "recent_listening_level": "medium",
+    "recent_discovery_level": "low",
+    "repeat_listening_ratio": 0.72,
+    "new_artist_acceptance": 0.34
+  },
+  "recommendation_profile": {
+    "personalization_strength": "high",
+    "discovery_readiness": "medium",
+    "new_release_affinity": "medium"
+  }
+}

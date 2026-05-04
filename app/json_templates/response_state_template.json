@@ -1,0 +1,38 @@
+{
+  "status": "success",
+  "response_type": "curator_recommendation",
+  "chatbot_response": "기존에 좋아하던 차분한 밤 분위기는 유지하면서 조금 새로운 결로 넘어갈 수 있는 곡으로 Luna Field의 Soft Orbit을 추천드릴게요.",
+  "display_recommendations": [
+    {
+      "content_id": "track_002",
+      "title": "Soft Orbit",
+      "artist": "Luna Field",
+      "label": "새로운 취향 시도",
+      "display_reason": "기존 calm/night 분위기와 연결되면서 dream_pop 계열로 취향을 넓혀볼 수 있는 곡"
+    }
+  ],
+  "used_content_ids": [
+    "track_002"
+  ],
+  "provenance": {
+    "used_ml_fields": [
+      "taste_profile.preferred_genres",
+      "taste_profile.preferred_moods"
+    ],
+    "used_kag_fields": [
+      "recommendation_goal.primary_goal",
+      "curation_intent.intent_type"
+    ],
+    "used_rag_content_ids": [
+      "track_002"
+    ],
+    "used_rag_fields": [
+      "recommended_content_evidence.evidence_summary",
+      "recommendation_reason.summary"
+    ]
+  },
+  "validation": {
+    "response_validation_passed": true,
+    "provenance_validation_passed": true
+  }
+}

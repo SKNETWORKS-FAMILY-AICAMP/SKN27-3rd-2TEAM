@@ -1,0 +1,65 @@
+{
+  "status": "success",
+  "user": {
+    "user_id": "user_001"
+  },
+  "recommendation_goal": {
+    "primary_goal": "new_taste_discovery",
+    "secondary_goal": "personalized_recommendation",
+    "goal_reason": "기존 취향을 유지하면서 새로운 취향 탐색 가능성이 있음"
+  },
+  "user_context": {
+    "base_preference": {
+      "genres": [
+        "rnb",
+        "indie"
+      ],
+      "moods": [
+        "calm",
+        "night"
+      ],
+      "tempo": "medium"
+    },
+    "behavior_context": {
+      "recent_listening_level": "medium",
+      "recent_discovery_level": "low",
+      "repeat_listening_ratio": 0.72,
+      "new_artist_acceptance": 0.34
+    }
+  },
+  "curation_intent": {
+    "intent_type": "new_taste_discovery",
+    "intent_confidence": 0.86,
+    "allowed_modes": [
+      "personalized_recommendation",
+      "new_taste_discovery",
+      "similar_taste_recommendation"
+    ]
+  },
+  "curation_strategy": {
+    "strategy_code": "SAFE_DISCOVERY_FROM_PERSONAL_TASTE",
+    "strategy_level": "medium",
+    "strategy_description_for_internal": "기존 취향과 연결되는 안전한 취향 탐색"
+  },
+  "content_requirements": {
+    "must_include": [
+      "personalized_match",
+      "discovery_candidate"
+    ],
+    "optional_include": [
+      "new_release"
+    ],
+    "avoid": [
+      "too_aggressive_genre_shift"
+    ]
+  },
+  "routing": {
+    "target_page": "main_recommendation_page",
+    "primary_section": "discovery_section",
+    "secondary_sections": [
+      "personalized_recommendation_section",
+      "new_release_section"
+    ]
+  },
+  "selected_path": "personalized_to_safe_discovery"
+}

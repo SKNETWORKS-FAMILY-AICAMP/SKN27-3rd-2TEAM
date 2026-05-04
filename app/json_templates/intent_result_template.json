@@ -1,0 +1,8 @@
+{
+  "status": "success",
+  "intent_type": "recommendation_reason_question",
+  "confidence": 0.91,
+  "target_content_id": "track_002",
+  "requires_recommendation": false,
+  "requires_information": true
+}
