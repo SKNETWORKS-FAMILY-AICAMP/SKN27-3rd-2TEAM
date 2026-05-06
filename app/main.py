@@ -1,19 +1,7 @@
+from app.common.default_state import SESSION_DEFAULTS
 from app.pages.chatbot_page import render_chatbot_page
 from app.pages.main_recommendation_page import render_main_recommendation_page
 from app.ui.components.sidebar import render_sidebar
-
-
-SESSION_DEFAULTS = {
-    "selected_user_id": "user_001",
-    "current_page": "main_recommendation_page",
-    "current_ml_output": None,
-    "current_kag_state": None,
-    "current_rag_state": None,
-    "current_response_state": None,
-    "chat_history": [],
-    "last_status": None,
-    "last_error": None,
-}
 
 
 def initialize_session_state(renderer):

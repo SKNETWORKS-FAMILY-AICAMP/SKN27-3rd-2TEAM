@@ -91,6 +91,7 @@ DB는 PostgreSQL 기준으로 설계합니다.
 ```text
 app/
   main.py
+  common/
   pages/
   ui/
     components/
@@ -111,6 +112,19 @@ app/
 docs/
 tests/
 ```
+
+## Common constants and state
+
+공통 계약 상수와 기본 state는 `app/common/`에서 관리합니다.
+
+- `app/common/constants.py`: `DEFAULT_USER_ID`, 공통 `status` 허용값
+- `app/common/default_state.py`: `SESSION_DEFAULTS`, `DEFAULT_ML_OUTPUT`, `FALLBACK_RESPONSE_STATE`
+- `app/common/labels.py`: 추천 category 표시 label
+
+레이어 책임이 명확한 상수는 기존 위치를 유지합니다.
+
+- SQL 쿼리 상수는 Repository Layer 책임이므로 `app/repositories/query_constants.py`에 둡니다.
+- UI 색상, spacing, radius 같은 theme 상수는 UI Layer 책임이므로 `app/ui/styles/theme.py`에 둡니다.
 
 ## KAG/RAG 업로드 구조
 
@@ -158,5 +172,6 @@ KAG/RAG 책임 분리는 다음 기준을 따릅니다.
 - [Service Flow 설계.md](docs/Service%20Flow%20설계.md)
 - [DB Schema 상세 설계.md](docs/DB%20Schema%20상세%20설계.md)
 - [JSON Schema  Pydantic Schem.md](docs/JSON%20Schema%20%20Pydantic%20Schem.md)
+- [Common Constants State.md](docs/Common%20Constants%20State.md)
 - [Agent Prompt 상세 설계.md](docs/Agent%20Prompt%20상세%20설계.md)
 - [WBS v2.md](docs/WBS%20v2.md)

@@ -11,6 +11,9 @@ Service는 2개로 분리한다.
 2. ChatbotService
 
 공통 내부 모듈:
+- app.common.constants
+- app.common.default_state
+- app.common.labels
 - MlOutputRepository
 - KagAdapter
 - RagAdapter
@@ -19,6 +22,11 @@ Service는 2개로 분리한다.
 - ResponseValidator
 - ProvenanceValidator
 - InteractionLogRepository
+
+공통 모듈 사용 규칙:
+- Service, Validator, Agent가 공유하는 계약 상수와 기본 state는 app.common을 통해 참조한다.
+- SQL 쿼리는 Repository Layer의 query_constants.py를 유지한다.
+- UI theme 값은 UI Layer의 styles/theme.py를 유지한다.
 
 ---
 

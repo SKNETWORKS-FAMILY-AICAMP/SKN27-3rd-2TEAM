@@ -2,7 +2,7 @@ import pytest
 
 from app.adapters.mock_kag_adapter import MockKagAdapter
 from app.adapters.mock_rag_adapter import MockRagAdapter
-from app.services.default_state import DEFAULT_ML_OUTPUT
+from app.common.default_state import DEFAULT_ML_OUTPUT
 
 
 @pytest.fixture

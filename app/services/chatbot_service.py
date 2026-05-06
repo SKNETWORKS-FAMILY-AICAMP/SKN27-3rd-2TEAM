@@ -1,6 +1,6 @@
 from app.adapters.mock_kag_adapter import MockKagAdapter
 from app.adapters.mock_rag_adapter import MockRagAdapter
-from app.services.default_state import DEFAULT_ML_OUTPUT, FALLBACK_RESPONSE_STATE
+from app.common.default_state import DEFAULT_ML_OUTPUT, FALLBACK_RESPONSE_STATE
 from app.services.llm_flow_service import LlmFlowService
 from app.services.view_model_service import ViewModelService
 from app.validators.contract_validator import ContractValidator

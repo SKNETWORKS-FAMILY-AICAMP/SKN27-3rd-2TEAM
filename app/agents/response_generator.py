@@ -1,6 +1,7 @@
+from app.common.default_state import FALLBACK_RESPONSE_STATE
+from app.common.labels import CATEGORY_LABELS
 from app.llm.openai_llm_client import OpenAiLlmClient
 from app.llm.response_state_schema import RESPONSE_STATE_JSON_SCHEMA
-from app.services.default_state import FALLBACK_RESPONSE_STATE
 
 
 RESPONSE_GENERATOR_SYSTEM_PROMPT = """
@@ -11,14 +12,6 @@ RAG_STATE에 없는 곡, 아티스트, 장르, 추천 이유를 새로 만들지
 반드시 ResponseState JSON 형식으로만 응답한다.
 validation 값은 검증기가 나중에 결정하므로 둘 다 false로 둔다.
 """
-
-CATEGORY_LABELS = {
-    "personalized_match": "취향 기반 추천",
-    "similar_taste": "비슷한 취향 추천",
-    "new_release": "새로 나온 추천",
-    "discovery_candidate": "새로운 취향 시도",
-    "information_related": "정보 기반 추천",
-}
 
 
 class ResponseGenerator:

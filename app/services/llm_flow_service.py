@@ -2,7 +2,7 @@ from app.agents.curation_agent import CurationAgent
 from app.agents.intent_agent import IntentAgent
 from app.agents.recommendation_agent import RecommendationAgent
 from app.agents.response_generator import ResponseGenerator
-from app.services.default_state import FALLBACK_RESPONSE_STATE
+from app.common.default_state import FALLBACK_RESPONSE_STATE
 
 
 class LlmFlowService:

@@ -1,4 +1,4 @@
-ALLOWED_STATUSES = {"success", "partial_match", "empty_result", "timeout", "error"}
+from app.common.constants import ALLOWED_STATUSES
 
 
 class ContractValidator:

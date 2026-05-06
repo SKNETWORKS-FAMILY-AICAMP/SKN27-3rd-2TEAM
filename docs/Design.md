@@ -591,6 +591,11 @@ rimas/
   app/
     main.py
 
+    common/
+      constants.py
+      default_state.py
+      labels.py
+
     pages/
       main_recommendation_page.py
       chatbot_page.py
