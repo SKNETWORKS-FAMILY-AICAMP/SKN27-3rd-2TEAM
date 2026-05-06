@@ -6,6 +6,8 @@
 
 **Architecture:** `app/json_templates/`를 새로 만들고, 각 계약은 독립 JSON 파일로 분리한다. 기존 `app/contracts` 빈 파일은 건드리지 않으며 KAG/RAG 실행 로직은 구현하지 않는다.
 
+**Contract update:** `app/contracts` is now a code package for `fields.py` and `enums.py`. Empty `*_example.json` files are deprecated; JSON examples live in `app/json_templates/*_template.json`.
+
 **Tech Stack:** JSON, Python standard library unittest.
 
 ---

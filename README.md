@@ -108,12 +108,23 @@ app/
   repositories/
   schemas/
   contracts/
+  json_templates/
   config/
 docs/
 tests/
 ```
 
 ## Common constants and state
+
+Current contract ownership:
+
+- `app/common/enums.py`: common `status` enum
+- `app/common/constants.py`: `DEFAULT_USER_ID`, enum-based common `status` values
+- `app/common/default_state.py`: `SESSION_DEFAULTS`, `DEFAULT_ML_OUTPUT`, `FALLBACK_RESPONSE_STATE`
+- `app/common/labels.py`: recommendation category display labels
+- `app/contracts/fields.py`: JSON input/output field enums
+- `app/contracts/enums.py`: contract value enums
+- `app/json_templates/`: JSON template examples
 
 공통 계약 상수와 기본 state는 `app/common/`에서 관리합니다.
 
