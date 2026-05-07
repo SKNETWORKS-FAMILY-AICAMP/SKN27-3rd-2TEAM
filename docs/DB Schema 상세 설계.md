@@ -79,6 +79,34 @@ interaction_logs는 append-only 방식으로 저장한다.
 
 MVP에서는 1~4번을 우선 구현한다.
 
+## Source Layer 분리 원칙
+
+Spotify/KKBOX 원천 데이터 기반 확장 테이블은 기존 Runtime Contract와 분리된 Source Layer로 관리한다.
+
+Source Layer 테이블:
+
+- `spotify_tracks`
+- `spotify_audio_features`
+- `spotify_lyrics`
+- `spotify_emotions`
+- `kkbox_user_features`
+- `user_music_profiles`
+
+Runtime Contract Layer 테이블:
+
+- `users`
+- `ml_outputs`
+- `music_catalog`
+- `interaction_logs`
+- 선택: `llm_call_logs`
+- 선택: `validation_logs`
+
+Service Layer는 Source Layer 테이블을 직접 조회하지 않는다. Source Layer 데이터는 loader, transformer, validator, catalog/profile build process를 거쳐 `music_catalog`와 `ml_outputs`에 반영한 뒤 Runtime Repository를 통해 사용한다.
+
+`interaction_logs.primary_goal`, `intent_type`, `target_page`, `primary_section`은 기존 Service Flow 로그 계약이므로 유지한다.
+
+Source Repository에서 사용하는 SQL도 Repository Layer 책임이므로 `app/repositories/query_constants.py`에 상수로 정의한다.
+
 ---
 
 # 4. users 테이블

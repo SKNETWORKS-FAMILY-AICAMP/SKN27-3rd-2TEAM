@@ -86,6 +86,8 @@ DB는 PostgreSQL 기준으로 설계합니다.
 
 `ML Output`, `KAG_STATE`, `RAG_STATE`, `RESPONSE_STATE`는 JSONB로 원본을 보존합니다. `interaction_logs`는 append-only 방식으로 저장합니다.
 
+Source Layer는 Spotify/KKBOX 원천 데이터와 전처리 산출물을 보존하는 계층입니다. Runtime Service Flow는 Source Layer 테이블을 직접 조회하지 않고, `music_catalog`, `ml_outputs`, `interaction_logs` 같은 Runtime Contract 테이블을 Repository Layer를 통해 사용합니다. SQL 상수는 기존 규칙대로 `app/repositories/query_constants.py`에서 관리합니다.
+
 ## 프로젝트 구조
 
 ```text
