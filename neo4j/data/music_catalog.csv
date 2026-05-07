@@ -1,0 +1,5 @@
+﻿content_id,title,artist,album,genres,moods,tempo,release_type
+track_001,Midnight Loop,Nova Lane,Night Sketch,"rnb, indie","calm, night",medium,existing_catalog
+track_002,Velvet Echo,June Park,Echo Room,"rnb, soul","calm, soft",medium,existing_catalog
+track_003,Fresh Signal,Mira Tone,Updated Signal,"indie, electro_pop","bright, clean",medium,new_release
+track_004,Soft Orbit,Luna Field,Orbit Notes,"dream_pop, ambient","calm, night, soft",slow,existing_catalog
