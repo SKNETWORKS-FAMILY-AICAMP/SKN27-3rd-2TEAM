@@ -24,7 +24,11 @@
 - Create: `db/load/load_kkbox_seed.sql`
   - `seed/users.csv`, `seed/kkbox_user_features.csv` 적재.
 - Create: `db/load/load_spotify_catalog.sql`
-  - `data/load/*_load.csv` 적재.
+  - 필수 Spotify load CSV와 `music_catalog` 적재.
+- Create: `db/load/load_spotify_lyrics.sql`
+  - 선택 CSV `data/load/spotify_lyrics_load.csv`가 있을 때만 적재.
+- Create: `db/load/load_spotify_emotions.sql`
+  - 선택 CSV `data/load/spotify_emotions_load.csv`가 있을 때만 적재.
 - Create: `db/load/verify_source_load.sql`
   - count/FK/중복/content_id 규칙 검증.
 - Create: `db/init/03-load-source-data.sh`
@@ -55,6 +59,8 @@ Source Layer 데이터 적재는 수동 적재를 기본 경로로 사용한다.
 
 - `db/load/load_kkbox_seed.sql`
 - `db/load/load_spotify_catalog.sql`
+- `db/load/load_spotify_lyrics.sql`
+- `db/load/load_spotify_emotions.sql`
 - `db/load/verify_source_load.sql`
 
 Docker 초기화 보조 스크립트:
@@ -87,6 +93,8 @@ Append this section after the README DB section:
 docker compose up -d db
 docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/load_kkbox_seed.sql
 docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/load_spotify_catalog.sql
+if (Test-Path data\load\spotify_lyrics_load.csv) { docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/load_spotify_lyrics.sql }
+if (Test-Path data\load\spotify_emotions_load.csv) { docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/load_spotify_emotions.sql }
 docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/verify_source_load.sql
 ```
 
@@ -103,6 +111,8 @@ docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/verify_sourc
 - `data/load/spotify_lyrics_load.csv`
 - `data/load/spotify_emotions_load.csv`
 
+선택 CSV는 파일이 있을 때만 별도 SQL로 적재합니다. 선택 CSV가 없으면 `spotify_lyrics`, `spotify_emotions` 적재만 건너뛰고 필수 Source Layer와 `music_catalog` 적재는 계속 사용할 수 있습니다.
+
 Docker 초기화 자동 적재는 새 PostgreSQL volume에서만 실행됩니다. 기존 volume에는 `/docker-entrypoint-initdb.d` 스크립트가 다시 실행되지 않습니다. 처음부터 다시 적재해야 하면 데이터가 삭제된다는 점을 확인한 뒤 `docker compose down -v`를 사용합니다.
 
 raw 데이터와 생성된 load CSV는 git에 포함하지 않습니다. `data/load/.gitkeep`, `seed/.gitkeep`만 저장소에 유지합니다.
@@ -114,7 +124,7 @@ raw 데이터와 생성된 load CSV는 git에 포함하지 않습니다. `data/l
 Run:
 
 ```powershell
-rg -n "Source Layer 데이터 적재|load_kkbox_seed.sql|docker compose exec db|docker compose down -v" docs README.md
+rg -n "Source Layer 데이터 적재|load_kkbox_seed.sql|docker compose exec db|docker compose down -v" "docs/DB Schema 상세 설계.md" README.md
 ```
 
 Expected:
@@ -162,6 +172,8 @@ def test_load_sql_files_exist():
     expected_files = (
         LOAD_DIR / "load_kkbox_seed.sql",
         LOAD_DIR / "load_spotify_catalog.sql",
+        LOAD_DIR / "load_spotify_lyrics.sql",
+        LOAD_DIR / "load_spotify_emotions.sql",
         LOAD_DIR / "verify_source_load.sql",
     )
 
@@ -187,16 +199,25 @@ def test_spotify_load_sql_uses_expected_copy_targets():
         "/workspace/data/load/spotify_tracks_load.csv",
         "\\copy spotify_audio_features(",
         "/workspace/data/load/spotify_audio_features_load.csv",
-        "\\copy spotify_lyrics(",
-        "/workspace/data/load/spotify_lyrics_load.csv",
-        "\\copy spotify_emotions(",
-        "/workspace/data/load/spotify_emotions_load.csv",
         "\\copy music_catalog(",
         "/workspace/data/load/music_catalog_load.csv",
     )
 
     for fragment in expected_fragments:
         assert fragment in sql
+
+    assert "spotify_lyrics_load.csv" not in sql
+    assert "spotify_emotions_load.csv" not in sql
+
+
+def test_optional_spotify_load_sql_uses_expected_copy_targets():
+    lyrics_sql = read(LOAD_DIR / "load_spotify_lyrics.sql")
+    emotions_sql = read(LOAD_DIR / "load_spotify_emotions.sql")
+
+    assert "\\copy spotify_lyrics(" in lyrics_sql
+    assert "/workspace/data/load/spotify_lyrics_load.csv" in lyrics_sql
+    assert "\\copy spotify_emotions(" in emotions_sql
+    assert "/workspace/data/load/spotify_emotions_load.csv" in emotions_sql
 
 
 def test_verify_sql_contains_required_checks():
@@ -236,6 +257,10 @@ def test_docker_init_script_guards_missing_files():
         "Skipping Source Layer data load",
         "load_kkbox_seed.sql",
         "load_spotify_catalog.sql",
+        "spotify_lyrics_load.csv",
+        "load_spotify_lyrics.sql",
+        "spotify_emotions_load.csv",
+        "load_spotify_emotions.sql",
         "verify_source_load.sql",
     )
 
@@ -278,6 +303,8 @@ def test_readme_documents_manual_and_docker_init_load():
         "docker compose exec db psql",
         "load_kkbox_seed.sql",
         "load_spotify_catalog.sql",
+        "load_spotify_lyrics.sql",
+        "load_spotify_emotions.sql",
         "verify_source_load.sql",
         "docker compose down -v",
         "data/load/.gitkeep",
@@ -300,6 +327,10 @@ Expected:
 
 ```text
 FAILED tests/test_rdb_data_load_pipeline.py::test_load_sql_files_exist
+FAILED tests/test_rdb_data_load_pipeline.py::test_kkbox_load_sql_uses_expected_copy_targets
+FAILED tests/test_rdb_data_load_pipeline.py::test_spotify_load_sql_uses_expected_copy_targets
+FAILED tests/test_rdb_data_load_pipeline.py::test_optional_spotify_load_sql_uses_expected_copy_targets
+FAILED tests/test_rdb_data_load_pipeline.py::test_verify_sql_contains_required_checks
 ```
 
 - [ ] **Step 3: Commit failing tests**
@@ -316,6 +347,8 @@ git commit -m "test: define source data load pipeline contract"
 **Files:**
 - Create: `db/load/load_kkbox_seed.sql`
 - Create: `db/load/load_spotify_catalog.sql`
+- Create: `db/load/load_spotify_lyrics.sql`
+- Create: `db/load/load_spotify_emotions.sql`
 - Create: `db/load/verify_source_load.sql`
 
 - [ ] **Step 1: Create KKBOX load SQL**
@@ -337,14 +370,26 @@ Create `db/load/load_spotify_catalog.sql`:
 
 \copy spotify_audio_features(track_id, danceability, energy, valence, tempo_bpm, acousticness, instrumentalness, liveness, speechiness, loudness, duration_ms, raw_json) FROM '/workspace/data/load/spotify_audio_features_load.csv' WITH (FORMAT csv, HEADER true);
 
-\copy spotify_lyrics(track_id, lyrics, language, lyrics_available, source_type, raw_json) FROM '/workspace/data/load/spotify_lyrics_load.csv' WITH (FORMAT csv, HEADER true);
-
-\copy spotify_emotions(track_id, primary_emotion, secondary_emotions, emotion_score_json, source_type, raw_json) FROM '/workspace/data/load/spotify_emotions_load.csv' WITH (FORMAT csv, HEADER true);
-
 \copy music_catalog(content_id, track_id, title, artist, album, genres, moods, tempo, release_type, recommendation_category, evidence_summary, source_type, metadata_json) FROM '/workspace/data/load/music_catalog_load.csv' WITH (FORMAT csv, HEADER true);
 ```
 
-- [ ] **Step 3: Create verification SQL**
+- [ ] **Step 3: Create optional Spotify lyrics load SQL**
+
+Create `db/load/load_spotify_lyrics.sql`:
+
+```sql
+\copy spotify_lyrics(track_id, lyrics, language, lyrics_available, source_type, raw_json) FROM '/workspace/data/load/spotify_lyrics_load.csv' WITH (FORMAT csv, HEADER true);
+```
+
+- [ ] **Step 4: Create optional Spotify emotions load SQL**
+
+Create `db/load/load_spotify_emotions.sql`:
+
+```sql
+\copy spotify_emotions(track_id, primary_emotion, secondary_emotions, emotion_score_json, source_type, raw_json) FROM '/workspace/data/load/spotify_emotions_load.csv' WITH (FORMAT csv, HEADER true);
+```
+
+- [ ] **Step 5: Create verification SQL**
 
 Create `db/load/verify_source_load.sql`:
 
@@ -392,24 +437,24 @@ WHERE track_id IS NOT NULL
 AND content_id <> ('mc_' || track_id);
 ```
 
-- [ ] **Step 4: Run load SQL contract tests**
+- [ ] **Step 6: Run load SQL contract tests**
 
 Run:
 
 ```powershell
-.venv\Scripts\python.exe -m pytest tests/test_rdb_data_load_pipeline.py::test_load_sql_files_exist tests/test_rdb_data_load_pipeline.py::test_kkbox_load_sql_uses_expected_copy_targets tests/test_rdb_data_load_pipeline.py::test_spotify_load_sql_uses_expected_copy_targets tests/test_rdb_data_load_pipeline.py::test_verify_sql_contains_required_checks -v
+.venv\Scripts\python.exe -m pytest tests/test_rdb_data_load_pipeline.py::test_load_sql_files_exist tests/test_rdb_data_load_pipeline.py::test_kkbox_load_sql_uses_expected_copy_targets tests/test_rdb_data_load_pipeline.py::test_spotify_load_sql_uses_expected_copy_targets tests/test_rdb_data_load_pipeline.py::test_optional_spotify_load_sql_uses_expected_copy_targets tests/test_rdb_data_load_pipeline.py::test_verify_sql_contains_required_checks -v
 ```
 
 Expected:
 
 ```text
-4 passed
+5 passed
 ```
 
-- [ ] **Step 5: Commit SQL files**
+- [ ] **Step 7: Commit SQL files**
 
 ```powershell
-git add db/load/load_kkbox_seed.sql db/load/load_spotify_catalog.sql db/load/verify_source_load.sql
+git add db/load/load_kkbox_seed.sql db/load/load_spotify_catalog.sql db/load/load_spotify_lyrics.sql db/load/load_spotify_emotions.sql db/load/verify_source_load.sql
 git commit -m "feat: add source data load sql"
 ```
 
@@ -448,6 +493,20 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -f /
 
 echo "Loading Spotify Source Layer data"
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -f /workspace/db/load/load_spotify_catalog.sql
+
+if [ -f "/workspace/data/load/spotify_lyrics_load.csv" ]; then
+  echo "Loading optional Spotify lyrics data"
+  psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -f /workspace/db/load/load_spotify_lyrics.sql
+else
+  echo "Skipping optional Spotify lyrics data: missing /workspace/data/load/spotify_lyrics_load.csv"
+fi
+
+if [ -f "/workspace/data/load/spotify_emotions_load.csv" ]; then
+  echo "Loading optional Spotify emotions data"
+  psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -f /workspace/db/load/load_spotify_emotions.sql
+else
+  echo "Skipping optional Spotify emotions data: missing /workspace/data/load/spotify_emotions_load.csv"
+fi
 
 echo "Verifying Source Layer data load"
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -f /workspace/db/load/verify_source_load.sql
@@ -562,6 +621,8 @@ Source Layer 데이터 적재
 docker compose exec db psql
 load_kkbox_seed.sql
 load_spotify_catalog.sql
+load_spotify_lyrics.sql
+load_spotify_emotions.sql
 verify_source_load.sql
 docker compose down -v
 data/load/.gitkeep
@@ -593,7 +654,7 @@ Run:
 Expected:
 
 ```text
-8 passed
+9 passed
 ```
 
 - [ ] **Step 4: Commit README/test completion**
@@ -616,7 +677,7 @@ git commit -m "docs: document source data load commands"
 Expected:
 
 ```text
-25 passed
+26 passed
 ```
 
 - [ ] **Step 2: Run full test suite**
