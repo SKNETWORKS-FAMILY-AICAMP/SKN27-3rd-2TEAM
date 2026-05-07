@@ -2,51 +2,135 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Spotify/KKBOX 원천 테이블을 Source Layer로 추가하되 기존 Runtime Contract Layer와 Service Flow를 깨지 않는다.
+**Goal:** Spotify/KKBOX 원천 테이블을 Source Layer로 추가하되 기존 docs의 Runtime Contract, Service Flow, SQL 상수 규칙을 깨지 않는다.
 
-**Architecture:** Source Layer 테이블은 원천 데이터와 provenance 보존을 담당하고, Service Layer는 기존 Runtime Repository만 의존한다. Runtime Contract는 `users`, `ml_outputs`, `music_catalog`, `interaction_logs`를 유지하며, `music_catalog`는 Source Layer에서 빌드된 추천 후보 계약으로 사용한다.
+**Architecture:** 문서 계약을 먼저 정렬한 뒤 스키마와 Repository를 구현한다. Source Layer 테이블은 원천 데이터와 provenance 보존을 담당하고, Service Layer는 기존 Runtime Repository만 의존한다. 모든 SQL 상수는 기존 문서 기준을 유지해 `app/repositories/query_constants.py`에 둔다.
 
-**Tech Stack:** Python, unittest/pytest, PostgreSQL SQL, psycopg2-compatible DB-API repository pattern.
+**Tech Stack:** Python, pytest/unittest, PostgreSQL SQL, psycopg2-compatible DB-API repository pattern.
 
 ---
 
 ## File Structure
 
+- Modify: `docs/DB Schema 상세 설계.md`
+  - Source Layer와 Runtime Contract Layer의 경계를 먼저 문서화한다.
+  - Source SQL도 기존 SQL 상수 문서 규칙에 맞춰 `query_constants.py`에 둔다고 명시한다.
+- Modify: `README.md`
+  - DB 기준에 Source Layer 설명을 추가한다.
+  - Service Layer가 Source Layer를 직접 조회하지 않는다고 명시한다.
+- Modify: `docs/Common Constants State.md`
+  - SQL 상수 위치를 `app/repositories/query_constants.py` 단일 파일로 유지한다고 명시한다.
 - Modify: `db/schema.sql`
   - Source Layer 테이블을 추가한다.
   - `users.source_user_id`, `users.source_type`을 추가한다.
-  - `music_catalog.track_id`와 `content_id VARCHAR(140)`을 반영한다.
+  - `music_catalog.track_id`, `content_id VARCHAR(140)`을 추가하되 기존 Runtime 계약을 보수적으로 유지한다.
+  - `music_catalog.artist`는 `NOT NULL`을 유지한다.
+  - `music_catalog.source_type` 기본값은 기존 문서와 호환되도록 `mock_music_catalog`를 유지한다.
+  - `ml_outputs` nullable 완화는 하지 않는다.
   - `interaction_logs.primary_goal`, `intent_type`, `target_page`, `primary_section`은 유지한다.
-  - `ml_outputs` nullable 완화는 이번 작업에서 하지 않는다.
-- Create: `app/repositories/source_query_constants.py`
-  - Source Repository 전용 SQL 상수를 둔다.
+- Modify: `app/repositories/query_constants.py`
+  - Runtime SQL과 Source SQL을 같은 Repository SQL 상수 파일에 둔다.
 - Create: `app/repositories/spotify_track_repository.py`
-  - Spotify track source 조회 책임만 가진다.
 - Create: `app/repositories/spotify_audio_feature_repository.py`
-  - Spotify audio feature source 조회 책임만 가진다.
 - Create: `app/repositories/spotify_lyrics_repository.py`
-  - Spotify lyrics source 조회 책임만 가진다.
 - Create: `app/repositories/spotify_emotion_repository.py`
-  - Spotify emotion source 조회 책임만 가진다.
 - Create: `app/repositories/kkbox_user_feature_repository.py`
-  - KKBOX user feature source 조회 책임만 가진다.
 - Create: `app/repositories/user_music_profile_repository.py`
-  - user music profile source 조회 책임만 가진다.
 - Create: `tests/test_rdb_source_layer_schema.py`
-  - Source Layer와 Runtime Contract의 스키마 경계를 검증한다.
 - Create: `tests/test_source_repositories.py`
-  - Source Repository가 query constant를 통해서만 조회하는지 검증한다.
 - Create: `tests/test_service_source_boundary.py`
-  - Service Layer가 Source Repository를 직접 import하지 않는지 검증한다.
 
 ---
 
-### Task 1: Schema Boundary Tests
+### Task 1: Documentation Contract Alignment
+
+**Files:**
+- Modify: `docs/DB Schema 상세 설계.md`
+- Modify: `README.md`
+- Modify: `docs/Common Constants State.md`
+
+- [ ] **Step 1: Update DB schema documentation first**
+
+Append this section near the table overview in `docs/DB Schema 상세 설계.md`:
+
+```markdown
+## Source Layer 분리 원칙
+
+Spotify/KKBOX 원천 데이터 기반 확장 테이블은 기존 Runtime Contract와 분리된 Source Layer로 관리한다.
+
+Source Layer 테이블:
+
+- `spotify_tracks`
+- `spotify_audio_features`
+- `spotify_lyrics`
+- `spotify_emotions`
+- `kkbox_user_features`
+- `user_music_profiles`
+
+Runtime Contract Layer 테이블:
+
+- `users`
+- `ml_outputs`
+- `music_catalog`
+- `interaction_logs`
+- 선택: `llm_call_logs`
+- 선택: `validation_logs`
+
+Service Layer는 Source Layer 테이블을 직접 조회하지 않는다. Source Layer 데이터는 loader, transformer, validator, catalog/profile build process를 거쳐 `music_catalog`와 `ml_outputs`에 반영한 뒤 Runtime Repository를 통해 사용한다.
+
+`interaction_logs.primary_goal`, `intent_type`, `target_page`, `primary_section`은 기존 Service Flow 로그 계약이므로 유지한다.
+
+Source Repository에서 사용하는 SQL도 Repository Layer 책임이므로 `app/repositories/query_constants.py`에 상수로 정의한다.
+```
+
+- [ ] **Step 2: Update README DB section**
+
+Append this paragraph under the README DB section:
+
+```markdown
+Source Layer는 Spotify/KKBOX 원천 데이터와 전처리 산출물을 보존하는 계층입니다. Runtime Service Flow는 Source Layer 테이블을 직접 조회하지 않고, `music_catalog`, `ml_outputs`, `interaction_logs` 같은 Runtime Contract 테이블을 Repository Layer를 통해 사용합니다. SQL 상수는 기존 규칙대로 `app/repositories/query_constants.py`에서 관리합니다.
+```
+
+- [ ] **Step 3: Update common constants note**
+
+Append this bullet under the SQL constants note in `docs/Common Constants State.md`:
+
+```markdown
+- Source Layer Repository SQL도 같은 Repository Layer 책임이므로 별도 SQL 상수 파일을 만들지 않고 `app/repositories/query_constants.py`에 둔다.
+```
+
+- [ ] **Step 4: Verify documentation mentions the approved boundary**
+
+Run:
+
+```powershell
+rg -n "Source Layer|Runtime Contract|spotify_tracks|query_constants.py" docs README.md
+```
+
+Expected:
+
+```text
+docs/DB Schema 상세 설계.md
+docs/Common Constants State.md
+docs/superpowers/specs/2026-05-07-rdb-source-layer-design.md
+README.md
+```
+
+- [ ] **Step 5: Commit documentation alignment**
+
+```powershell
+git add "docs/DB Schema 상세 설계.md" "docs/Common Constants State.md" README.md
+git commit -m "docs: align source layer contract"
+```
+
+---
+
+### Task 2: Schema Boundary Tests
 
 **Files:**
 - Create: `tests/test_rdb_source_layer_schema.py`
 
-- [ ] **Step 1: Write the failing schema boundary tests**
+- [ ] **Step 1: Write failing schema boundary tests**
 
 Create `tests/test_rdb_source_layer_schema.py`:
 
@@ -78,9 +162,11 @@ def test_users_keep_runtime_identity_and_add_source_identity():
     assert "chk_users_source_type" in SCHEMA_SQL
 
 
-def test_music_catalog_links_to_spotify_source_without_losing_runtime_contract():
+def test_music_catalog_links_to_spotify_source_without_relaxing_runtime_contract():
     assert "content_id VARCHAR(140) PRIMARY KEY" in SCHEMA_SQL
     assert "track_id VARCHAR(128) REFERENCES spotify_tracks(track_id) ON DELETE SET NULL" in SCHEMA_SQL
+    assert "artist VARCHAR(255) NOT NULL" in SCHEMA_SQL
+    assert "source_type VARCHAR(100) NOT NULL DEFAULT 'mock_music_catalog'" in SCHEMA_SQL
     assert "recommendation_category VARCHAR(64)" in SCHEMA_SQL
     assert "chk_music_catalog_recommendation_category" in SCHEMA_SQL
 
@@ -121,19 +207,19 @@ Expected:
 ```text
 FAILED tests/test_rdb_source_layer_schema.py::test_source_layer_tables_are_declared
 FAILED tests/test_rdb_source_layer_schema.py::test_users_keep_runtime_identity_and_add_source_identity
-FAILED tests/test_rdb_source_layer_schema.py::test_music_catalog_links_to_spotify_source_without_losing_runtime_contract
+FAILED tests/test_rdb_source_layer_schema.py::test_music_catalog_links_to_spotify_source_without_relaxing_runtime_contract
 ```
 
-- [ ] **Step 3: Commit the failing tests**
+- [ ] **Step 3: Commit failing schema tests**
 
 ```powershell
 git add tests/test_rdb_source_layer_schema.py
-git commit -m "test: define rdb source layer schema contract"
+git commit -m "test: define source layer schema contract"
 ```
 
 ---
 
-### Task 2: PostgreSQL Schema Update
+### Task 3: PostgreSQL Schema Update
 
 **Files:**
 - Modify: `db/schema.sql`
@@ -286,24 +372,24 @@ CREATE TABLE IF NOT EXISTS user_music_profiles (
 );
 ```
 
-- [ ] **Step 3: Update `music_catalog` table**
+- [ ] **Step 3: Update `music_catalog` without relaxing existing runtime fields**
 
-Replace the `music_catalog` table block with:
+Replace the existing `music_catalog` table block with:
 
 ```sql
 CREATE TABLE IF NOT EXISTS music_catalog (
     content_id VARCHAR(140) PRIMARY KEY,
     track_id VARCHAR(128) REFERENCES spotify_tracks(track_id) ON DELETE SET NULL,
-    title TEXT NOT NULL,
-    artist TEXT,
-    album TEXT,
+    title VARCHAR(255) NOT NULL,
+    artist VARCHAR(255) NOT NULL,
+    album VARCHAR(255),
     genres TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
     moods TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
     tempo VARCHAR(32) NOT NULL DEFAULT 'unknown',
     release_type VARCHAR(32) NOT NULL DEFAULT 'unknown',
     recommendation_category VARCHAR(64),
     evidence_summary TEXT,
-    source_type VARCHAR(100) NOT NULL DEFAULT 'spotify_900k_catalog',
+    source_type VARCHAR(100) NOT NULL DEFAULT 'mock_music_catalog',
     metadata_json JSONB NOT NULL DEFAULT '{}'::JSONB,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -378,42 +464,26 @@ ON user_music_profiles USING GIN (profile_json);
 
 - [ ] **Step 5: Add `music_catalog.track_id` index**
 
-Insert this index before `idx_music_catalog_release_type`:
-
 ```sql
 CREATE INDEX IF NOT EXISTS idx_music_catalog_track_id
 ON music_catalog(track_id);
 ```
 
-- [ ] **Step 6: Run schema boundary tests**
+- [ ] **Step 6: Run schema and repository tests**
 
 Run:
 
 ```powershell
-C:\Python314\python.exe -m pytest tests/test_rdb_source_layer_schema.py -v
+C:\Python314\python.exe -m pytest tests/test_rdb_source_layer_schema.py tests/test_rdb_repositories.py -v
 ```
 
 Expected:
 
 ```text
-5 passed
+9 passed
 ```
 
-- [ ] **Step 7: Run existing repository tests**
-
-Run:
-
-```powershell
-C:\Python314\python.exe -m pytest tests/test_rdb_repositories.py -v
-```
-
-Expected:
-
-```text
-4 passed
-```
-
-- [ ] **Step 8: Commit schema update**
+- [ ] **Step 7: Commit schema update**
 
 ```powershell
 git add db/schema.sql tests/test_rdb_source_layer_schema.py
@@ -422,10 +492,10 @@ git commit -m "feat: add rdb source layer schema"
 
 ---
 
-### Task 3: Source Repository Query Constants
+### Task 4: Source Repository Query Constants
 
 **Files:**
-- Create: `app/repositories/source_query_constants.py`
+- Modify: `app/repositories/query_constants.py`
 - Create: `tests/test_source_repositories.py`
 
 - [ ] **Step 1: Write failing tests for Source Repository query usage**
@@ -435,7 +505,7 @@ Create `tests/test_source_repositories.py`:
 ```python
 import unittest
 
-from app.repositories import source_query_constants
+from app.repositories import query_constants
 from app.repositories.kkbox_user_feature_repository import KkboxUserFeatureRepository
 from app.repositories.spotify_audio_feature_repository import SpotifyAudioFeatureRepository
 from app.repositories.spotify_emotion_repository import SpotifyEmotionRepository
@@ -487,7 +557,7 @@ class SourceRepositoryTest(unittest.TestCase):
             connection.cursor_instance.executed,
             [
                 (
-                    source_query_constants.SELECT_SPOTIFY_TRACK_BY_TRACK_ID,
+                    query_constants.SELECT_SPOTIFY_TRACK_BY_TRACK_ID,
                     {"track_id": "spotify_track_001"},
                 )
             ],
@@ -505,7 +575,7 @@ class SourceRepositoryTest(unittest.TestCase):
             connection.cursor_instance.executed,
             [
                 (
-                    source_query_constants.SELECT_SPOTIFY_AUDIO_FEATURE_BY_TRACK_ID,
+                    query_constants.SELECT_SPOTIFY_AUDIO_FEATURE_BY_TRACK_ID,
                     {"track_id": "spotify_track_001"},
                 )
             ],
@@ -523,7 +593,7 @@ class SourceRepositoryTest(unittest.TestCase):
             connection.cursor_instance.executed,
             [
                 (
-                    source_query_constants.SELECT_SPOTIFY_LYRICS_BY_TRACK_ID,
+                    query_constants.SELECT_SPOTIFY_LYRICS_BY_TRACK_ID,
                     {"track_id": "spotify_track_001"},
                 )
             ],
@@ -541,13 +611,13 @@ class SourceRepositoryTest(unittest.TestCase):
             connection.cursor_instance.executed,
             [
                 (
-                    source_query_constants.SELECT_SPOTIFY_EMOTION_BY_TRACK_ID,
+                    query_constants.SELECT_SPOTIFY_EMOTION_BY_TRACK_ID,
                     {"track_id": "spotify_track_001"},
                 )
             ],
         )
 
-    def test_kkbox_user_feature_repository_finds_latest_by_user_id(self):
+    def test_kkbox_user_feature_repository_finds_by_user_id(self):
         expected = [{"user_id": "user_001"}]
         connection = FakeConnection(fetchall_result=expected)
         repository = KkboxUserFeatureRepository(connection)
@@ -559,7 +629,7 @@ class SourceRepositoryTest(unittest.TestCase):
             connection.cursor_instance.executed,
             [
                 (
-                    source_query_constants.SELECT_KKBOX_USER_FEATURES_BY_USER_ID,
+                    query_constants.SELECT_KKBOX_USER_FEATURES_BY_USER_ID,
                     {"user_id": "user_001"},
                 )
             ],
@@ -577,7 +647,7 @@ class SourceRepositoryTest(unittest.TestCase):
             connection.cursor_instance.executed,
             [
                 (
-                    source_query_constants.SELECT_LATEST_USER_MUSIC_PROFILE_BY_USER_ID,
+                    query_constants.SELECT_LATEST_USER_MUSIC_PROFILE_BY_USER_ID,
                     {"user_id": "user_001"},
                 )
             ],
@@ -620,9 +690,9 @@ Expected:
 ModuleNotFoundError: No module named 'app.repositories.spotify_track_repository'
 ```
 
-- [ ] **Step 3: Create Source query constants**
+- [ ] **Step 3: Add Source query constants to existing `query_constants.py`**
 
-Create `app/repositories/source_query_constants.py`:
+Append this block to `app/repositories/query_constants.py`:
 
 ```python
 SELECT_SPOTIFY_TRACK_BY_TRACK_ID = """
@@ -665,16 +735,16 @@ LIMIT 1;
 """
 ```
 
-- [ ] **Step 4: Commit failing repository tests and constants**
+- [ ] **Step 4: Commit failing repository tests and query constants**
 
 ```powershell
-git add app/repositories/source_query_constants.py tests/test_source_repositories.py
+git add app/repositories/query_constants.py tests/test_source_repositories.py
 git commit -m "test: define source repository query contracts"
 ```
 
 ---
 
-### Task 4: Source Repository Implementations
+### Task 5: Source Repository Implementations
 
 **Files:**
 - Create: `app/repositories/spotify_track_repository.py`
@@ -689,7 +759,7 @@ git commit -m "test: define source repository query contracts"
 Create `app/repositories/spotify_track_repository.py`:
 
 ```python
-from app.repositories import source_query_constants
+from app.repositories import query_constants
 from app.repositories.base_repository import BaseRepository
 
 
@@ -700,7 +770,7 @@ class SpotifyTrackRepository(BaseRepository):
 
         with self._cursor() as cursor:
             cursor.execute(
-                source_query_constants.SELECT_SPOTIFY_TRACK_BY_TRACK_ID,
+                query_constants.SELECT_SPOTIFY_TRACK_BY_TRACK_ID,
                 {"track_id": track_id},
             )
             return cursor.fetchone()
@@ -711,7 +781,7 @@ class SpotifyTrackRepository(BaseRepository):
 Create `app/repositories/spotify_audio_feature_repository.py`:
 
 ```python
-from app.repositories import source_query_constants
+from app.repositories import query_constants
 from app.repositories.base_repository import BaseRepository
 
 
@@ -722,7 +792,7 @@ class SpotifyAudioFeatureRepository(BaseRepository):
 
         with self._cursor() as cursor:
             cursor.execute(
-                source_query_constants.SELECT_SPOTIFY_AUDIO_FEATURE_BY_TRACK_ID,
+                query_constants.SELECT_SPOTIFY_AUDIO_FEATURE_BY_TRACK_ID,
                 {"track_id": track_id},
             )
             return cursor.fetchone()
@@ -733,7 +803,7 @@ class SpotifyAudioFeatureRepository(BaseRepository):
 Create `app/repositories/spotify_lyrics_repository.py`:
 
 ```python
-from app.repositories import source_query_constants
+from app.repositories import query_constants
 from app.repositories.base_repository import BaseRepository
 
 
@@ -744,7 +814,7 @@ class SpotifyLyricsRepository(BaseRepository):
 
         with self._cursor() as cursor:
             cursor.execute(
-                source_query_constants.SELECT_SPOTIFY_LYRICS_BY_TRACK_ID,
+                query_constants.SELECT_SPOTIFY_LYRICS_BY_TRACK_ID,
                 {"track_id": track_id},
             )
             return cursor.fetchone()
@@ -755,7 +825,7 @@ class SpotifyLyricsRepository(BaseRepository):
 Create `app/repositories/spotify_emotion_repository.py`:
 
 ```python
-from app.repositories import source_query_constants
+from app.repositories import query_constants
 from app.repositories.base_repository import BaseRepository
 
 
@@ -766,7 +836,7 @@ class SpotifyEmotionRepository(BaseRepository):
 
         with self._cursor() as cursor:
             cursor.execute(
-                source_query_constants.SELECT_SPOTIFY_EMOTION_BY_TRACK_ID,
+                query_constants.SELECT_SPOTIFY_EMOTION_BY_TRACK_ID,
                 {"track_id": track_id},
             )
             return cursor.fetchone()
@@ -777,7 +847,7 @@ class SpotifyEmotionRepository(BaseRepository):
 Create `app/repositories/kkbox_user_feature_repository.py`:
 
 ```python
-from app.repositories import source_query_constants
+from app.repositories import query_constants
 from app.repositories.base_repository import BaseRepository
 
 
@@ -788,7 +858,7 @@ class KkboxUserFeatureRepository(BaseRepository):
 
         with self._cursor() as cursor:
             cursor.execute(
-                source_query_constants.SELECT_KKBOX_USER_FEATURES_BY_USER_ID,
+                query_constants.SELECT_KKBOX_USER_FEATURES_BY_USER_ID,
                 {"user_id": user_id},
             )
             return cursor.fetchall()
@@ -799,7 +869,7 @@ class KkboxUserFeatureRepository(BaseRepository):
 Create `app/repositories/user_music_profile_repository.py`:
 
 ```python
-from app.repositories import source_query_constants
+from app.repositories import query_constants
 from app.repositories.base_repository import BaseRepository
 
 
@@ -810,7 +880,7 @@ class UserMusicProfileRepository(BaseRepository):
 
         with self._cursor() as cursor:
             cursor.execute(
-                source_query_constants.SELECT_LATEST_USER_MUSIC_PROFILE_BY_USER_ID,
+                query_constants.SELECT_LATEST_USER_MUSIC_PROFILE_BY_USER_ID,
                 {"user_id": user_id},
             )
             return cursor.fetchone()
@@ -833,13 +903,13 @@ Expected:
 - [ ] **Step 8: Commit Source Repository implementations**
 
 ```powershell
-git add app/repositories/source_query_constants.py app/repositories/spotify_track_repository.py app/repositories/spotify_audio_feature_repository.py app/repositories/spotify_lyrics_repository.py app/repositories/spotify_emotion_repository.py app/repositories/kkbox_user_feature_repository.py app/repositories/user_music_profile_repository.py tests/test_source_repositories.py
+git add app/repositories/query_constants.py app/repositories/spotify_track_repository.py app/repositories/spotify_audio_feature_repository.py app/repositories/spotify_lyrics_repository.py app/repositories/spotify_emotion_repository.py app/repositories/kkbox_user_feature_repository.py app/repositories/user_music_profile_repository.py tests/test_source_repositories.py
 git commit -m "feat: add source layer repositories"
 ```
 
 ---
 
-### Task 5: Service Boundary Guard
+### Task 6: Service Boundary Guard
 
 **Files:**
 - Create: `tests/test_service_source_boundary.py`
@@ -860,7 +930,6 @@ SOURCE_REPOSITORY_MODULES = (
     "spotify_emotion_repository",
     "kkbox_user_feature_repository",
     "user_music_profile_repository",
-    "source_query_constants",
 )
 
 
@@ -915,77 +984,6 @@ git commit -m "test: guard service source layer boundary"
 
 ---
 
-### Task 6: Documentation Alignment
-
-**Files:**
-- Modify: `docs/DB Schema 상세 설계.md`
-- Modify: `README.md`
-
-- [ ] **Step 1: Update DB schema documentation**
-
-Append this section near the DB table overview in `docs/DB Schema 상세 설계.md`:
-
-```markdown
-## Source Layer 분리 원칙
-
-Spotify/KKBOX 원천 데이터 기반 확장 테이블은 Runtime Contract와 분리된 Source Layer로 관리한다.
-
-Source Layer 테이블:
-
-- `spotify_tracks`
-- `spotify_audio_features`
-- `spotify_lyrics`
-- `spotify_emotions`
-- `kkbox_user_features`
-- `user_music_profiles`
-
-Runtime Contract Layer 테이블:
-
-- `users`
-- `ml_outputs`
-- `music_catalog`
-- `interaction_logs`
-- 선택: `llm_call_logs`
-- 선택: `validation_logs`
-
-Service Layer는 Source Layer 테이블을 직접 조회하지 않는다. Source Layer 데이터는 loader, transformer, validator, catalog/profile build process를 거쳐 `music_catalog`와 `ml_outputs`에 반영한 뒤 Runtime Repository를 통해 사용한다.
-
-`interaction_logs.primary_goal`, `intent_type`, `target_page`, `primary_section`은 기존 Service Flow 로그 계약이므로 유지한다.
-```
-
-- [ ] **Step 2: Update README DB 기준**
-
-Append this paragraph under the README DB section:
-
-```markdown
-Source Layer는 Spotify/KKBOX 원천 데이터와 전처리 산출물을 보존하는 계층입니다. Runtime Service Flow는 Source Layer 테이블을 직접 조회하지 않고, `music_catalog`, `ml_outputs`, `interaction_logs` 같은 Runtime Contract 테이블을 Repository Layer를 통해 사용합니다.
-```
-
-- [ ] **Step 3: Run documentation grep**
-
-Run:
-
-```powershell
-rg -n "Source Layer|Runtime Contract|spotify_tracks|user_music_profiles" docs README.md
-```
-
-Expected:
-
-```text
-docs/DB Schema 상세 설계.md
-docs/superpowers/specs/2026-05-07-rdb-source-layer-design.md
-README.md
-```
-
-- [ ] **Step 4: Commit documentation alignment**
-
-```powershell
-git add "docs/DB Schema 상세 설계.md" README.md
-git commit -m "docs: align db docs with source layer boundary"
-```
-
----
-
 ## Final Verification
 
 - [ ] **Step 1: Run RDB test suite**
@@ -1027,6 +1025,7 @@ no modified or untracked files
 ## Self-Review
 
 - Spec coverage: Source Layer, Runtime Contract Layer, Repository boundary, transformation direction, schema compatibility, and service boundary are covered by tasks.
-- Placeholder scan: 모든 구현 단계가 구체적인 파일, 코드, 명령, 기대 결과를 포함한다.
-- Type consistency: Repository method names are consistent across tests and implementation tasks.
+- Docs compliance: Documentation alignment is Task 1, before schema or code changes.
+- SQL constant compliance: Source SQL constants are added to existing `app/repositories/query_constants.py`.
+- Runtime contract compliance: `music_catalog.artist NOT NULL`, `music_catalog.source_type DEFAULT 'mock_music_catalog'`, `ml_outputs NOT NULL` fields, and existing `interaction_logs` service columns are preserved.
 - Scope decision: This plan does not implement loader/transformer CSV generation. That remains a separate plan because it touches external dataset processing and file generation.
