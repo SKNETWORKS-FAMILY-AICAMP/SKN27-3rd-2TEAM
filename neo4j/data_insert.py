@@ -14,19 +14,18 @@ from common.connection import Neo4j_Connection
 ###################################################################################################
 def main():
     """ 해당 부분에 사전에 정의한 쿼리 함수들을 설정해서 실행함 """
-    # 모든 데이터 삭제 (초기화) 
-    conn = Neo4j_Connection()
-    conn.clear_database()
+    # # 모든 데이터 삭제 (초기화) 
+    # conn = Neo4j_Connection()
+    # conn.clear_database()
 
-    # 유저 데이터 추가 
-    import_data(path="users.csv", row_query=Query.users)
-    import_data(path="genres.csv", row_query=Query.genres)
-    import_data(path="artists.csv", row_query=Query.artists)
-    import_data(path="moods.csv", row_query=Query.moods)
-
-
-
-
+    # # 유저 데이터 추가 
+    # import_data(path="users.csv", query_params=Query.users)
+    # import_data(path="genres.csv", query_params=Query.genres)
+    # import_data(path="artists.csv", query_params=Query.artists)
+    # import_data(path="moods.csv", query_params=Query.moods)
+    # import_data(path="ml_outputs.csv", query_params=Query.ml_outputs)
+    # import_data(path="music_catalog.csv", query_params=Query.music_catalog)
+    # import_data(path="recommands.csv", query_params=Query.recommands)
 
 
 
