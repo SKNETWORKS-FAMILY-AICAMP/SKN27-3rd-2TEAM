@@ -1,0 +1,36 @@
+services:
+  app:
+    build:
+      context: .
+    environment:
+      RIMAS_DB_HOST: db
+      RIMAS_DB_PORT: "5432"
+      RIMAS_DB_NAME: ${RIMAS_DB_NAME:-rimas}
+      RIMAS_DB_USER: ${RIMAS_DB_USER:-rimas}
+      RIMAS_DB_PASSWORD: ${RIMAS_DB_PASSWORD:-rimas_password}
+    ports:
+      - "${RIMAS_APP_PORT:-8501}:8501"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${RIMAS_DB_NAME:-rimas}
+      POSTGRES_USER: ${RIMAS_DB_USER:-rimas}
+      POSTGRES_PASSWORD: ${RIMAS_DB_PASSWORD:-rimas_password}
+    ports:
+      - "${RIMAS_DB_HOST_PORT:-5432}:5432"
+    volumes:
+      - rimas_postgres_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  rimas_postgres_data:

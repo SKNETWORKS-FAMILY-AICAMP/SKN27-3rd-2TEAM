@@ -35,6 +35,7 @@
 ### 1. 폴더 구조 생성
 
 /app
+/common
 /services
 /adapters
 /agents
@@ -103,6 +104,11 @@ schemas/
 - SELECT_LATEST_ML_OUTPUT_BY_USER_ID
 - INSERT_INTERACTION_LOG
 - SELECT_MUSIC_BY_CATEGORY
+
+유지 원칙:
+- SQL 쿼리는 Repository Layer 책임이므로 query_constants.py에 유지한다.
+- 공통 status/default state/category label은 app/common에서 관리한다.
+- UI theme 상수는 app/ui/styles/theme.py에 유지한다.
 
 ---
 

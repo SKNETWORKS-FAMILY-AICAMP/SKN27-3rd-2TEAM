@@ -38,6 +38,7 @@ Thumbs.db
 *.pid
 *.tmp
 tmp/
+tmp*/
 temp/
 
 # Build artifacts

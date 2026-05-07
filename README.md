@@ -91,6 +91,7 @@ DB는 PostgreSQL 기준으로 설계합니다.
 ```text
 app/
   main.py
+  common/
   pages/
   ui/
     components/
@@ -99,14 +100,65 @@ app/
   agents/
     prompts/
   adapters/
+  kag/
+    README.md
+  rag/
+    README.md
   validators/
   repositories/
   schemas/
   contracts/
+  json_templates/
   config/
 docs/
 tests/
 ```
+
+## Common constants and state
+
+Current contract ownership:
+
+- `app/common/enums.py`: common `status` enum
+- `app/common/constants.py`: `DEFAULT_USER_ID`, enum-based common `status` values
+- `app/common/default_state.py`: `SESSION_DEFAULTS`, `DEFAULT_ML_OUTPUT`, `FALLBACK_RESPONSE_STATE`
+- `app/common/labels.py`: recommendation category display labels
+- `app/contracts/fields.py`: JSON input/output field enums
+- `app/contracts/enums.py`: contract value enums
+- `app/json_templates/`: JSON template examples
+
+공통 계약 상수와 기본 state는 `app/common/`에서 관리합니다.
+
+- `app/common/constants.py`: `DEFAULT_USER_ID`, 공통 `status` 허용값
+- `app/common/default_state.py`: `SESSION_DEFAULTS`, `DEFAULT_ML_OUTPUT`, `FALLBACK_RESPONSE_STATE`
+- `app/common/labels.py`: 추천 category 표시 label
+
+레이어 책임이 명확한 상수는 기존 위치를 유지합니다.
+
+- SQL 쿼리 상수는 Repository Layer 책임이므로 `app/repositories/query_constants.py`에 둡니다.
+- UI 색상, spacing, radius 같은 theme 상수는 UI Layer 책임이므로 `app/ui/styles/theme.py`에 둡니다.
+
+## KAG/RAG 업로드 구조
+
+KAG와 RAG의 실제 구현 업로드와 검토를 쉽게 하기 위해 다음 폴더를 분리했습니다.
+
+- `app/kag/`: KAG 관련 구현 파일을 배치할 패키지
+- `app/rag/`: RAG 관련 구현 파일을 배치할 패키지
+
+각 폴더는 Python 패키지로 import 가능하도록 `__init__.py`를 포함합니다.
+기존 Service Layer는 `app.adapters`의 `KagAdapter`, `RagAdapter`, Mock/Real Adapter 경계를 통해 KAG/RAG를 호출하는 구조를 유지합니다.
+향후 `RealKagAdapter`, `RealRagAdapter`에서 `app.kag`, `app.rag` 내부 구현을 연결하더라도 Service Layer import 경로를 직접 변경하지 않는 방향이 기본 원칙입니다.
+
+각 폴더의 README는 기존 설계 문서 기준 기능정의서입니다.
+
+- `app/kag/README.md`: KAG 역할, 입력/출력, 계층 관계, 제한 사항, 검증 기준
+- `app/rag/README.md`: RAG 역할, 입력/출력, evidence/provenance 기준, 제한 사항, 검증 기준
+
+KAG/RAG 책임 분리는 다음 기준을 따릅니다.
+
+- KAG는 사용자 상태, 사용자 입력, ML Output을 기반으로 추천 방향과 큐레이션 경로를 결정합니다.
+- RAG는 KAG_STATE가 결정한 방향에 맞춰 추천 후보, 추천 근거, 음악 정보 설명 근거를 제공합니다.
+- LLM은 추천 후보를 새로 만들지 않고 KAG/RAG/ML 근거 안에서 자연어 응답만 생성합니다.
+- UI는 Service Layer가 만든 View Model을 표시하며 KAG/RAG 원본을 수정하지 않습니다.
 
 ## 구현 순서 원칙
 
@@ -131,5 +183,6 @@ tests/
 - [Service Flow 설계.md](docs/Service%20Flow%20설계.md)
 - [DB Schema 상세 설계.md](docs/DB%20Schema%20상세%20설계.md)
 - [JSON Schema  Pydantic Schem.md](docs/JSON%20Schema%20%20Pydantic%20Schem.md)
+- [Common Constants State.md](docs/Common%20Constants%20State.md)
 - [Agent Prompt 상세 설계.md](docs/Agent%20Prompt%20상세%20설계.md)
 - [WBS v2.md](docs/WBS%20v2.md)

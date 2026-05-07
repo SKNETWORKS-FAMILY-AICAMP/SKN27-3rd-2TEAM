@@ -591,6 +591,11 @@ rimas/
   app/
     main.py
 
+    common/
+      constants.py
+      default_state.py
+      labels.py
+
     pages/
       main_recommendation_page.py
       chatbot_page.py
@@ -658,14 +663,18 @@ rimas/
       interaction_log_schema.py
 
     contracts/
-      ml_output_example.json
-      kag_state_example.json
-      rag_state_example.json
-      intent_result_example.json
-      curation_plan_example.json
-      selected_recommendations_example.json
-      response_state_example.json
-      interaction_log_example.json
+      fields.py
+      enums.py
+
+    json_templates/
+      ml_output_template.json
+      kag_state_template.json
+      rag_state_template.json
+      intent_result_template.json
+      curation_plan_template.json
+      selected_recommendations_template.json
+      response_state_template.json
+      interaction_log_template.json
 
     config/
       settings.py

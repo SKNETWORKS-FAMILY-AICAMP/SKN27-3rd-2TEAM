@@ -6,6 +6,9 @@ DB_PORT = int(os.getenv("RIMAS_DB_PORT", "5432"))
 DB_NAME = os.getenv("RIMAS_DB_NAME", "rimas")
 DB_USER = os.getenv("RIMAS_DB_USER", "rimas")
 DB_PASSWORD = os.getenv("RIMAS_DB_PASSWORD", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+RIMAS_LLM_MODEL = os.getenv("RIMAS_LLM_MODEL", "gpt-4.1-mini")
+RIMAS_LLM_TIMEOUT_SECONDS = float(os.getenv("RIMAS_LLM_TIMEOUT_SECONDS", "30"))
 
 
 def get_database_config():
