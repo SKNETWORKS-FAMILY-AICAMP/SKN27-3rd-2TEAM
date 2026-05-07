@@ -107,6 +107,34 @@ Service Layer는 Source Layer 테이블을 직접 조회하지 않는다. Source
 
 Source Repository에서 사용하는 SQL도 Repository Layer 책임이므로 `app/repositories/query_constants.py`에 상수로 정의한다.
 
+## Source Layer 적재 파이프라인
+
+Source Layer 데이터 적재는 수동 적재를 기본 경로로 사용한다. Docker 초기화 자동 적재는 새 PostgreSQL volume에서 load CSV가 존재할 때만 실행되는 선택 옵션이다.
+
+적재 SQL 위치:
+
+- `db/load/load_kkbox_seed.sql`
+- `db/load/load_spotify_catalog.sql`
+- `db/load/load_spotify_lyrics.sql`
+- `db/load/load_spotify_emotions.sql`
+- `db/load/verify_source_load.sql`
+
+Docker 초기화 보조 스크립트:
+
+- `db/init/03-load-source-data.sh`
+
+적재 CSV 위치:
+
+- `seed/users.csv`
+- `seed/kkbox_user_features.csv`
+- `data/load/spotify_tracks_load.csv`
+- `data/load/spotify_audio_features_load.csv`
+- `data/load/spotify_lyrics_load.csv`
+- `data/load/spotify_emotions_load.csv`
+- `data/load/music_catalog_load.csv`
+
+`user_music_profiles`는 현재 1차 적재 대상에서 제외한다. 테이블은 Source Layer 스키마로 유지하되, CSV 생성 규칙이 승인된 뒤 별도 적재 파이프라인으로 추가한다.
+
 ---
 
 # 4. users 테이블

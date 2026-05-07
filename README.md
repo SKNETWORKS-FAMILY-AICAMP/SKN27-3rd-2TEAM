@@ -88,6 +88,38 @@ DB는 PostgreSQL 기준으로 설계합니다.
 
 Source Layer는 Spotify/KKBOX 원천 데이터와 전처리 산출물을 보존하는 계층입니다. Runtime Service Flow는 Source Layer 테이블을 직접 조회하지 않고, `music_catalog`, `ml_outputs`, `interaction_logs` 같은 Runtime Contract 테이블을 Repository Layer를 통해 사용합니다. SQL 상수는 기존 규칙대로 `app/repositories/query_constants.py`에서 관리합니다.
 
+## Source Layer 데이터 적재
+
+기본 경로는 수동 적재입니다.
+
+```powershell
+docker compose up -d db
+docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/load_kkbox_seed.sql
+docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/load_spotify_catalog.sql
+if (Test-Path data\load\spotify_lyrics_load.csv) { docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/load_spotify_lyrics.sql }
+if (Test-Path data\load\spotify_emotions_load.csv) { docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/load_spotify_emotions.sql }
+docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/verify_source_load.sql
+```
+
+필수 CSV:
+
+- `seed/users.csv`
+- `seed/kkbox_user_features.csv`
+- `data/load/spotify_tracks_load.csv`
+- `data/load/spotify_audio_features_load.csv`
+- `data/load/music_catalog_load.csv`
+
+선택 CSV:
+
+- `data/load/spotify_lyrics_load.csv`
+- `data/load/spotify_emotions_load.csv`
+
+선택 CSV는 파일이 있을 때만 별도 SQL로 적재합니다. 선택 CSV가 없으면 `spotify_lyrics`, `spotify_emotions` 적재만 건너뛰고 필수 Source Layer와 `music_catalog` 적재는 계속 사용할 수 있습니다.
+
+Docker 초기화 자동 적재는 새 PostgreSQL volume에서만 실행됩니다. 기존 volume에는 `/docker-entrypoint-initdb.d` 스크립트가 다시 실행되지 않습니다. 처음부터 다시 적재해야 하면 데이터가 삭제된다는 점을 확인한 뒤 `docker compose down -v`를 사용합니다.
+
+raw 데이터와 생성된 load CSV는 git에 포함하지 않습니다. `data/load/.gitkeep`, `seed/.gitkeep`만 저장소에 유지합니다.
+
 ## 프로젝트 구조
 
 ```text
