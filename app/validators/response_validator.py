@@ -1,4 +1,7 @@
-class ResponseValidator:
+from app.validators.base_validator import BaseValidator
+
+
+class ResponseValidator(BaseValidator):
     REQUIRED_FIELDS = {
         "status",
         "response_type",

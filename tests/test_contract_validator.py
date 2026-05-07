@@ -4,7 +4,7 @@ from app.validators.contract_validator import ContractValidator
 def test_contract_validator_accepts_minimal_docs_contracts():
     validator = ContractValidator()
 
-    result = validator.validate_all(
+    result = validator.validate(
         ml_output={
             "status": "success",
             "user_id": "user_001",

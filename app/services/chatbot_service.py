@@ -1,6 +1,6 @@
 from app.adapters.mock_kag_adapter import MockKagAdapter
 from app.adapters.mock_rag_adapter import MockRagAdapter
-from app.common.default_state import DEFAULT_ML_OUTPUT, FALLBACK_RESPONSE_STATE
+from app.common.default_state import FALLBACK_RESPONSE_STATE, resolve_ml_output
 from app.services.llm_flow_service import LlmFlowService
 from app.services.view_model_service import ViewModelService
 from app.validators.contract_validator import ContractValidator
@@ -31,25 +31,26 @@ class ChatbotService:
 
     def submit_message(self, user_id, user_input):
         ml_output = self._get_ml_output(user_id)
+        kag_state, rag_state = self._build_states(user_id, user_input, ml_output)
+
+        contract_result = self._contract_validator.validate(ml_output, kag_state, rag_state)
+        if not contract_result["passed"]:
+            return self._build_view_model(user_id, user_input, dict(FALLBACK_RESPONSE_STATE), ml_output, kag_state, rag_state, contract_result)
+
+        response_state, llm_result = self._run_llm(user_input, ml_output, kag_state, rag_state)
+        validation_result = self._validate_response(contract_result, llm_result, response_state, rag_state)
+
+        if not validation_result["passed"]:
+            response_state = dict(FALLBACK_RESPONSE_STATE)
+
+        return self._build_view_model(user_id, user_input, response_state, ml_output, kag_state, rag_state, validation_result)
+
+    def _build_states(self, user_id, user_input, ml_output):
         kag_state = self._kag_adapter.build_state(user_id, user_input, ml_output)
         rag_state = self._rag_adapter.build_state(kag_state)
-        contract_result = self._contract_validator.validate_all(
-            ml_output,
-            kag_state,
-            rag_state,
-        )
-        if not contract_result["passed"]:
-            return self._build_view_model(
-                user_id=user_id,
-                user_input=user_input,
-                response_state=dict(FALLBACK_RESPONSE_STATE),
-                ml_output=ml_output,
-                kag_state=kag_state,
-                rag_state=rag_state,
-                validation_result=contract_result,
-            )
+        return kag_state, rag_state
 
-        llm_result = {"passed": True, "errors": []}
+    def _run_llm(self, user_input, ml_output, kag_state, rag_state):
         try:
             response_state = self._llm_flow_service.run(
                 user_input=user_input,
@@ -57,33 +58,16 @@ class ChatbotService:
                 kag_state=kag_state,
                 rag_state=rag_state,
             )
+            return response_state, {"passed": True, "errors": []}
         except Exception:
-            response_state = dict(FALLBACK_RESPONSE_STATE)
-            llm_result = {"passed": False, "errors": ["LLM_CALL_FAILED"]}
+            return dict(FALLBACK_RESPONSE_STATE), {"passed": False, "errors": ["LLM_CALL_FAILED"]}
 
-        response_result = self._response_validator.validate(response_state)
-        provenance_result = self._provenance_validator.validate(
-            response_state,
-            rag_state,
-        )
-
-        validation_result = self._merge_results(
+    def _validate_response(self, contract_result, llm_result, response_state, rag_state):
+        return self._merge_results(
             contract_result,
             llm_result,
-            response_result,
-            provenance_result,
-        )
-        if not validation_result["passed"]:
-            response_state = dict(FALLBACK_RESPONSE_STATE)
-
-        return self._build_view_model(
-            user_id=user_id,
-            user_input=user_input,
-            response_state=response_state,
-            ml_output=ml_output,
-            kag_state=kag_state,
-            rag_state=rag_state,
-            validation_result=validation_result,
+            self._response_validator.validate(response_state),
+            self._provenance_validator.validate(response_state, rag_state),
         )
 
     def _build_view_model(
@@ -111,15 +95,4 @@ class ChatbotService:
         return {"passed": not errors, "errors": errors}
 
     def _get_ml_output(self, user_id):
-        if self._ml_output_repository is None:
-            ml_output = dict(DEFAULT_ML_OUTPUT)
-            ml_output["user_id"] = user_id
-            return ml_output
-
-        found = self._ml_output_repository.get_latest_by_user_id(user_id)
-        if found:
-            return found
-
-        ml_output = dict(DEFAULT_ML_OUTPUT)
-        ml_output["user_id"] = user_id
-        return ml_output
+        return resolve_ml_output(user_id, self._ml_output_repository)

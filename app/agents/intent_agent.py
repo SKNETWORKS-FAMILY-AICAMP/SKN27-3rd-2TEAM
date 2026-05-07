@@ -1,4 +1,7 @@
-class IntentAgent:
+from app.agents.base_agent import BaseAgent
+
+
+class IntentAgent(BaseAgent):
     def run(self, user_input, kag_state=None, rag_state=None):
         text = user_input or ""
         intent_type = self._classify(text)

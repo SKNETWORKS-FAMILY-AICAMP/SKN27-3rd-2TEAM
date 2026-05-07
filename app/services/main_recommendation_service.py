@@ -1,6 +1,6 @@
 from app.adapters.mock_kag_adapter import MockKagAdapter
 from app.adapters.mock_rag_adapter import MockRagAdapter
-from app.common.default_state import DEFAULT_ML_OUTPUT
+from app.common.default_state import resolve_ml_output
 from app.services.view_model_service import ViewModelService
 from app.validators.contract_validator import ContractValidator
 
@@ -24,7 +24,7 @@ class MainRecommendationService:
         ml_output = self._get_ml_output(user_id)
         kag_state = self._kag_adapter.build_state(user_id, "", ml_output)
         rag_state = self._rag_adapter.build_state(kag_state)
-        validation_result = self._contract_validator.validate_all(
+        validation_result = self._contract_validator.validate(
             ml_output, kag_state, rag_state
         )
 
@@ -37,15 +37,4 @@ class MainRecommendationService:
         )
 
     def _get_ml_output(self, user_id):
-        if self._ml_output_repository is None:
-            ml_output = dict(DEFAULT_ML_OUTPUT)
-            ml_output["user_id"] = user_id
-            return ml_output
-
-        found = self._ml_output_repository.get_latest_by_user_id(user_id)
-        if found:
-            return found
-
-        ml_output = dict(DEFAULT_ML_OUTPUT)
-        ml_output["user_id"] = user_id
-        return ml_output
+        return resolve_ml_output(user_id, self._ml_output_repository)

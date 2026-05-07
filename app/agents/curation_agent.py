@@ -16,7 +16,10 @@ INTENT_TO_FOCUS = {
 }
 
 
-class CurationAgent:
+from app.agents.base_agent import BaseAgent
+
+
+class CurationAgent(BaseAgent):
     def run(self, intent_result, kag_state, rag_state):
         evidence_items = rag_state.get("recommended_content_evidence", [])
         if not evidence_items:

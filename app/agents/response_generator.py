@@ -1,3 +1,4 @@
+from app.agents.base_agent import BaseAgent
 from app.common.default_state import FALLBACK_RESPONSE_STATE
 from app.common.labels import CATEGORY_LABELS
 from app.llm.openai_llm_client import OpenAiLlmClient
@@ -14,7 +15,7 @@ validation 값은 검증기가 나중에 결정하므로 둘 다 false로 둔다
 """
 
 
-class ResponseGenerator:
+class ResponseGenerator(BaseAgent):
     def __init__(self, llm_client=None):
         self._llm_client = llm_client
 
