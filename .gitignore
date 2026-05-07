@@ -45,3 +45,9 @@ temp/
 build/
 dist/
 *.egg-info/
+
+# Generated source data load files
+data/load/*
+!data/load/.gitkeep
+seed/*
+!seed/.gitkeep
