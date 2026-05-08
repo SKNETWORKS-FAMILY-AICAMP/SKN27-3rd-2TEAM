@@ -587,6 +587,7 @@ RAG가 하지 않는 것:
 
 # 8. 폴더 구조
 
+```
 rimas/
   app/
     main.py
@@ -695,6 +696,8 @@ rimas/
     test_chatbot_service.py
     test_mock_kag_adapter.py
     test_mock_rag_adapter.py
+
+```
 
 ---
 
