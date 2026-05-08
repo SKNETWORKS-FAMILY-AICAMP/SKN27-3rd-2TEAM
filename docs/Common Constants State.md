@@ -13,6 +13,7 @@
 레이어 책임이 명확한 상수는 기존 위치를 유지한다.
 
 - SQL 쿼리 상수는 Repository Layer 책임이므로 `app/repositories/query_constants.py`에 둔다.
+- Source Layer Repository SQL도 같은 Repository Layer 책임이므로 별도 SQL 상수 파일을 만들지 않고 `app/repositories/query_constants.py`에 둔다.
 - UI 색상, spacing, radius 같은 theme 상수는 UI Layer 책임이므로 `app/ui/styles/theme.py`에 둔다.
 
 ## 사용 규칙

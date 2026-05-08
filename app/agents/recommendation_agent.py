@@ -1,4 +1,7 @@
-class RecommendationAgent:
+from app.agents.base_agent import BaseAgent
+
+
+class RecommendationAgent(BaseAgent):
     def run(self, curation_plan, rag_state):
         if curation_plan.get("curation_mode") == "fallback":
             return {

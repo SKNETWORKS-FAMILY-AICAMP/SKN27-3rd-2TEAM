@@ -1,6 +1,6 @@
 from app.common.constants import ALLOWED_STATUSES, DEFAULT_USER_ID
 from app.common.default_state import (
-    DEFAULT_ML_OUTPUT,
+    MOCK_ML_OUTPUT,
     FALLBACK_RESPONSE_STATE,
     SESSION_DEFAULTS,
 )
@@ -17,6 +17,6 @@ def test_common_defaults_match_documented_session_state():
 def test_common_state_constants_keep_contract_values():
     assert "success" in ALLOWED_STATUSES
     assert "error" in ALLOWED_STATUSES
-    assert DEFAULT_ML_OUTPUT["user_id"] == DEFAULT_USER_ID
+    assert MOCK_ML_OUTPUT["user_id"] == DEFAULT_USER_ID
     assert FALLBACK_RESPONSE_STATE["response_type"] == "fallback"
     assert CATEGORY_LABELS["discovery_candidate"]

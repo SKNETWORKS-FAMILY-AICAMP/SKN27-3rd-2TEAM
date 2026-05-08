@@ -2,12 +2,12 @@ import pytest
 
 from app.adapters.mock_kag_adapter import MockKagAdapter
 from app.adapters.mock_rag_adapter import MockRagAdapter
-from app.common.default_state import DEFAULT_ML_OUTPUT
+from app.common.default_state import MOCK_ML_OUTPUT
 
 
 @pytest.fixture
 def sample_payloads():
-    ml_output = dict(DEFAULT_ML_OUTPUT)
+    ml_output = dict(MOCK_ML_OUTPUT)
     ml_output["user_id"] = "user_001"
     kag_state = MockKagAdapter().build_state(
         "user_001",

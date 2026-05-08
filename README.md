@@ -86,28 +86,71 @@ DB는 PostgreSQL 기준으로 설계합니다.
 
 `ML Output`, `KAG_STATE`, `RAG_STATE`, `RESPONSE_STATE`는 JSONB로 원본을 보존합니다. `interaction_logs`는 append-only 방식으로 저장합니다.
 
+Source Layer는 Spotify/KKBOX 원천 데이터와 전처리 산출물을 보존하는 계층입니다. Runtime Service Flow는 Source Layer 테이블을 직접 조회하지 않고, `music_catalog`, `ml_outputs`, `interaction_logs` 같은 Runtime Contract 테이블을 Repository Layer를 통해 사용합니다. SQL 상수는 기존 규칙대로 `app/repositories/query_constants.py`에서 관리합니다.
+
+## Source Layer 데이터 적재
+
+기본 경로는 수동 적재입니다.
+
+```powershell
+docker compose up -d db
+docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/load_kkbox_seed.sql
+docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/load_spotify_catalog.sql
+if (Test-Path data\load\spotify_lyrics_load.csv) { docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/load_spotify_lyrics.sql }
+if (Test-Path data\load\spotify_emotions_load.csv) { docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/load_spotify_emotions.sql }
+docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/verify_source_load.sql
+```
+
+필수 CSV:
+
+- `seed/users.csv`
+- `seed/kkbox_user_features.csv`
+- `data/load/spotify_tracks_load.csv`
+- `data/load/spotify_audio_features_load.csv`
+- `data/load/music_catalog_load.csv`
+
+선택 CSV:
+
+- `data/load/spotify_lyrics_load.csv`
+- `data/load/spotify_emotions_load.csv`
+
+선택 CSV는 파일이 있을 때만 별도 SQL로 적재합니다. 선택 CSV가 없으면 `spotify_lyrics`, `spotify_emotions` 적재만 건너뛰고 필수 Source Layer와 `music_catalog` 적재는 계속 사용할 수 있습니다.
+
+Docker 초기화 자동 적재는 새 PostgreSQL volume에서만 실행됩니다. 기존 volume에는 `/docker-entrypoint-initdb.d` 스크립트가 다시 실행되지 않습니다. 처음부터 다시 적재해야 하면 데이터가 삭제된다는 점을 확인한 뒤 `docker compose down -v`를 사용합니다.
+
+raw 데이터와 생성된 load CSV는 git에 포함하지 않습니다. `data/load/.gitkeep`, `seed/.gitkeep`만 저장소에 유지합니다.
+
 ## 프로젝트 구조
 
 ```text
 app/
   main.py
-  common/
+  common/              # 공통 상수, enum, 기본 state
   pages/
   ui/
     components/
     styles/
   services/
   agents/
+    base_agent.py      # Agent ABC (BaseAgent)
     prompts/
   adapters/
+    kag_adapter.py     # KagAdapter ABC
+    rag_adapter.py     # RagAdapter ABC
+    mock_kag_adapter.py
+    mock_rag_adapter.py
+    real_kag_adapter.py  # 설계 진행 중
+    real_rag_adapter.py  # 설계 진행 중
   kag/
     README.md
   rag/
     README.md
   validators/
+    base_validator.py  # Validator ABC (BaseValidator)
   repositories/
+    base_repository.py # Repository ABC (BaseRepository, _cursor 공통 구현)
   schemas/
-  contracts/
+  contracts/           # JSON 필드명 및 도메인 enum (ContractValidator의 source of truth)
   json_templates/
   config/
 docs/
@@ -118,18 +161,20 @@ tests/
 
 Current contract ownership:
 
-- `app/common/enums.py`: common `status` enum
-- `app/common/constants.py`: `DEFAULT_USER_ID`, enum-based common `status` values
-- `app/common/default_state.py`: `SESSION_DEFAULTS`, `DEFAULT_ML_OUTPUT`, `FALLBACK_RESPONSE_STATE`
+- `app/common/enums.py`: common `status` enum (`ResponseStatus`)
+- `app/common/constants.py`: `DEFAULT_USER_ID`, enum-based common `status` values (`ALLOWED_STATUSES`)
+- `app/common/default_state.py`: `SESSION_DEFAULTS`, `MOCK_ML_OUTPUT`, `FALLBACK_RESPONSE_STATE`, `resolve_ml_output()`
 - `app/common/labels.py`: recommendation category display labels
-- `app/contracts/fields.py`: JSON input/output field enums
-- `app/contracts/enums.py`: contract value enums
+- `app/contracts/fields.py`: JSON input/output field enums — `ContractValidator`의 필수 필드 정의의 source of truth
+- `app/contracts/enums.py`: contract value enums (`IntentType`, `CurationMode`, `RecommendationCategory`, `ResponseTone`)
 - `app/json_templates/`: JSON template examples
 
 공통 계약 상수와 기본 state는 `app/common/`에서 관리합니다.
 
 - `app/common/constants.py`: `DEFAULT_USER_ID`, 공통 `status` 허용값
-- `app/common/default_state.py`: `SESSION_DEFAULTS`, `DEFAULT_ML_OUTPUT`, `FALLBACK_RESPONSE_STATE`
+- `app/common/default_state.py`: `SESSION_DEFAULTS`, `MOCK_ML_OUTPUT`, `FALLBACK_RESPONSE_STATE`, `resolve_ml_output()`
+  - `MOCK_ML_OUTPUT`: DB 연결 없이 동작할 때 사용하는 Mock ML 데이터 (기본값이 아닌 Mock 데이터임을 명시)
+  - `resolve_ml_output(user_id, ml_output_repository=None)`: Repository 유무에 관계없이 ML Output을 반환하는 공통 헬퍼 함수
 - `app/common/labels.py`: 추천 category 표시 label
 
 레이어 책임이 명확한 상수는 기존 위치를 유지합니다.
@@ -176,6 +221,41 @@ KAG/RAG 책임 분리는 다음 기준을 따릅니다.
 - UI 먼저 만들기
 - LLM 먼저 붙이기
 - Schema 없이 구현하기
+
+## 코드 구조 원칙
+
+### 계층 간 추상화
+
+각 계층에는 ABC(Abstract Base Class)가 정의되어 있으며, 구현체는 반드시 ABC를 상속합니다.
+
+| 계층 | ABC | 핵심 추상 메서드 |
+| --- | --- | --- |
+| Agent | `BaseAgent` (`app/agents/base_agent.py`) | `run(**kwargs) → dict` |
+| Validator | `BaseValidator` (`app/validators/base_validator.py`) | `validate(**kwargs) → dict` |
+| Repository | `BaseRepository` (`app/repositories/base_repository.py`) | `_cursor()` (공통 구현 제공) |
+| Adapter | `KagAdapter`, `RagAdapter` (`app/adapters/`) | `build_state(...)` |
+
+Validator의 `validate()` 반환 형식은 `{"passed": bool, "errors": list[str]}`으로 통일합니다.
+
+### 의존성 주입 원칙
+
+Service 생성자는 모든 외부 의존성을 파라미터로 받습니다. 기본값은 Mock 구현체이며, 프로덕션 환경에서는 Real 구현체를 명시적으로 주입합니다.
+
+```python
+# 테스트: Mock이 기본값으로 동작
+service = ChatbotService()
+
+# 프로덕션: Real 구현체를 명시적으로 주입
+service = ChatbotService(
+    kag_adapter=RealKagAdapter(...),
+    rag_adapter=RealRagAdapter(...),
+    ml_output_repository=MlOutputRepository(connection),
+)
+```
+
+### contracts/fields.py 연결 원칙
+
+`ContractValidator`의 필수 필드 목록은 `app/contracts/fields.py`의 Enum을 source of truth로 사용합니다. 필드 추가/변경은 `contracts/fields.py`만 수정하면 Validator에 자동 반영됩니다.
 
 ## 설계 문서
 

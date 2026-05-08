@@ -1,34 +1,20 @@
 from app.common.constants import ALLOWED_STATUSES
+from app.contracts.fields import KagStateField, MlOutputField, RagStateField
+from app.validators.base_validator import BaseValidator
 
 
-class ContractValidator:
-    ML_REQUIRED_FIELDS = (
-        "status",
-        "user_id",
-        "taste_profile",
-        "behavior_profile",
-        "recommendation_profile",
-    )
-    KAG_REQUIRED_FIELDS = (
-        "status",
-        "user",
-        "recommendation_goal",
-        "user_context",
-        "curation_intent",
-        "curation_strategy",
-        "content_requirements",
-        "routing",
-        "selected_path",
-    )
+class ContractValidator(BaseValidator):
+    ML_REQUIRED_FIELDS = tuple(f.value for f in MlOutputField)
+    KAG_REQUIRED_FIELDS = tuple(f.value for f in KagStateField)
     RAG_REQUIRED_FIELDS = (
-        "status",
-        "recommendation_context",
-        "recommended_content_evidence",
-        "recommendation_reason",
-        "recommendation_scripts",
+        RagStateField.STATUS,
+        RagStateField.RECOMMENDATION_CONTEXT,
+        RagStateField.RECOMMENDED_CONTENT_EVIDENCE,
+        RagStateField.RECOMMENDATION_REASON,
+        RagStateField.RECOMMENDATION_SCRIPTS,
     )
 
-    def validate_all(self, ml_output, kag_state, rag_state):
+    def validate(self, ml_output, kag_state, rag_state):
         results = [
             self.validate_ml_output(ml_output),
             self.validate_kag(kag_state),

@@ -129,3 +129,42 @@ INSERT INTO validation_logs (
     %(validation_detail_json)s
 );
 """
+
+SELECT_SPOTIFY_TRACK_BY_TRACK_ID = """
+SELECT *
+FROM spotify_tracks
+WHERE track_id = %(track_id)s;
+"""
+
+SELECT_SPOTIFY_AUDIO_FEATURE_BY_TRACK_ID = """
+SELECT *
+FROM spotify_audio_features
+WHERE track_id = %(track_id)s;
+"""
+
+SELECT_SPOTIFY_LYRICS_BY_TRACK_ID = """
+SELECT *
+FROM spotify_lyrics
+WHERE track_id = %(track_id)s;
+"""
+
+SELECT_SPOTIFY_EMOTION_BY_TRACK_ID = """
+SELECT *
+FROM spotify_emotions
+WHERE track_id = %(track_id)s;
+"""
+
+SELECT_KKBOX_USER_FEATURES_BY_USER_ID = """
+SELECT *
+FROM kkbox_user_features
+WHERE user_id = %(user_id)s
+ORDER BY created_at DESC;
+"""
+
+SELECT_LATEST_USER_MUSIC_PROFILE_BY_USER_ID = """
+SELECT *
+FROM user_music_profiles
+WHERE user_id = %(user_id)s
+ORDER BY created_at DESC
+LIMIT 1;
+"""

@@ -79,6 +79,62 @@ interaction_logs는 append-only 방식으로 저장한다.
 
 MVP에서는 1~4번을 우선 구현한다.
 
+## Source Layer 분리 원칙
+
+Spotify/KKBOX 원천 데이터 기반 확장 테이블은 기존 Runtime Contract와 분리된 Source Layer로 관리한다.
+
+Source Layer 테이블:
+
+- `spotify_tracks`
+- `spotify_audio_features`
+- `spotify_lyrics`
+- `spotify_emotions`
+- `kkbox_user_features`
+- `user_music_profiles`
+
+Runtime Contract Layer 테이블:
+
+- `users`
+- `ml_outputs`
+- `music_catalog`
+- `interaction_logs`
+- 선택: `llm_call_logs`
+- 선택: `validation_logs`
+
+Service Layer는 Source Layer 테이블을 직접 조회하지 않는다. Source Layer 데이터는 loader, transformer, validator, catalog/profile build process를 거쳐 `music_catalog`와 `ml_outputs`에 반영한 뒤 Runtime Repository를 통해 사용한다.
+
+`interaction_logs.primary_goal`, `intent_type`, `target_page`, `primary_section`은 기존 Service Flow 로그 계약이므로 유지한다.
+
+Source Repository에서 사용하는 SQL도 Repository Layer 책임이므로 `app/repositories/query_constants.py`에 상수로 정의한다.
+
+## Source Layer 적재 파이프라인
+
+Source Layer 데이터 적재는 수동 적재를 기본 경로로 사용한다. Docker 초기화 자동 적재는 새 PostgreSQL volume에서 load CSV가 존재할 때만 실행되는 선택 옵션이다.
+
+적재 SQL 위치:
+
+- `db/load/load_kkbox_seed.sql`
+- `db/load/load_spotify_catalog.sql`
+- `db/load/load_spotify_lyrics.sql`
+- `db/load/load_spotify_emotions.sql`
+- `db/load/verify_source_load.sql`
+
+Docker 초기화 보조 스크립트:
+
+- `db/init/03-load-source-data.sh`
+
+적재 CSV 위치:
+
+- `seed/users.csv`
+- `seed/kkbox_user_features.csv`
+- `data/load/spotify_tracks_load.csv`
+- `data/load/spotify_audio_features_load.csv`
+- `data/load/spotify_lyrics_load.csv`
+- `data/load/spotify_emotions_load.csv`
+- `data/load/music_catalog_load.csv`
+
+`user_music_profiles`는 현재 1차 적재 대상에서 제외한다. 테이블은 Source Layer 스키마로 유지하되, CSV 생성 규칙이 승인된 뒤 별도 적재 파이프라인으로 추가한다.
+
 ---
 
 # 4. users 테이블

@@ -1,4 +1,7 @@
-class ProvenanceValidator:
+from app.validators.base_validator import BaseValidator
+
+
+class ProvenanceValidator(BaseValidator):
     def validate(self, response_state, rag_state):
         rag_items = {
             item.get("content_id"): item

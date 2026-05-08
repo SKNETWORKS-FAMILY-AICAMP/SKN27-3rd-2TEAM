@@ -13,7 +13,7 @@ SESSION_DEFAULTS = {
     "last_error": None,
 }
 
-DEFAULT_ML_OUTPUT = {
+MOCK_ML_OUTPUT = {
     "status": "success",
     "user_id": DEFAULT_USER_ID,
     "taste_profile": {
@@ -34,6 +34,17 @@ DEFAULT_ML_OUTPUT = {
         "new_release_affinity": "medium",
     },
 }
+
+def resolve_ml_output(user_id, ml_output_repository=None):
+    """Repository가 없거나 결과가 없으면 MOCK_ML_OUTPUT을 기본값으로 반환한다."""
+    if ml_output_repository is not None:
+        found = ml_output_repository.get_latest_by_user_id(user_id)
+        if found:
+            return found
+    ml_output = dict(MOCK_ML_OUTPUT)
+    ml_output["user_id"] = user_id
+    return ml_output
+
 
 FALLBACK_RESPONSE_STATE = {
     "status": "error",

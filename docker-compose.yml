@@ -24,8 +24,10 @@ services:
       - "${RIMAS_DB_HOST_PORT:-5432}:5432"
     volumes:
       - rimas_postgres_data:/var/lib/postgresql/data
+      - .:/workspace:ro
       - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - ./db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      - ./db/init/03-load-source-data.sh:/docker-entrypoint-initdb.d/03-load-source-data.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
