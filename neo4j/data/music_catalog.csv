@@ -1,5 +1,6 @@
-﻿content_id,title,artist,album,genres,moods,tempo,release_type
-track_001,Midnight Loop,Nova Lane,Night Sketch,"rnb, indie","calm, night",medium,existing_catalog
-track_002,Velvet Echo,June Park,Echo Room,"rnb, soul","calm, soft",medium,existing_catalog
-track_003,Fresh Signal,Mira Tone,Updated Signal,"indie, electro_pop","bright, clean",medium,new_release
-track_004,Soft Orbit,Luna Field,Orbit Notes,"dream_pop, ambient","calm, night, soft",slow,existing_catalog
+"content_id","track_id","title","artist","album","genres","moods","tempo","release_type","recommendation_category","evidence_summary","source_type","metadata_json","created_at","updated_at"
+track_001,,Midnight Loop,Nova Lane,Night Sketch,"{rnb,indie}","{calm,night}",medium,existing_catalog,personalized_match,user_001의 rnb/indie 취향과 calm/night 분위기에 직접 연결되는 곡,mock_music_catalog,"{""match_reason"": {""mood_match"": true, ""genre_match"": true}}",2026-05-09 16:30:25.969 +0900,2026-05-09 16:30:25.969 +0900
+track_002,,Velvet Echo,June Park,Echo Room,"{rnb,soul}","{calm,soft}",medium,existing_catalog,similar_taste,기존 rnb 취향과 가까운 분위기의 유사 취향 후보,mock_music_catalog,"{""match_reason"": {""mood_match"": true, ""genre_match"": true}}",2026-05-09 16:30:25.969 +0900,2026-05-09 16:30:25.969 +0900
+track_003,,Fresh Signal,Mira Tone,Updated Signal,"{indie,electro_pop}","{bright,clean}",medium,new_release,new_release,최근 업데이트 곡이며 indie 취향과 일부 연결되는 신보 후보,mock_music_catalog,"{""match_reason"": {""genre_match"": true, ""new_taste_expansion"": true}}",2026-05-09 16:30:25.969 +0900,2026-05-09 16:30:25.969 +0900
+track_004,,Soft Orbit,Luna Field,Orbit Notes,"{dream_pop,ambient}","{calm,night,soft}",slow,existing_catalog,discovery_candidate,calm/night 분위기와 연결되면서 dream_pop 계열로 확장 가능한 곡,mock_music_catalog,"{""match_reason"": {""mood_match"": true, ""new_taste_expansion"": true}}",2026-05-09 16:30:25.969 +0900,2026-05-09 16:30:25.969 +0900
+info_dream_pop_001,,dream_pop,genre_information,,{dream_pop},"{calm,soft}",unknown,unknown,information_related,dream_pop 장르 설명에 사용할 수 있는 정보성 메타데이터,mock_music_catalog,"{""summary"": ""soft and atmospheric pop style"", ""info_type"": ""genre""}",2026-05-09 16:30:25.969 +0900,2026-05-09 16:30:25.969 +0900
