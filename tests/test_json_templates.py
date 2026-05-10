@@ -6,31 +6,18 @@ from pathlib import Path
 TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "app" / "json_templates"
 
 EXPECTED_TEMPLATE_FIELDS = {
-    "ml_output_template.json": {
-        "status",
-        "user_id",
-        "taste_profile",
-        "behavior_profile",
-        "recommendation_profile",
-    },
     "kag_state_template.json": {
         "status",
-        "user",
         "recommendation_goal",
-        "user_context",
-        "curation_intent",
-        "curation_strategy",
-        "content_requirements",
-        "routing",
-        "selected_path",
+        "recommended_content_ids",
+        "recommendation_category",
+        "route",
+        "target_section",
     },
     "rag_state_template.json": {
         "status",
-        "recommendation_context",
         "recommended_content_evidence",
         "recommendation_reason",
-        "information_evidence",
-        "recommendation_scripts",
     },
     "intent_result_template.json": {
         "status",
@@ -39,15 +26,6 @@ EXPECTED_TEMPLATE_FIELDS = {
         "target_content_id",
         "requires_recommendation",
         "requires_information",
-    },
-    "curation_plan_template.json": {
-        "status",
-        "curation_mode",
-        "response_focus",
-        "tone",
-        "allowed_content_ids",
-        "primary_content_id",
-        "use_information_evidence",
     },
     "selected_recommendations_template.json": {
         "status",
@@ -59,14 +37,13 @@ EXPECTED_TEMPLATE_FIELDS = {
         "chatbot_response",
         "display_recommendations",
         "used_content_ids",
-        "provenance",
-        "validation",
     },
     "interaction_log_template.json": {
         "log_id",
         "user_id",
+        "session_id",
         "user_input",
-        "ml_output",
+        "session_context",
         "kag_state",
         "rag_state",
         "response_state",
@@ -92,15 +69,9 @@ class JsonTemplateTest(unittest.TestCase):
     def test_kag_template_has_required_nested_sections(self):
         template = self._load_template("kag_state_template.json")
 
-        self.assertEqual(set(template["user"].keys()), {"user_id"})
-        self.assertEqual(
-            set(template["content_requirements"].keys()),
-            {"must_include", "optional_include", "avoid"},
-        )
-        self.assertEqual(
-            set(template["routing"].keys()),
-            {"target_page", "primary_section", "secondary_sections"},
-        )
+        self.assertEqual(set(template["recommendation_goal"].keys()), {"primary_goal"})
+        self.assertIsInstance(template["recommended_content_ids"], list)
+        self.assertEqual(template["route"], "safe_discovery")
 
     def test_rag_template_has_content_evidence_shape(self):
         template = self._load_template("rag_state_template.json")
@@ -115,11 +86,7 @@ class JsonTemplateTest(unittest.TestCase):
                 "album",
                 "genre",
                 "mood",
-                "tempo",
-                "release_type",
-                "recommendation_category",
                 "evidence_summary",
-                "match_reason",
             },
         )
 

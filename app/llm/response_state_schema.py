@@ -40,46 +40,6 @@ RESPONSE_STATE_JSON_SCHEMA = {
             "type": "array",
             "items": {"type": "string"},
         },
-        "provenance": {
-            "type": "object",
-            "properties": {
-                "used_ml_fields": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-                "used_kag_fields": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-                "used_rag_content_ids": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-                "used_rag_fields": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-            },
-            "required": [
-                "used_ml_fields",
-                "used_kag_fields",
-                "used_rag_content_ids",
-                "used_rag_fields",
-            ],
-            "additionalProperties": False,
-        },
-        "validation": {
-            "type": "object",
-            "properties": {
-                "response_validation_passed": {"type": "boolean"},
-                "provenance_validation_passed": {"type": "boolean"},
-            },
-            "required": [
-                "response_validation_passed",
-                "provenance_validation_passed",
-            ],
-            "additionalProperties": False,
-        },
     },
     "required": [
         "status",
@@ -87,8 +47,6 @@ RESPONSE_STATE_JSON_SCHEMA = {
         "chatbot_response",
         "display_recommendations",
         "used_content_ids",
-        "provenance",
-        "validation",
     ],
     "additionalProperties": False,
 }

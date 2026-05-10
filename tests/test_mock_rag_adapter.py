@@ -1,23 +1,16 @@
-from app.adapters.mock_kag_adapter import MockKagAdapter
-from app.adapters.mock_rag_adapter import MockRagAdapter
+from app.kag.adapters.mock_kag_adapter import MockKagAdapter
+from app.rag.adapters.mock_rag_adapter import MockRagAdapter
 
 
 def test_mock_rag_adapter_returns_only_docs_allowed_recommendation_categories():
-    kag_state = MockKagAdapter().build_state(
-        "user_001",
-        "",
-        {
-            "status": "success",
-            "user_id": "user_001",
-            "taste_profile": {
-                "preferred_genres": ["rnb"],
-                "preferred_moods": ["calm"],
-                "preferred_tempo": "medium",
-            },
-            "behavior_profile": {},
-            "recommendation_profile": {},
-        },
-    )
+    session_context = {
+        "session_id": "session_001",
+        "recent_genres": ["rnb"],
+        "recent_moods": ["calm"],
+        "recent_artists": [],
+        "conversation_summary": "",
+    }
+    kag_state = MockKagAdapter().build_state("user_001", "", session_context)
 
     rag_state = MockRagAdapter().build_state(kag_state)
 

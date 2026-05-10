@@ -1,40 +1,95 @@
-from app.adapters.mock_kag_adapter import MockKagAdapter
-from app.adapters.mock_rag_adapter import MockRagAdapter
-from app.common.default_state import resolve_ml_output
-from app.services.view_model_service import ViewModelService
-from app.validators.contract_validator import ContractValidator
+import logging
+import time
+
+from app.agents.orchestrator_agent import OrchestratorAgent
+from app.services import session_cache_service
+
+logger = logging.getLogger("rimas.service.main_recommendation")
 
 
 class MainRecommendationService:
-    def __init__(
-        self,
-        kag_adapter=None,
-        rag_adapter=None,
-        contract_validator=None,
-        view_model_service=None,
-        ml_output_repository=None,
-    ):
-        self._kag_adapter = kag_adapter or MockKagAdapter()
-        self._rag_adapter = rag_adapter or MockRagAdapter()
-        self._contract_validator = contract_validator or ContractValidator()
-        self._view_model_service = view_model_service or ViewModelService()
-        self._ml_output_repository = ml_output_repository
+    """메인 추천 페이지 — LLM 없이 KAG+RAG 결과로 뷰모델을 만든다.
+    Redis에서 SESSION_CONTEXT를 읽고, 결과는 view_model_service로 변환한다.
+    RDB 쿼리는 RAG builder 내부에서만 발생하므로 중복 조회 없음.
+    """
 
-    def get_page_view_model(self, user_id):
-        ml_output = self._get_ml_output(user_id)
-        kag_state = self._kag_adapter.build_state(user_id, "", ml_output)
-        rag_state = self._rag_adapter.build_state(kag_state)
-        validation_result = self._contract_validator.validate(
-            ml_output, kag_state, rag_state
-        )
+    def __init__(self, orchestrator: OrchestratorAgent | None = None):
+        self._orchestrator = orchestrator or OrchestratorAgent()
 
-        return self._view_model_service.build_main_view_model(
+    def get_page_view_model(self, user_id: str, session_id: str) -> dict:
+        start = time.perf_counter()
+
+        session_context = session_cache_service.load_context(session_id)
+
+        result = self._orchestrator.run_recommendation(
             user_id=user_id,
-            ml_output=ml_output,
-            kag_state=kag_state,
-            rag_state=rag_state,
-            validation_result=validation_result,
+            session_id=session_id,
+            session_context=session_context,
         )
 
-    def _get_ml_output(self, user_id):
-        return resolve_ml_output(user_id, self._ml_output_repository)
+        ms = round((time.perf_counter() - start) * 1000, 1)
+        kag_state = result.get("kag_state", {})
+        rag_state = result.get("rag_state", {})
+
+        logger.info(
+            "main_recommendation_ok",
+            extra={"user_id": user_id, "session_id": session_id, "ms": ms},
+        )
+
+        return self._build_view_model(user_id, session_context, kag_state, rag_state, ms)
+
+    @staticmethod
+    def _build_view_model(
+        user_id: str,
+        session_context: dict,
+        kag_state: dict,
+        rag_state: dict,
+        latency_ms: float,
+    ) -> dict:
+        evidence = rag_state.get("recommended_content_evidence", [])
+        groups: dict[str, list] = {
+            "personalized": [],
+            "discovery": [],
+            "new_release": [],
+        }
+        category_map = {
+            "personalized_match": "personalized",
+            "discovery_candidate": "discovery",
+            "new_release": "new_release",
+        }
+        for item in evidence:
+            target = category_map.get(item.get("recommendation_category"))
+            if target in groups:
+                groups[target].append({
+                    "content_id": item.get("content_id"),
+                    "title": item.get("title"),
+                    "artist": item.get("artist"),
+                    "album": item.get("album"),
+                    "genre": item.get("genre", []),
+                    "mood": item.get("mood", []),
+                    "display_reason": item.get("evidence_summary", ""),
+                })
+
+        taste_badges = (
+            session_context.get("recent_genres", []) +
+            session_context.get("recent_moods", [])
+        )
+
+        return {
+            "status": "success",
+            "page_type": "main_recommendation_page",
+            "user_id": user_id,
+            "taste_badges": taste_badges,
+            "today_theme": rag_state.get("recommendation_reason", {}).get("summary", ""),
+            "character_message": rag_state.get("recommendation_scripts", {}).get("dj_intro", ""),
+            "personalized": groups["personalized"],
+            "new_release": groups["new_release"],
+            "discovery": groups["discovery"],
+            "personalized_guide": rag_state.get("recommendation_scripts", {}).get("discovery_message", ""),
+            "debug": {
+                "session_context": session_context,
+                "kag_state": kag_state,
+                "rag_state": rag_state,
+                "latency_ms": latency_ms,
+            },
+        }
