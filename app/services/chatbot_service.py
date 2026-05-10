@@ -1,98 +1,82 @@
-from app.adapters.mock_kag_adapter import MockKagAdapter
-from app.adapters.mock_rag_adapter import MockRagAdapter
-from app.common.default_state import FALLBACK_RESPONSE_STATE, resolve_ml_output
-from app.services.llm_flow_service import LlmFlowService
-from app.services.view_model_service import ViewModelService
-from app.validators.contract_validator import ContractValidator
-from app.validators.provenance_validator import ProvenanceValidator
-from app.validators.response_validator import ResponseValidator
+import logging
+import time
+
+from app.agents.orchestrator_agent import OrchestratorAgent
+from app.services import session_cache_service
+from app.services.logging_service import LoggingService
+
+logger = logging.getLogger("rimas.service.chatbot")
 
 
 class ChatbotService:
+    """챗봇 메시지 처리 — 1 API 호출 = 1 turn.
+
+    흐름:
+      Redis에서 SESSION_CONTEXT 로드 (DB 조회 없음)
+      → OrchestratorAgent (KAG → RAG → Intent → Rec → LLM → Validate)
+      → Redis에 turn 저장 + SESSION_CONTEXT 업데이트
+      → interaction_log 비동기 저장 (선택)
+    """
+
     def __init__(
         self,
-        kag_adapter=None,
-        rag_adapter=None,
-        contract_validator=None,
-        response_validator=None,
-        provenance_validator=None,
-        view_model_service=None,
-        ml_output_repository=None,
-        llm_flow_service=None,
+        orchestrator: OrchestratorAgent | None = None,
+        logging_service: LoggingService | None = None,
     ):
-        self._kag_adapter = kag_adapter or MockKagAdapter()
-        self._rag_adapter = rag_adapter or MockRagAdapter()
-        self._contract_validator = contract_validator or ContractValidator()
-        self._response_validator = response_validator or ResponseValidator()
-        self._provenance_validator = provenance_validator or ProvenanceValidator()
-        self._view_model_service = view_model_service or ViewModelService()
-        self._ml_output_repository = ml_output_repository
-        self._llm_flow_service = llm_flow_service or LlmFlowService()
+        self._orchestrator = orchestrator or OrchestratorAgent()
+        self._logging_service = logging_service
 
-    def submit_message(self, user_id, user_input):
-        ml_output = self._get_ml_output(user_id)
-        kag_state, rag_state = self._build_states(user_id, user_input, ml_output)
+    def submit_message(self, user_id: str, session_id: str, user_input: str) -> dict:
+        start = time.perf_counter()
 
-        contract_result = self._contract_validator.validate(ml_output, kag_state, rag_state)
-        if not contract_result["passed"]:
-            return self._build_view_model(user_id, user_input, dict(FALLBACK_RESPONSE_STATE), ml_output, kag_state, rag_state, contract_result)
+        # 1. Redis에서 SESSION_CONTEXT 로드 — DB 조회 없음
+        session_context = session_cache_service.load_context(session_id)
 
-        response_state, llm_result = self._run_llm(user_input, ml_output, kag_state, rag_state)
-        validation_result = self._validate_response(contract_result, llm_result, response_state, rag_state)
-
-        if not validation_result["passed"]:
-            response_state = dict(FALLBACK_RESPONSE_STATE)
-
-        return self._build_view_model(user_id, user_input, response_state, ml_output, kag_state, rag_state, validation_result)
-
-    def _build_states(self, user_id, user_input, ml_output):
-        kag_state = self._kag_adapter.build_state(user_id, user_input, ml_output)
-        rag_state = self._rag_adapter.build_state(kag_state)
-        return kag_state, rag_state
-
-    def _run_llm(self, user_input, ml_output, kag_state, rag_state):
-        try:
-            response_state = self._llm_flow_service.run(
-                user_input=user_input,
-                ml_output=ml_output,
-                kag_state=kag_state,
-                rag_state=rag_state,
-            )
-            return response_state, {"passed": True, "errors": []}
-        except Exception:
-            return dict(FALLBACK_RESPONSE_STATE), {"passed": False, "errors": ["LLM_CALL_FAILED"]}
-
-    def _validate_response(self, contract_result, llm_result, response_state, rag_state):
-        return self._merge_results(
-            contract_result,
-            llm_result,
-            self._response_validator.validate(response_state),
-            self._provenance_validator.validate(response_state, rag_state),
+        # 2. Orchestrator 실행 (KAG → RAG → LLM → Validate)
+        result = self._orchestrator.run_chatbot(
+            user_id=user_id,
+            session_id=session_id,
+            user_input=user_input,
+            session_context=session_context,
         )
 
-    def _build_view_model(
-        self,
-        user_id,
-        user_input,
-        response_state,
-        ml_output,
-        kag_state,
-        rag_state,
-        validation_result,
-    ):
-        return self._view_model_service.build_chatbot_view_model(
-            user_id=user_id,
+        meta = result.pop("_meta", {})
+        kag_state = meta.get("kag_state", {})
+        rag_state = meta.get("rag_state", {})
+        latency_ms = meta.get("latency_ms", round((time.perf_counter() - start) * 1000, 1))
+
+        # 3. Redis에 turn 저장 + SESSION_CONTEXT 업데이트 (1번만)
+        session_cache_service.save_turn_and_update_context(
+            session_id=session_id,
             user_input=user_input,
-            response_state=response_state,
-            ml_output=ml_output,
+            response_state=result,
             kag_state=kag_state,
             rag_state=rag_state,
-            validation_result=validation_result,
         )
 
-    def _merge_results(self, *results):
-        errors = [error for result in results for error in result.get("errors", [])]
-        return {"passed": not errors, "errors": errors}
+        # 4. interaction_log 저장 (실패해도 응답은 반환)
+        if self._logging_service:
+            try:
+                self._logging_service.save(
+                    user_id=user_id,
+                    session_id=session_id,
+                    user_input=user_input,
+                    session_context=session_context,
+                    kag_state=kag_state,
+                    rag_state=rag_state,
+                    response_state=result,
+                    latency_ms=latency_ms,
+                )
+            except Exception as exc:
+                logger.error("log_save_error", extra={"error": str(exc)}, exc_info=True)
 
-    def _get_ml_output(self, user_id):
-        return resolve_ml_output(user_id, self._ml_output_repository)
+        logger.info(
+            "chatbot_ok",
+            extra={"user_id": user_id, "session_id": session_id, "ms": latency_ms},
+        )
+
+        return {
+            "status": result.get("status", "error"),
+            "response_state": result,
+            "latency_ms": latency_ms,
+        }

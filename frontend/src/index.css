@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0E1018;
+  --surface: rgba(255,255,255,0.06);
+  --surface-strong: rgba(255,255,255,0.10);
+  --text: #B9B3C9;
+  --text-h: #F4F0FF;
+  --text-muted: rgba(185,179,201,0.55);
+  --accent: #BFA7FF;
+  --accent-mint: #8EF6D4;
+  --accent-blue: #8EC5FF;
+  --border: rgba(255,255,255,0.08);
+  --border-accent: rgba(191,167,255,0.2);
+  --nav-bg: rgba(14,16,24,0.88);
+  --radius-sm: 12px;
+  --radius: 24px;
+  --radius-lg: 32px;
+  --shadow-soft: 0 20px 60px rgba(0,0,0,0.28);
+  --shadow-glow: 0 0 40px rgba(191,167,255,0.22);
+  --blur-glass: blur(18px);
+  --sans: system-ui, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
+
+  font: 15px/1.6 var(--sans);
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Light theme overrides ───────────────────────────────────────────────── */
+
+[data-theme="light"] {
+  --bg: #F0EEFF;
+  --surface: rgba(255,255,255,0.78);
+  --surface-strong: rgba(255,255,255,0.95);
+  --text: #3D3558;
+  --text-h: #1A1228;
+  --text-muted: rgba(61,53,88,0.78);   /* 52% → 78%: 대비비 2.6:1 → 4.9:1 */
+  --accent: #6941E0;                    /* 밝은 배경에서 보라 강화 */
+  --accent-mint: #0A6E45;              /* 2.76:1 → 5.1:1: 섹션 레이블 가독성 */
+  --accent-blue: #1D6FB8;
+  --border: rgba(100,80,200,0.12);
+  --border-accent: rgba(105,65,224,0.24);
+  --nav-bg: rgba(240,238,255,0.90);    /* 라이트 네비 배경 */
+  --shadow-soft: 0 20px 60px rgba(100,80,160,0.10);
+  --shadow-glow: 0 0 40px rgba(105,65,224,0.14);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+h1, h2, h3 {
+  color: var(--text-h);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+button {
+  cursor: pointer;
+  font: inherit;
+  border: none;
+  background: none;
+}
+
+textarea {
+  font: inherit;
+  resize: none;
+}
+
+p { margin: 0; }

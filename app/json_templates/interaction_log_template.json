@@ -1,9 +1,14 @@
 {
   "log_id": "log_20260504_0001",
   "user_id": "user_001",
+  "session_id": "session_abc123",
   "user_input": "새로운 취향으로 들을 만한 노래 추천해줘",
-  "ml_output": {
-    "status": "success"
+  "session_context": {
+    "session_id": "session_abc123",
+    "recent_genres": ["rnb", "indie"],
+    "recent_artists": [],
+    "recent_moods": ["calm", "night"],
+    "conversation_summary": ""
   },
   "kag_state": {
     "status": "success"

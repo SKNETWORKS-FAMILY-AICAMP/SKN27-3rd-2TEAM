@@ -21,13 +21,23 @@ def test_provenance_validator_rejects_content_id_not_in_rag_state():
 def test_provenance_validator_accepts_titles_and_artists_from_rag_state():
     rag_state = {
         "recommended_content_evidence": [
-            {"content_id": "track_001", "title": "Midnight Loop", "artist": "Nova Lane"}
+            {
+                "content_id": "track_001",
+                "title": "Midnight Loop",
+                "artist": "Nova Lane",
+                "evidence_summary": "차분한 밤 분위기와 연결되는 곡",
+            }
         ]
     }
     response_state = {
         "used_content_ids": ["track_001"],
         "display_recommendations": [
-            {"content_id": "track_001", "title": "Midnight Loop", "artist": "Nova Lane"}
+            {
+                "content_id": "track_001",
+                "title": "Midnight Loop",
+                "artist": "Nova Lane",
+                "display_reason": "차분한 밤 분위기와 연결되는 곡",
+            }
         ],
     }
 

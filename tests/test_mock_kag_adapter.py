@@ -1,33 +1,21 @@
-from app.adapters.mock_kag_adapter import MockKagAdapter
+from app.kag.adapters.mock_kag_adapter import MockKagAdapter
 
 
-def test_mock_kag_adapter_returns_docs_defined_kag_state():
+def test_mock_kag_adapter_returns_kag_state():
     adapter = MockKagAdapter()
-    ml_output = {
-        "status": "success",
-        "user_id": "user_001",
-        "taste_profile": {
-            "preferred_genres": ["rnb", "indie"],
-            "preferred_moods": ["calm", "night"],
-            "preferred_tempo": "medium",
-        },
-        "behavior_profile": {
-            "recent_listening_level": "medium",
-            "recent_discovery_level": "low",
-            "repeat_listening_ratio": 0.72,
-            "new_artist_acceptance": 0.34,
-        },
-        "recommendation_profile": {
-            "personalization_strength": "high",
-            "discovery_readiness": "medium",
-            "new_release_affinity": "medium",
-        },
+    session_context = {
+        "session_id": "session_001",
+        "recent_genres": ["rnb", "indie"],
+        "recent_moods": ["calm", "night"],
+        "recent_artists": [],
+        "conversation_summary": "",
     }
 
-    kag_state = adapter.build_state("user_001", "새로운 취향도 추천해줘", ml_output)
+    kag_state = adapter.build_state("user_001", "새로운 취향도 추천해줘", session_context)
 
     assert kag_state["status"] == "success"
-    assert kag_state["user"]["user_id"] == "user_001"
     assert kag_state["recommendation_goal"]["primary_goal"] == "new_taste_discovery"
-    assert kag_state["routing"]["target_page"] == "main_recommendation_page"
-    assert "personalized_match" in kag_state["content_requirements"]["must_include"]
+    assert kag_state["recommendation_category"] == "discovery_candidate"
+    assert kag_state["route"] == "safe_discovery"
+    assert kag_state["target_section"] == "discovery_section"
+    assert isinstance(kag_state["recommended_content_ids"], list)

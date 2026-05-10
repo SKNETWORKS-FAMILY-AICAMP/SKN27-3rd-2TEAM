@@ -14,3 +14,10 @@ __pycache__
 docs
 tests
 db
+frontend/node_modules
+frontend/dist
+frontend/.vite
+frontend/.cache
+data/load
+data/processed
+seed

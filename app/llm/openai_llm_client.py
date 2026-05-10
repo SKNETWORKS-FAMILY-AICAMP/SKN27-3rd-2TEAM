@@ -23,7 +23,7 @@ class OpenAiLlmClient:
         self._timeout_seconds = (
             timeout_seconds
             if timeout_seconds is not None
-            else settings.RIMAS_LLM_TIMEOUT_SECONDS
+            else settings.RIMAS_LLM_TIMEOUT
         )
         self._client = openai_client or self._build_client()
 

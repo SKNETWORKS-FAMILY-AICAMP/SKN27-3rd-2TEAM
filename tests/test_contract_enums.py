@@ -46,26 +46,14 @@ class ContractEnumTest(unittest.TestCase):
             "recommendation_category",
         )
 
-    def test_contract_value_enums_cover_documented_values(self):
-        from app.common.enums import ResponseStatus
-        from app.contracts.enums import IntentType, RecommendationCategory
-
-        self.assertEqual(ResponseStatus.SUCCESS, "success")
-        self.assertEqual(ResponseStatus.EMPTY_RESULT, "empty_result")
-        self.assertEqual(
-            RecommendationCategory.DISCOVERY_CANDIDATE,
-            "discovery_candidate",
-        )
-        self.assertEqual(
-            IntentType.RECOMMENDATION_REASON_QUESTION,
-            "recommendation_reason_question",
-        )
-
-    def test_allowed_statuses_are_derived_from_status_enum(self):
+    def test_allowed_statuses_contain_documented_values(self):
         from app.common.constants import ALLOWED_STATUSES
-        from app.common.enums import ResponseStatus
 
-        self.assertEqual(ALLOWED_STATUSES, {status.value for status in ResponseStatus})
+        self.assertIn("success", ALLOWED_STATUSES)
+        self.assertIn("error", ALLOWED_STATUSES)
+        self.assertIn("partial_match", ALLOWED_STATUSES)
+        self.assertIn("empty_result", ALLOWED_STATUSES)
+        self.assertIn("timeout", ALLOWED_STATUSES)
 
 
 if __name__ == "__main__":

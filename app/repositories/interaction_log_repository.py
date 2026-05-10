@@ -8,10 +8,9 @@ except ImportError:
 
 
 JSON_FIELDS = (
-    "ml_output_json",
-    "kag_state_json",
-    "rag_state_json",
-    "response_state_json",
+    "compact_kag_state_json",
+    "compact_rag_state_json",
+    "compact_response_state_json",
     "validation_result_json",
 )
 
@@ -53,6 +52,7 @@ class InteractionLogRepository(BaseRepository):
     def _validate_required_fields(self, log):
         required_fields = (
             "log_id",
+            "request_id",
             "user_id",
             "page_type",
             "status",

@@ -1,0 +1,8 @@
+node_modules
+dist
+dist-ssr
+.vite
+.cache
+*.log
+.env
+.env.*
