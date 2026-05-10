@@ -1,3 +1,0 @@
-\copy users(user_id, display_name, source_user_id, source_type) FROM '/workspace/seed/users.csv' WITH (FORMAT csv, HEADER true);
-
-\copy kkbox_user_features(user_id, source_user_id, total_interactions, unique_song_count, repeat_listening_ratio, recent_listening_level, recent_discovery_level, new_artist_acceptance, churn_label, feature_json, source_dataset) FROM '/workspace/seed/kkbox_user_features.csv' WITH (FORMAT csv, HEADER true);
