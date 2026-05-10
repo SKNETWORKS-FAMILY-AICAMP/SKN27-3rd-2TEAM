@@ -72,77 +72,65 @@ class Query:
         parameters = {"mood": row["mood"]}
         return query, parameters
 
-    @staticmethod
-    def ml_outputs(row: pd.Series):
-        """ml_outputs.csv: User -[:has_outputs]-> MlOutputs, 장르/아티스트/무드는 FOREACH로 다중 연결."""
-        query = """
-        MERGE (u:User {user_id: $user_id})
-        MERGE (mo:MlOutputs {user_id: $user_id})
-        SET
-            mo.user_id = $user_id,
-            mo.status = $status,
-            mo.preferred_tempo = $preferred_tempo,
-            mo.recent_listening_level = $recent_listening_level,
-            mo.recent_discovery_level = $recent_discovery_level,
-            mo.repeat_listening_ratio = $repeat_listening_ratio,
-            mo.new_artist_acceptance = $new_artist_acceptance,
-            mo.personalization_strength = $personalization_strength,
-            mo.discovery_readiness = $discovery_readiness,
-            mo.new_release_affinity = $new_release_affinity
-        MERGE (u)-[:has_outputs]->(mo)
-        FOREACH (g IN $genres | MERGE (mo)-[:preferred_genres]->(gn:Genre {genre: g}))
-        FOREACH (a IN $artists | MERGE (mo)-[:preferred_artists]->(ar:Artist {artist: a}))
-        FOREACH (m IN $moods | MERGE (mo)-[:preferred_moods]->(mm:Mood {mood: m}))
-        """
-        uid = str(row["user_id"])
-        parameters = {
-            "user_id": uid,
-            "status": _scalar_or_none(row["status"]),
-            "preferred_tempo": _scalar_or_none(row["preferred_tempo"]),
-            "recent_listening_level": _scalar_or_none(row["recent_listening_level"]),
-            "recent_discovery_level": _scalar_or_none(row["recent_discovery_level"]),
-            "repeat_listening_ratio": _scalar_or_none(row["repeat_listening_ratio"]),
-            "new_artist_acceptance": _scalar_or_none(row["new_artist_acceptance"]),
-            "personalization_strength": _scalar_or_none(row["personalization_strength"]),
-            "discovery_readiness": _scalar_or_none(row["discovery_readiness"]),
-            "new_release_affinity": _scalar_or_none(row["new_release_affinity"]),
-            "genres": _split_multi(row.get("preferred_genres")),
-            "artists": _split_multi(row.get("preferred_artists")),
-            "moods": _split_multi(row.get("preferred_moods")),
-        }
-        return query, parameters
 
     @staticmethod
     def music_catalog(row: pd.Series):
-        """music_catalog.csv: MusicCatalog 중심, Album-[:in_album]->MusicCatalog 등 관계 구성."""
+        """Kaggle/Spotify 포맷 music_catalog.csv 한 행을 MusicCatalog 노드에 프로퍼티로만 적재한다. 엣지·별도 노드 연결은 별도 쿼리에서 처리."""
+        track_id = str(row["track_id"]).strip()
+        content_id = f"mc_{track_id}"
         query = """
         MERGE (mc:MusicCatalog {content_id: $content_id})
-        SET mc.title = $title,
-            mc.name = $title
-        FOREACH (_ IN CASE WHEN $artist IS NOT NULL THEN [1] ELSE [] END |
-            MERGE (mc)-[:has_artist]->(ar:Artist {artist: $artist})
-        )
-        FOREACH (_ IN CASE WHEN $album IS NOT NULL THEN [1] ELSE [] END |
-            MERGE (al:Album {album: $album})-[:in_album]->(mc)
-        )
-        FOREACH (g IN $genres | MERGE (mc)-[:has_genre]->(gn:Genre {genre: g}))
-        FOREACH (m IN $moods | MERGE (mc)-[:has_mood]->(mm:Mood {mood: m}))
-        FOREACH (_ IN CASE WHEN $tempo IS NOT NULL THEN [1] ELSE [] END |
-            MERGE (mc)-[:has_tempo]->(tp:Tempo {tempo: $tempo})
-        )
-        FOREACH (_ IN CASE WHEN $release_type IS NOT NULL THEN [1] ELSE [] END |
-            MERGE (mc)-[:has_release_type]->(rt:ReleaseType {release_type: $release_type})
-        )
+        SET mc.name = $track_name,
+            mc.track_id = $track_id,
+            mc.content_id = $content_id,
+            mc.track_name = $track_name,
+            mc.track_artist = $track_artist,
+            mc.track_popularity = $track_popularity,
+            mc.track_album_id = $track_album_id,
+            mc.track_album_name = $track_album_name,
+            mc.track_album_release_date = $track_album_release_date,
+            mc.playlist_name = $playlist_name,
+            mc.playlist_id = $playlist_id,
+            mc.playlist_genre = $playlist_genre,
+            mc.playlist_subgenre = $playlist_subgenre,
+            mc.danceability = $danceability,
+            mc.energy = $energy,
+            mc.`key` = $key,
+            mc.loudness = $loudness,
+            mc.mode = $mode,
+            mc.speechiness = $speechiness,
+            mc.acousticness = $acousticness,
+            mc.instrumentalness = $instrumentalness,
+            mc.liveness = $liveness,
+            mc.valence = $valence,
+            mc.tempo = $tempo,
+            mc.duration_ms = $duration_ms
         """
         parameters = {
-            "content_id": str(row["content_id"]),
-            "title": _scalar_or_none(row["title"]),
-            "artist": _scalar_or_none(row.get("artist")),
-            "album": _scalar_or_none(row.get("album")),
-            "tempo": _scalar_or_none(row.get("tempo")),
-            "release_type": _scalar_or_none(row.get("release_type")),
-            "genres": _split_multi(row.get("genres")),
-            "moods": _split_multi(row.get("moods")),
+            "content_id": content_id,
+            "track_id": track_id,
+            "track_name": _scalar_or_none(row["track_name"]),
+            "track_artist": _scalar_or_none(row["track_artist"]),
+            "track_popularity": _scalar_or_none(row["track_popularity"]),
+            "track_album_id": _scalar_or_none(row["track_album_id"]),
+            "track_album_name": _scalar_or_none(row["track_album_name"]),
+            "track_album_release_date": _scalar_or_none(row["track_album_release_date"]),
+            "playlist_name": _scalar_or_none(row["playlist_name"]),
+            "playlist_id": _scalar_or_none(row["playlist_id"]),
+            "playlist_genre": _scalar_or_none(row["playlist_genre"]),
+            "playlist_subgenre": _scalar_or_none(row["playlist_subgenre"]),
+            "danceability": _scalar_or_none(row["danceability"]),
+            "energy": _scalar_or_none(row["energy"]),
+            "key": _scalar_or_none(row["key"]),
+            "loudness": _scalar_or_none(row["loudness"]),
+            "mode": _scalar_or_none(row["mode"]),
+            "speechiness": _scalar_or_none(row["speechiness"]),
+            "acousticness": _scalar_or_none(row["acousticness"]),
+            "instrumentalness": _scalar_or_none(row["instrumentalness"]),
+            "liveness": _scalar_or_none(row["liveness"]),
+            "valence": _scalar_or_none(row["valence"]),
+            "tempo": _scalar_or_none(row["tempo"]),
+            "duration_ms": _scalar_or_none(row["duration_ms"]),
         }
         return query, parameters
 

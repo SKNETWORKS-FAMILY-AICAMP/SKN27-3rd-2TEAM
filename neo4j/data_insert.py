@@ -24,7 +24,7 @@ def main():
     # import_data(path="artists.csv", query_params=Query.artists)
     # import_data(path="moods.csv", query_params=Query.moods)
     # import_data(path="ml_outputs.csv", query_params=Query.ml_outputs)
-    # import_data(path="music_catalog.csv", query_params=Query.music_catalog)
+    import_data(path="music_catalog.csv", query_params=Query.music_catalog)
     # import_data(path="recommands.csv", query_params=Query.recommands)
 
 
