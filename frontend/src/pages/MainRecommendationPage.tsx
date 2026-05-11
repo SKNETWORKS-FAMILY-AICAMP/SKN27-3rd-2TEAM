@@ -13,10 +13,10 @@ import type { RecommendationCategoryTarget } from "../components/home/Constellat
 
 interface Props {
   onChatOpen?: () => void;
-  initialCategory?: RecommendationCategoryTarget;
+  category?: RecommendationCategoryTarget;
 }
 
-export function MainRecommendationPage({ onChatOpen, initialCategory }: Props) {
+export function MainRecommendationPage({ onChatOpen, category }: Props) {
   const { userId, sessionId } = useSessionStore();
   const [detailContentId, setDetailContentId] = useState(() => {
     return new URLSearchParams(window.location.search).get("detail");
@@ -67,13 +67,6 @@ export function MainRecommendationPage({ onChatOpen, initialCategory }: Props) {
     setDetailContentId(null);
   };
 
-  useEffect(() => {
-    if (!data || !initialCategory) return;
-
-    const section = document.getElementById(`recommendation-${initialCategory}`);
-    section?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [initialCategory, data]);
-
   if (isLoading) {
     return (
       <DreamBackground variant="main">
@@ -91,50 +84,90 @@ export function MainRecommendationPage({ onChatOpen, initialCategory }: Props) {
   }
 
   const vm = data.view_model;
+  const isCategoryPage = Boolean(category);
+
+  const categoryView = category
+    ? {
+        personalized: {
+          title: "개인화 추천",
+          label: "Taste Based",
+          cards: vm.personalized,
+        },
+        discovery: {
+          title: "새로운 취향",
+          label: "Discovery",
+          cards: vm.discovery,
+        },
+        newRelease: {
+          title: "신규 발매",
+          label: "New Release",
+          cards: vm.new_release,
+        },
+      }[category]
+    : null;
 
   return (
     <DreamBackground variant="main">
-      <div className="main-page">
+      <div className={`main-page${isCategoryPage ? " main-page--category" : ""}`}>
         {data.session_degraded && (
           <div className="session-degraded-banner">
             세션 연결이 불안정하여 개인화 기능이 일부 제한될 수 있습니다.
           </div>
         )}
 
-        <TopTasteHeader tasteBadges={vm.taste_badges} todayTheme={vm.today_theme} />
+        {!isCategoryPage && (
+          <>
+            <TopTasteHeader tasteBadges={vm.taste_badges} todayTheme={vm.today_theme} />
 
-        <section className="hero-section">
-          <CharacterDjBanner message={vm.character_message} onChatOpen={onChatOpen} />
-        </section>
+            <section className="hero-section">
+              <CharacterDjBanner message={vm.character_message} onChatOpen={onChatOpen} />
+            </section>
+          </>
+        )}
+
+        {isCategoryPage && categoryView && (
+          <div className="category-page-header">
+            <span className="category-page-header__label">{categoryView.label}</span>
+            <h1 className="category-page-header__title">{categoryView.title}</h1>
+            {vm.today_theme && (
+              <p className="category-page-header__description">{vm.today_theme}</p>
+            )}
+          </div>
+        )}
 
         <div className="recommendation-dashboard">
-          <div id="recommendation-personalized">
+          {categoryView ? (
             <RecommendationSection
-              title="개인화 추천"
-              label="Taste Based"
-              cards={vm.personalized}
+              title={categoryView.title}
+              label={categoryView.label}
+              cards={categoryView.cards}
               onOpenDetail={openDetail}
             />
-          </div>
-          <div id="recommendation-discovery">
-            <RecommendationSection
-              title="새로운 취향"
-              label="Discovery"
-              cards={vm.discovery}
-              onOpenDetail={openDetail}
-            />
-          </div>
-          <div id="recommendation-newRelease">
-            <RecommendationSection
-              title="신규 발매"
-              label="New Release"
-              cards={vm.new_release}
-              onOpenDetail={openDetail}
-            />
-          </div>
+          ) : (
+            <>
+              <RecommendationSection
+                title="개인화 추천"
+                label="Taste Based"
+                cards={vm.personalized}
+                onOpenDetail={openDetail}
+              />
+              <RecommendationSection
+                title="새로운 취향"
+                label="Discovery"
+                cards={vm.discovery}
+                onOpenDetail={openDetail}
+              />
+              <RecommendationSection
+                title="신규 발매"
+                label="New Release"
+                cards={vm.new_release}
+                onOpenDetail={openDetail}
+              />
+            </>
+          )}
         </div>
 
-        {vm.personalized_guide && (
+        {!isCategoryPage && vm.personalized_guide && (
           <p className="personalized-guide">{vm.personalized_guide}</p>
         )}
 

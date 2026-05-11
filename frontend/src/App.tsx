@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ConstellationHome } from "./components/home/ConstellationHome";
-import type { RecommendationCategoryTarget } from "./components/home/ConstellationHome";
 import { MainRecommendationPage } from "./pages/MainRecommendationPage";
 import { ChatbotPage } from "./pages/ChatbotPage";
 import { useSessionStore } from "./stores/sessionStore";
@@ -18,14 +17,15 @@ const queryClient = new QueryClient({
   },
 });
 
-type Page = "home" | "main" | "chatbot";
+type Page = "home" | "main" | "personalized" | "discovery" | "newRelease" | "chatbot";
 
 function AppContent() {
   const [page, setPage] = useState<Page>("home");
-  const [recommendationCategory, setRecommendationCategory] =
-    useState<RecommendationCategoryTarget | undefined>();
   const { userId, setUserId } = useSessionStore();
   const { theme, toggle } = useThemeStore();
+
+  const isRecommendationPage =
+    page === "main" || page === "personalized" || page === "discovery" || page === "newRelease";
 
   return (
     <div className="app">
@@ -35,9 +35,8 @@ function AppContent() {
             RIMAS
           </button>
           <button
-            className={`nav-btn${page === "main" ? " nav-btn--active" : ""}`}
+            className={`nav-btn${isRecommendationPage ? " nav-btn--active" : ""}`}
             onClick={() => {
-              setRecommendationCategory(undefined);
               setPage("main");
             }}
           >
@@ -46,7 +45,6 @@ function AppContent() {
           <button
             className={`nav-btn${page === "chatbot" ? " nav-btn--active" : ""}`}
             onClick={() => {
-              setRecommendationCategory(undefined);
               setPage("chatbot");
             }}
           >
@@ -69,20 +67,29 @@ function AppContent() {
 
       <main className="app-content">
         {page === "home" && (
-          <ConstellationHome
-            onNavigate={(nextPage, category) => {
-              setRecommendationCategory(category);
-              setPage(nextPage);
-            }}
-          />
+          <ConstellationHome onNavigate={setPage} />
         )}
         {page === "main" && (
           <MainRecommendationPage
-            initialCategory={recommendationCategory}
-            onChatOpen={() => {
-              setRecommendationCategory(undefined);
-              setPage("chatbot");
-            }}
+            onChatOpen={() => setPage("chatbot")}
+          />
+        )}
+        {page === "personalized" && (
+          <MainRecommendationPage
+            category="personalized"
+            onChatOpen={() => setPage("chatbot")}
+          />
+        )}
+        {page === "discovery" && (
+          <MainRecommendationPage
+            category="discovery"
+            onChatOpen={() => setPage("chatbot")}
+          />
+        )}
+        {page === "newRelease" && (
+          <MainRecommendationPage
+            category="newRelease"
+            onChatOpen={() => setPage("chatbot")}
           />
         )}
         {page === "chatbot" && <ChatbotPage />}

@@ -367,6 +367,39 @@
   gap: 32px;
 }
 
+.main-page--category {
+  gap: 24px;
+}
+
+.category-page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 4px 0;
+}
+
+.category-page-header__label {
+  color: var(--accent-peach);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.category-page-header__title {
+  color: var(--text-h);
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.category-page-header__description {
+  max-width: 720px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
 .hero-section {
   padding-top: 18px;
 }
@@ -635,7 +668,7 @@
 }
 
 .rec-section {
-  padding: 24px;
+  padding: 20px;
 }
 
 .rec-section__header {
@@ -660,15 +693,15 @@
 
 .rec-section__grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .rec-card {
   width: 100%;
   min-height: 100%;
-  padding: 18px;
-  border-radius: var(--radius);
+  padding: 14px;
+  border-radius: 20px;
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -694,22 +727,22 @@
 .rec-card__cover {
   width: 100%;
   aspect-ratio: 1;
-  margin-bottom: 12px;
-  border-radius: 18px;
+  margin-bottom: 10px;
+  border-radius: 14px;
 }
 
 .rec-card__label {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
   color: var(--accent-peach);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
 }
 
 .rec-card__title {
   overflow: hidden;
   color: var(--text-h);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -718,7 +751,7 @@
 .rec-card__artist {
   margin-top: 2px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .rec-card__tags,
@@ -730,8 +763,8 @@
 }
 
 .tag {
-  padding: 3px 10px;
-  font-size: 11px;
+  padding: 2px 8px;
+  font-size: 10px;
 }
 
 .tag--genre {
@@ -748,13 +781,13 @@
 
 .rec-card__reason {
   display: -webkit-box;
-  margin-top: 10px;
+  margin-top: 8px;
   overflow: hidden;
   color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 11px;
+  line-height: 1.45;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
 }
 
 .detail-modal {

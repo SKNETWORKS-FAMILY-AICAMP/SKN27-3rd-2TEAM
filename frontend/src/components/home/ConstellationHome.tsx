@@ -1,21 +1,20 @@
 import { MascotCharacter } from "../mascot/MascotCharacter";
 
-type PageTarget = "main" | "chatbot";
 export type RecommendationCategoryTarget = "personalized" | "discovery" | "newRelease";
+export type HomePageTarget = RecommendationCategoryTarget | "chatbot";
 
 type ConstellationNode = {
   id: string;
   label: string;
   x: number;
   y: number;
-  target: PageTarget;
-  category?: RecommendationCategoryTarget;
+  target: HomePageTarget;
 };
 
 const constellationNodes: ConstellationNode[] = [
-  { id: "personalized", label: "개인화 추천", target: "main", category: "personalized", x: 28, y: 36 },
-  { id: "discovery", label: "새로운 취향", target: "main", category: "discovery", x: 72, y: 36 },
-  { id: "newRelease", label: "신규 발매", target: "main", category: "newRelease", x: 30, y: 68 },
+  { id: "personalized", label: "개인화 추천", target: "personalized", x: 28, y: 36 },
+  { id: "discovery", label: "새로운 취향", target: "discovery", x: 72, y: 36 },
+  { id: "newRelease", label: "신규 발매", target: "newRelease", x: 30, y: 68 },
   { id: "chatbot", label: "DJ 챗봇", target: "chatbot", x: 70, y: 68 },
 ];
 
@@ -29,7 +28,7 @@ const constellationLines = [
 ] as const;
 
 type Props = {
-  onNavigate: (page: PageTarget, category?: RecommendationCategoryTarget) => void;
+  onNavigate: (page: HomePageTarget) => void;
 };
 
 function findNode(id: string) {
@@ -72,7 +71,7 @@ export function ConstellationHome({ onNavigate }: Props) {
             type="button"
             className="constellation-node"
             style={{ left: `${node.x}%`, top: `${node.y}%` }}
-            onClick={() => onNavigate(node.target, node.category)}
+            onClick={() => onNavigate(node.target)}
           >
             <span className="constellation-star" aria-hidden="true" />
             <span className="constellation-label">{node.label}</span>
