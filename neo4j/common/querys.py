@@ -199,3 +199,63 @@ class Query:
         }
 
         return query, parameters
+
+    @staticmethod
+    def edge_has_subgenre(rows: list[dict]) -> tuple[str, dict]:
+        """
+        기존 MusicCatalog 노드와 기존 SubGenre 노드를
+        UNWIND 기반으로 연결하는 쿼리.
+        """
+
+        query = """
+        UNWIND $rows AS row
+
+        MATCH (mc:MusicCatalog {track_id: row.track_id})
+        MATCH (sg:SubGenre {subgenre: row.subgenre})
+
+        MERGE (mc)-[:HAS_SUBGENRE]->(sg)
+        """
+
+        parameters = {
+            "rows": [
+                {
+                    "track_id": str(row["track_id"]),
+                    "subgenre": row["playlist_subgenre"],
+                }
+                for row in rows
+                if row.get("track_id") is not None
+                and row.get("playlist_subgenre") is not None
+            ]
+        }
+
+        return query, parameters
+
+    @staticmethod
+    def edge_performed_by(rows: list[dict]) -> tuple[str, dict]:
+        """
+        기존 MusicCatalog 노드와 기존 Artist 노드를
+        UNWIND 기반으로 연결하는 쿼리.
+        """
+
+        query = """
+        UNWIND $rows AS row
+
+        MATCH (mc:MusicCatalog {track_id: row.track_id})
+        MATCH (a:Artist {artist: row.artist})
+
+        MERGE (mc)-[:PERFORMED_BY]->(a)
+        """
+
+        parameters = {
+            "rows": [
+                {
+                    "track_id": str(row["track_id"]),
+                    "artist": row["track_artist"],
+                }
+                for row in rows
+                if row.get("track_id") is not None
+                and row.get("track_artist") is not None
+            ]
+        }
+
+        return query, parameters

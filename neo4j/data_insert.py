@@ -39,13 +39,9 @@ def main():
     ############################### 엣지 연결 ############################################
     # 데이터 전체를 주회해야 하므로 import_data 를 통해 실행하게 됨 
     # 다만 각 쿼리 내부에 연결 여부를 매핑하는 함수가 들어있어야 한다. 조건에 맞으면 연결 / 아니면 pass 
-    import_data(path="music_catalog.csv", query_params=Query.edge_has_genre)
-
-
-
-
-
-
+    # import_data(path="music_catalog.csv", query_params=Query.edge_has_genre)
+    # import_data(path="music_catalog.csv", query_params=Query.edge_has_subgenre)
+    # import_data(path="music_catalog.csv", query_params=Query.edge_performed_by)
 
 
 
