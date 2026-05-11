@@ -26,7 +26,7 @@ RIMAS_ELASTICSEARCH_URL = os.getenv("RIMAS_ELASTICSEARCH_URL", "http://localhost
 
 # LLM
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-RIMAS_LLM_MODEL = os.getenv("RIMAS_LLM_MODEL", "gpt-4.1-mini")
+RIMAS_LLM_MODEL = os.getenv("RIMAS_LLM_MODEL", "GPT-5.4 mini")
 RIMAS_LLM_TIMEOUT = float(os.getenv("RIMAS_LLM_TIMEOUT_SECONDS", "30"))
 
 # CORS
