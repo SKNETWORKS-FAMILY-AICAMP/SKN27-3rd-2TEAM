@@ -152,3 +152,27 @@ def extract_release_year(release_date: str | None) -> Optional[int]:
         return None
 
     return int(year_text)
+
+
+###########################################################
+# 장르 / 서브장르 조합 중복제거 -> csv 파일로 neo4j/data 폴더에 저장 
+###########################################################
+def remove_duplicate_genre_subgenre(path: str):
+    """
+    df 에서 장르 / 서브장르 조합 중복제거 
+    같은 row의 playlist_genres와 playlist_subgenre를 하나의 튜플로 묶은다음 set에 넣어서 중복을 제거하고 나서 
+    다시 해당 데이터를 별도의 dataframe으로 반환 한다. 
+    반환 시에는 하나의 튜플이었던 데이터를 다시 genres, subgenres로 분리해야 한다. 
+    """
+    # 파일 path 에서 데이터를 읽어온다. 
+    df = pd.read_csv(path)
+
+    # df에서 playlist_genres와 playlist_subgenre를 하나의 튜플로 묶은다음 set에 넣어서 중복을 제거한다.
+    genre_subgenre_set = set(zip(df["playlist_genre"], df["playlist_subgenre"]))
+
+    # 중복을 제거한 튜플을 가지고 다시 dataframe으로 변환한다. 
+    # 변환 시에는 튜플에서 [0] 인덱스는 장르, [1] 인덱스는 서브장르여야 한다. 
+    genre_subgenre_df = pd.DataFrame(genre_subgenre_set, columns=["genres", "subgenres"])
+
+    # csv 파일로 neo4j/data 폴더에 저장 
+    genre_subgenre_df.to_csv(get_filepath("genre_subgenre.csv"), index=False)

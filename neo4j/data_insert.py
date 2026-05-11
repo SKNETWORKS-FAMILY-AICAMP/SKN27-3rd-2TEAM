@@ -3,11 +3,15 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# 패키지
+import pandas as pd
+
 # 모듈
 from common.querys import Query
 from common.utils import import_data, import_column, execute_query
 from common.connection import Neo4j_Connection
 from common.constant import KagMoodLabel, KagTempoLabel
+from common.utils import remove_duplicate_genre_subgenre, get_filepath
 
 
 ###################################################################################################
@@ -43,6 +47,12 @@ def main():
     # import_data(path="music_catalog.csv", query_params=Query.edge_has_subgenre)
     # import_data(path="music_catalog.csv", query_params=Query.edge_performed_by)
 
+
+
+    ############################### 서브노드 간 엣지 연결 ############################################
+    # 장르랑 서브 장르 연결을 위한 csv 데이터 생성 
+    # remove_duplicate_genre_subgenre(path=get_filepath("music_catalog.csv"))
+    # import_data(path="genre_subgenre.csv", query_params=Query.edge_has_genre_subgenre)
 
 
 

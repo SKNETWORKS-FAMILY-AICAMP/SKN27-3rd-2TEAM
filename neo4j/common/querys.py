@@ -170,7 +170,7 @@ class Query:
 
 
 
-############################################ 엣지 연결 ############################################
+############################################ 데이터 엣지 연결 ############################################
 
     @staticmethod
     def edge_has_genre(rows: list[dict]) -> tuple[str, dict]:
@@ -257,5 +257,44 @@ class Query:
                 and row.get("track_artist") is not None
             ]
         }
+
+        return query, parameters
+
+
+
+
+
+############################################ 서브노드 간 엣지 연결 #########################################
+
+    @staticmethod
+    def edge_has_genre_subgenre(rows: list[dict]) -> tuple[str, dict]:
+        """
+        genre_subgenre.csv(genres, subgenres) 행을 이용해
+        기존 Genre·SubGenre 노드를 매칭하고, 서브장르가 해당 장르에 속함을 표시한다.
+        """
+
+        query = """
+        UNWIND $rows AS row
+
+        MATCH (g:Genre {genre: row.genre})
+        MATCH (sg:SubGenre {subgenre: row.subgenre})
+
+        MERGE (g)-[:GENRE_INCLUDES_SUBGENRE]->(sg)
+        """
+
+        merged_rows = []
+        for row in rows:
+            genre = scalar_or_none(row.get("genres"))
+            subgenre = scalar_or_none(row.get("subgenres"))
+            if genre is None or subgenre is None:
+                continue
+            merged_rows.append(
+                {
+                    "genre": str(genre).strip(),
+                    "subgenre": str(subgenre).strip(),
+                }
+            )
+
+        parameters = {"rows": merged_rows}
 
         return query, parameters
