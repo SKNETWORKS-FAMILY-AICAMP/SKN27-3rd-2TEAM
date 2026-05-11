@@ -7,7 +7,7 @@ interface Props {
 
 export const ChatHistory = memo(function ChatHistory({ history }: Props) {
   if (history.length === 0) {
-    return <p className="chat-empty">무엇이든 물어보세요. DJ가 답해드릴게요 🎵</p>;
+    return <p className="chat-empty">무엇이든 물어보세요. DJ가 답해드릴게요.</p>;
   }
 
   return (

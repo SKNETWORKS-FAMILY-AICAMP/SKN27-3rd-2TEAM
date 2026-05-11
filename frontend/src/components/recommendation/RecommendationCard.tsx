@@ -9,12 +9,12 @@ interface Props {
 export const RecommendationCard = memo(function RecommendationCard({ card, onOpenDetail }: Props) {
   return (
     <button
-      className="rec-card"
+      className="rec-card glass-panel"
       type="button"
       onClick={() => onOpenDetail?.(card.content_id)}
       aria-label={`${card.title} detail`}
     >
-      <div className="rec-card__cover">note</div>
+      <div className="rec-card__cover">♪</div>
 
       {card.label && (
         <span className="rec-card__label">{card.label}</span>
