@@ -3,15 +3,20 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 패키지
-import pandas as pd
-
 # 모듈
 from common.querys import Query
-from common.utils import import_data, import_column, execute_query
+from common.utils import (
+    import_data,
+    import_column,
+    import_music_catalog_scenarios,
+    remove_duplicate_genre_subgenre,
+    get_filepath,
+)
 from common.connection import Neo4j_Connection
-from common.constant import KagMoodLabel, KagTempoLabel
-from common.utils import remove_duplicate_genre_subgenre, get_filepath
+from common.constant import (
+    KagMoodLabel,
+    KagTempoLabel,
+)
 
 
 ###################################################################################################
@@ -36,8 +41,10 @@ def main():
     # import_column(path="music_catalog.csv", column_name="track_artist", query_params=Query.artists)
     # import_column(path="music_catalog.csv", column_name="playlist_subgenre", query_params=Query.subgenres)
     # import_column(path="music_catalog.csv", column_name="track_album_release_date", query_params=Query.year)
-    # execute_query(values=list(KagMoodLabel.__members__.values()), query_params=Query.mood)
-    # execute_query(values=list(KagTempoLabel.__members__.values()), query_params=Query.tempo)
+
+    ######################## 검색 시나리오에 따른 분류 노드 / 엣지 추가 ##############################
+    # 모든 시나리오를 enum으로 취급해서 하나의 노드로 연결
+    # import_music_catalog_scenarios()
 
 
     ############################### 엣지 연결 ############################################

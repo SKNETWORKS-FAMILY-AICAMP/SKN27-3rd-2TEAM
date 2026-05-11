@@ -162,3 +162,6 @@ track_id	track_name	track_artist	track_popularity	track_album_id	track_album_nam
 
 # 추천 과정 process 
 
+
+# 컬럼 내용 구분
+

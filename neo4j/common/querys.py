@@ -9,7 +9,12 @@ import pandas as pd
 
 # 모듈
 from common.utils import extract_release_year, split_multi, scalar_or_none
-from common.constant import KagMoodLabel, KagTempoLabel
+from common.constant import (
+    KagMoodLabel,
+    KagTempoLabel,
+    KagNodeLabel,
+    KagRelationType,
+)
 
 
 ####################################################################
@@ -297,4 +302,44 @@ class Query:
 
         parameters = {"rows": merged_rows}
 
+        return query, parameters
+
+
+############################################ 시나리오 분류 (music_catalog_scenarios.csv) ############################################
+
+    @staticmethod
+    def scenario_dim_tags_merge(rows: list[dict]) -> tuple[str, dict]:
+        """
+        dim_* 컬럼에서 등장하는 (컬럼명, tag_id) 쌍별로 ScenarioTag 노드를 MERGE한다.
+        rows: { "dimension": "dim_weather", "tag_id": "weather_sunny" } 형태.
+        """
+
+        label = KagNodeLabel.SCENARIO_TAG.value
+        query = f"""
+        UNWIND $rows AS row
+        MERGE (st:{label} {{
+            dimension: row.dimension,
+            tag_id: row.tag_id
+        }})
+        """
+        parameters = {"rows": rows}
+        return query, parameters
+
+    @staticmethod
+    def scenario_dim_tags_link(rows: list[dict]) -> tuple[str, dict]:
+        """
+        MusicCatalog(track_id)와 ScenarioTag(dimension, tag_id)를 HAS_SCENARIO_TAG로 연결한다.
+        rows: { "track_id", "dimension", "tag_id" } 형태. 해당 MusicCatalog 노드가 없으면 해당 행은 매칭되지 않는다.
+        """
+
+        rel = KagRelationType.HAS_SCENARIO_TAG.value
+        mcl = KagNodeLabel.MUSIC_CATALOG.value
+        stl = KagNodeLabel.SCENARIO_TAG.value
+        query = f"""
+        UNWIND $rows AS row
+        MATCH (mc:{mcl} {{track_id: row.track_id}})
+        MATCH (st:{stl} {{dimension: row.dimension, tag_id: row.tag_id}})
+        MERGE (mc)-[:{rel}]->(st)
+        """
+        parameters = {"rows": rows}
         return query, parameters

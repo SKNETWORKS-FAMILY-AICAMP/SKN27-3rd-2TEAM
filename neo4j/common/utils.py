@@ -7,6 +7,12 @@ logger = logging.getLogger(__name__)
 import pandas as pd
 from pathlib import Path
 from common.connection import Neo4j_Connection
+from common.constant import (
+    MUSIC_CATALOG_SCENARIOS_CSV_FILENAME,
+    SCENARIO_CSV_TAG_SEPARATOR,
+    SCENARIO_DIM_COLUMNS,
+    SCENARIO_KEY_COLUMN,
+)
 from typing import Optional
 
 
@@ -94,6 +100,47 @@ def import_column(path: str = None,column_name: str = None,query_params=None,bat
         logger.info(f"{column_name!r} "f"{start + len(batch)} / {total_count}개 적재 완료")
 
     logger.info(f"컬럼 {column_name!r} "f"유니크 {total_count}개 적재 완료")
+
+
+def split_scenario_csv_cell(value, sep: str) -> list[str]:
+    """dim_* 셀에 들어 있는 세미콜론 구분 tag_id 목록을 리스트로 정규화한다."""
+    if value is None or pd.isna(value):
+        return []
+    s = str(value).strip()
+    if not s:
+        return []
+    return [p.strip() for p in str(s).split(sep) if p.strip()]
+
+
+def import_music_catalog_scenarios(batch_size: int = 1000) -> None:
+    """
+    music_catalog_scenarios.csv의 각 dim_* 컬럼에서 유일한 tag_id마다 ScenarioTag 노드를 만들고,
+    동일 파일의 track_id에 대응하는 MusicCatalog 노드와 HAS_SCENARIO_TAG 관계로 연결한다.
+    MusicCatalog 적재가 선행되어 있어야 매칭된다.
+    """
+    from common.querys import Query
+
+    df = pd.read_csv(get_filepath(MUSIC_CATALOG_SCENARIOS_CSV_FILENAME))
+    tag_pairs: set[tuple[str, str]] = set()
+    link_rows: list[dict] = []
+
+    for rec in df.to_dict("records"):
+        tid_raw = rec.get(SCENARIO_KEY_COLUMN)
+        if tid_raw is None or (isinstance(tid_raw, float) and pd.isna(tid_raw)):
+            continue
+        track_id = str(tid_raw).strip()
+        if not track_id:
+            continue
+        for col in SCENARIO_DIM_COLUMNS:
+            if col not in rec:
+                continue
+            for tag in split_scenario_csv_cell(rec.get(col), SCENARIO_CSV_TAG_SEPARATOR):
+                tag_pairs.add((col, tag))
+                link_rows.append({"track_id": track_id, "dimension": col, "tag_id": tag})
+
+    tag_rows = [{"dimension": d, "tag_id": t} for d, t in sorted(tag_pairs)]
+    execute_query(tag_rows, Query.scenario_dim_tags_merge, batch_size=batch_size)
+    execute_query(link_rows, Query.scenario_dim_tags_link, batch_size=batch_size)
 
 
 ############################################################
