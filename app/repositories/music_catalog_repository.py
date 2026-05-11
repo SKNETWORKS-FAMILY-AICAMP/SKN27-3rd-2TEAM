@@ -38,6 +38,16 @@ class MusicCatalogRepository(BaseRepository):
             {"moods": moods},
         )
 
+    def find_by_content_id(self, content_id):
+        if not content_id:
+            raise ValueError("content_id is required")
+        with self._cursor() as cursor:
+            cursor.execute(
+                query_constants.SELECT_MUSIC_BY_CONTENT_ID,
+                {"content_id": content_id},
+            )
+            return cursor.fetchone()
+
     def _fetch_all(self, query, params):
         with self._cursor() as cursor:
             cursor.execute(query, params)

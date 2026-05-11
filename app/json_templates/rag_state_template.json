@@ -1,10 +1,7 @@
 {
   "status": "success",
-  "recommendation_context": {
-    "context_type": "new_taste_discovery",
-    "base_context": "사용자의 rnb/indie 취향과 calm/night 분위기를 기준으로 안전한 취향 확장 후보를 제공",
-    "source_type": "mock_music_catalog"
-  },
+  "query": "calm indie music",
+  "normalized_query": "calm indie music",
   "recommended_content_evidence": [
     {
       "content_id": "track_001",
@@ -12,70 +9,17 @@
       "artist": "Nova Lane",
       "album": "Night Sketch",
       "genre": [
-        "rnb",
         "indie"
       ],
       "mood": [
-        "calm",
         "night"
       ],
-      "tempo": "medium",
-      "release_type": "existing_catalog",
-      "recommendation_category": "personalized_match",
-      "evidence_summary": "사용자의 기존 rnb/indie 취향과 calm/night 분위기에 직접 연결되는 곡",
-      "match_reason": {
-        "genre_match": true,
-        "mood_match": true,
-        "tempo_match": true,
-        "new_taste_expansion": false
-      }
-    },
-    {
-      "content_id": "track_002",
-      "title": "Soft Orbit",
-      "artist": "Luna Field",
-      "album": "Orbit Notes",
-      "genre": [
-        "dream_pop",
-        "ambient"
-      ],
-      "mood": [
-        "calm",
-        "night",
-        "soft"
-      ],
-      "tempo": "slow",
-      "release_type": "existing_catalog",
-      "recommendation_category": "discovery_candidate",
-      "evidence_summary": "기존 calm/night 분위기와 연결되면서 dream_pop 계열로 확장 가능한 곡",
-      "match_reason": {
-        "genre_match": false,
-        "mood_match": true,
-        "tempo_match": false,
-        "new_taste_expansion": true
-      }
+      "evidence_summary": "차분한 밤 분위기와 연결되는 곡"
     }
   ],
   "recommendation_reason": {
-    "summary": "기존 개인화 추천을 유지하면서 부담 없는 취향 확장 후보를 함께 구성",
-    "reason_items": [
-      "기존 rnb/indie 취향과 연결되는 곡을 포함",
-      "calm/night 분위기를 유지하면서 새로운 장르 후보를 포함"
-    ]
+    "summary": "사용자의 최근 선호 분위기와 연결되는 곡"
   },
-  "information_evidence": [
-    {
-      "info_id": "genre_dream_pop_001",
-      "info_type": "genre",
-      "title": "dream_pop",
-      "summary": "부드럽고 몽환적인 분위기의 pop 계열 장르"
-    }
-  ],
-  "recommendation_scripts": {
-    "dj_intro": "기존에 좋아하던 분위기는 유지하면서 조금 새로운 결의 음악을 골라봤어요.",
-    "personalized_message": "먼저 익숙하게 들을 수 있는 곡을 추천드릴게요.",
-    "new_release_message": "최근 업데이트된 곡 중에서도 취향과 연결되는 곡을 함께 넣었어요.",
-    "discovery_message": "새로운 취향을 시도하고 싶다면 이 곡부터 시작해볼 수 있어요.",
-    "fallback_message": "지금은 충분한 추천 근거가 부족해서 기본 안내만 제공할게요."
-  }
+  "retrieval_metadata": {},
+  "retrieval_trace": {}
 }

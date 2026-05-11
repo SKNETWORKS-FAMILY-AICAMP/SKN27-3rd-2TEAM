@@ -1,10 +1,11 @@
 from app.agents.base_agent import BaseAgent
+from app.common.constants import ALLOWED_INTENT_TYPES
 
 
 class IntentAgent(BaseAgent):
-    def run(self, user_input, kag_state=None, rag_state=None):
+    def run(self, user_input, kag_state=None, rag_state=None, intent_state=None):
         text = user_input or ""
-        intent_type = self._classify(text)
+        intent_type = self._confirmed_intent_type(text, intent_state)
         return {
             "status": "success",
             "intent_type": intent_type,
@@ -14,27 +15,30 @@ class IntentAgent(BaseAgent):
             in {
                 "personalized_recommendation",
                 "new_release_recommendation",
-                "new_taste_discovery",
-                "similar_taste_recommendation",
+                "discovery_recommendation",
             },
             "requires_information": intent_type
             in {
-                "music_information_question",
-                "recommendation_reason_question",
+                "music_information",
+                "recommendation_reason",
             },
         }
 
+    def _confirmed_intent_type(self, text, intent_state):
+        planned_intent = (intent_state or {}).get("intent_type")
+        if planned_intent in ALLOWED_INTENT_TYPES:
+            return planned_intent
+        return self._classify(text)
+
     def _classify(self, text):
         if "왜" in text or "이유" in text:
-            return "recommendation_reason_question"
+            return "recommendation_reason"
         if "최신" in text or "새로 나온" in text or "신곡" in text:
             return "new_release_recommendation"
-        if "비슷" in text:
-            return "similar_taste_recommendation"
-        if "뭐야" in text or "정보" in text or "어떤" in text:
-            return "music_information_question"
-        if "취향" in text or "다른" in text or "새로운" in text:
-            return "new_taste_discovery"
+        if "뭐야" in text or "정보" in text or "알려" in text or "어떤" in text:
+            return "music_information"
+        if "다른" in text or "새로운" in text or "발견" in text:
+            return "discovery_recommendation"
         if "추천" in text:
             return "personalized_recommendation"
         return "general_chat"

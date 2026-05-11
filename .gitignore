@@ -19,8 +19,8 @@ ENV/
 .env.*
 !.env.example
 
-# Streamlit
-.streamlit/secrets.toml
+# React
+frontend/node_modules
 
 # Jupyter
 .ipynb_checkpoints/

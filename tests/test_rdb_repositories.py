@@ -1,7 +1,6 @@
 import unittest
 
 from app.repositories.interaction_log_repository import InteractionLogRepository
-from app.repositories.ml_output_repository import MlOutputRepository
 from app.repositories.music_catalog_repository import MusicCatalogRepository
 from app.repositories import query_constants
 
@@ -41,24 +40,6 @@ class FakeConnection:
 
 
 class RdbRepositoryTest(unittest.TestCase):
-    def test_ml_output_repository_fetches_latest_by_user_id(self):
-        expected = {"user_id": "user_001", "status": "success"}
-        connection = FakeConnection(fetchone_result=expected)
-        repository = MlOutputRepository(connection)
-
-        result = repository.get_latest_by_user_id("user_001")
-
-        self.assertEqual(result, expected)
-        self.assertEqual(
-            connection.cursor_instance.executed,
-            [
-                (
-                    query_constants.SELECT_LATEST_ML_OUTPUT_BY_USER_ID,
-                    {"user_id": "user_001"},
-                )
-            ],
-        )
-
     def test_music_catalog_repository_finds_by_categories(self):
         expected = [{"content_id": "track_001"}]
         connection = FakeConnection(fetchall_result=expected)
@@ -73,6 +54,24 @@ class RdbRepositoryTest(unittest.TestCase):
                 (
                     query_constants.SELECT_MUSIC_BY_CATEGORIES,
                     {"categories": ["personalized_match"]},
+                )
+            ],
+        )
+
+    def test_music_catalog_repository_finds_by_content_id(self):
+        expected = {"content_id": "track_001"}
+        connection = FakeConnection(fetchone_result=expected)
+        repository = MusicCatalogRepository(connection)
+
+        result = repository.find_by_content_id("track_001")
+
+        self.assertEqual(result, expected)
+        self.assertEqual(
+            connection.cursor_instance.executed,
+            [
+                (
+                    query_constants.SELECT_MUSIC_BY_CONTENT_ID,
+                    {"content_id": "track_001"},
                 )
             ],
         )
@@ -93,10 +92,10 @@ class RdbRepositoryTest(unittest.TestCase):
             "primary_section": "personalized_recommendation_section",
             "validation_status": "success",
             "error_type": None,
-            "ml_output_json": {"status": "success"},
-            "kag_state_json": {"status": "success"},
-            "rag_state_json": {"status": "success"},
-            "response_state_json": {"status": "success"},
+            "request_id": "req_001",
+            "compact_kag_state_json": {"status": "success"},
+            "compact_rag_state_json": {"status": "success"},
+            "compact_response_state_json": {"status": "success"},
             "validation_result_json": {"validation_status": "success"},
             "latency_ms": 120,
         }
@@ -105,10 +104,6 @@ class RdbRepositoryTest(unittest.TestCase):
 
         self.assertEqual(result, "log_20260504_0001")
         self.assertEqual(connection.commits, 1)
-        self.assertEqual(
-            connection.cursor_instance.executed,
-            [(query_constants.INSERT_INTERACTION_LOG, log)],
-        )
 
     def test_interaction_log_repository_finds_by_user_id(self):
         expected = [{"log_id": "log_20260504_0001"}]

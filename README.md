@@ -1,268 +1,387 @@
 # RIMAS
 
-Personalized Music Recommendation + Curator-Based Expansion Architecture
+**RIMAS (Recommendation Intelligence Music Assistant System)**는 Multi-Agent AI 기반 음악 큐레이터 시스템입니다. 사용자의 취향을 분석하고 그래프 탐색(KAG)과 의미 검색(RAG)을 결합하여 개인화된 음악을 추천하며, 자연어 챗봇으로 음악 대화를 지원합니다.
 
-RIMAS v2는 기존 사용자 기반 개인화 추천을 유지하면서, 최신 업데이트 음악 추천, 새로운 취향 탐색, 음악/아티스트/장르 정보 제공, LLM 기반 큐레이터형 설명을 확장하는 음악 추천 시스템입니다.
+---
 
-## 핵심 원칙
+## 요구사항 정의서
 
-- ML은 사용자 상태와 취향 기반 입력 정보를 제공합니다.
-- KAG는 사용자 기반 추천 방향과 큐레이션 경로를 결정합니다.
-- RAG는 추천 후보와 설명 근거를 제공합니다.
-- LLM은 추천 후보를 새로 만들지 않고, 사용자에게 전달할 큐레이터형 자연어 응답만 생성합니다.
-- 추천과 설명의 근거는 반드시 `KAG_STATE`, `RAG_STATE`, `ML Output` 기반으로 제한합니다.
-- UI는 Service만 호출하며, SQL 실행이나 LLM 직접 호출을 수행하지 않습니다.
-- `ML Output`, `KAG_STATE`, `RAG_STATE` 원본은 수정하지 않습니다.
-- Contract Validation 실패 시 LLM을 실행하지 않습니다.
-- Response Validation 또는 Provenance Validation 실패 시 fallback으로 전환합니다.
-- PostgreSQL에 성공, 실패, fallback 로그를 저장합니다.
-- Mock Adapter에서 Real Adapter로 교체 가능한 구조를 유지합니다.
+### 프로젝트 배경 및 목표
 
-## ERD
+기존 음악 스트리밍 서비스의 추천 시스템은 단순 이력 기반 필터링에 의존하여 취향의 다양성과 맥락을 충분히 반영하지 못합니다. RIMAS는 그래프 기반 관계 탐색(KAG), 의미 기반 증거 검색(RAG), LLM 자연어 생성을 결합한 Multi-Agent 구조로 이 한계를 극복합니다.
 
-![RIMAS ERD](docs/ERD.png)
+**목표**: 사용자 취향과 맥락을 이해하는 개인화 음악 추천 + 자연어 대화 기반 음악 큐레이션 서비스 제공
 
-## 전체 시스템 흐름
+---
 
-### Main Recommendation Page
+### 기능 요구사항 (Functional Requirements)
 
-```text
-Page Entry
--> selected_user_id 확인
--> ML Output 조회
--> KAG_STATE 생성 또는 수신
--> RAG_STATE 생성 또는 수신
--> Contract Validation
--> Recommendation View Model 생성
--> Main Recommendation Page 출력
--> interaction_logs 저장
+| ID | 기능 | 설명 |
+|----|------|------|
+| FR-01 | 개인화 음악 추천 | 사용자 취향 프로파일과 그래프 관계 기반으로 3개 섹션(개인화·탐색·신규) 추천 제공 |
+| FR-02 | 자연어 챗봇 대화 | 사용자 자연어 입력을 분석하여 의도에 맞는 음악 추천 및 설명 응답 생성 |
+| FR-03 | 음악 상세 정보 조회 | 추천 카드 클릭 시 RAG 증거 기반 음악 상세 정보(장르·분위기·추천 이유) 제공 |
+| FR-04 | 세션 히스토리 관리 | 대화 히스토리와 세션 컨텍스트를 Redis에 보관하고 세션 수명 동안 유지 |
+| FR-05 | 세션 영속화 | Redis 세션 데이터를 PostgreSQL로 플러시하여 영구 보관 |
+| FR-06 | 취향 배지 표시 | 사용자 취향 태그(mood·genre)를 헤더 배지로 시각화 |
+| FR-07 | 음악 상세 URL 공유 | `?detail={content_id}` 파라미터로 상세 모달 직접 링크 지원 |
+
+---
+
+### 비기능 요구사항 (Non-Functional Requirements)
+
+| ID | 분류 | 요구사항 |
+|----|------|---------|
+| NFR-01 | 가용성 | Redis 장애 시에도 추천 흐름을 계속 진행하고 `session_degraded` 플래그로 프론트에 통보 |
+| NFR-02 | 멱등성 | `request_id` 기반 중복 요청 차단 — 같은 요청의 재시도는 동일 ID를 재사용하고 백엔드가 409로 차단 |
+| NFR-03 | 복원력 | LLM(InputPlanner) 실패 시 rule-based fallback 자동 전환, 추천 흐름 중단 없음 |
+| NFR-04 | 안전성 | `prod` 환경에서 필수 환경 변수 누락 시 서버 시작 즉시 실패(fail-fast) |
+| NFR-05 | 정보 보호 | 내부 Agent trace·validator trace는 API 응답에 미노출, 외부에 보이지 않음 |
+| NFR-06 | 추천 품질 | 추천 결과는 최대 5곡으로 제한하여 집중도 있는 큐레이션 제공 |
+| NFR-07 | 성능 | React Query stale-time 및 마운트 단위 requestId로 불필요한 중복 API 호출 방지 |
+| NFR-08 | 확장성 | Mock Adapter를 통한 전체 흐름 검증 — Real Neo4j / Elasticsearch 교체 없이 독립 동작 가능 |
+
+---
+
+## 기능 설계서
+
+### 시스템 아키텍처
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Frontend (React + TypeScript)             │
+│  MainRecommendationPage  │  ChatbotPage  │  MusicDetailModal     │
+│  React Query + Zustand   │  useMutation  │  URL param routing    │
+└────────────────┬────────────────────────────────────────────────┘
+                 │  REST API (axios)
+┌────────────────▼────────────────────────────────────────────────┐
+│                       Backend (FastAPI)                          │
+│  /api/recommendations/main  │  /api/chatbot/respond             │
+│  /api/music/detail          │  /api/sessions/{id}/flush         │
+└────────────────┬────────────────────────────────────────────────┘
+                 │
+     ┌───────────┼──────────────┐
+     ▼           ▼              ▼
+  Redis       PostgreSQL     External
+  (세션/캐시)  (영속 데이터)   OpenAI LLM
+                             Neo4j (KAG)
+                             Elasticsearch (RAG)
 ```
 
-### Chatbot Page
+---
 
-```text
-User Input
--> selected_user_id 확인
--> ML Output 조회
--> KAG_STATE 생성 또는 수신
--> RAG_STATE 생성 또는 수신
--> Contract Validation
--> Intent Agent
--> Curation Agent
--> Recommendation Agent
--> Response Generator
--> Response Validation
--> Provenance Validation
--> interaction_logs 저장
--> Chatbot Page 출력
+### Agent 파이프라인 설계
+
+Multi-Agent 오케스트레이터가 각 Agent를 순차 실행합니다.
+
+```
+사용자 요청
+    │
+    ▼
+InputPlannerAgent
+  - 사용자 의도 분류 (primary_goal / mood / genre / era 등)
+  - LLM(OpenAI) 우선 → 실패 시 rule-based fallback
+    │
+    ▼
+KagDispatchAgent
+  - 그래프 탐색으로 추천 방향 및 후보 content_id 결정
+  - KAG_STATE 생성 (route / target_section / recommended_content_ids)
+    │
+    ▼
+ContractValidator
+  - KAG_STATE + SESSION_CONTEXT 계약(enum) 검증
+  - 타입·필드 위반 시 경고 로그 (흐름은 계속)
+    │
+    ▼
+RagDispatchAgent
+  - 후보 content_id에 대한 의미 기반 증거 검색
+  - RAG_STATE 생성 (evidence_summary / recommendation_reason)
+    │
+    ▼
+IntentAgent  [챗봇 전용]
+  - KAG + RAG 결과 기반 최종 intent 결정
+    │
+    ▼
+RecommendationAgent
+  - 최종 추천 후보 선택 (최대 5곡)
+  - 랭킹 점수 = max(0.1, 1.0 − (rank−1) × 0.05)
+    │
+    ▼
+ResponseGenerator
+  - LLM으로 추천 이유 자연어 응답 생성
+  - API 키 없으면 로컬 템플릿 응답 반환
+    │
+    ▼
+ResponseValidator + ProvenanceValidator
+  - 응답 품질 검증 (형식 / 출처 일관성)
+    │
+    ▼
+최종 응답 반환
 ```
 
-## 시스템 레이어
+---
 
-| Layer | 책임 | 금지 사항 |
-| --- | --- | --- |
-| UI | 사용자 입력, 추천 카드, 챗봇 응답, 개인화 안내 표시 | SQL 실행, ML/KAG/RAG 수정, 추천 생성, LLM 직접 호출 |
-| Service | 전체 실행 흐름 제어, Repository/Adapter/Validator/Agent 조합, 로그 저장 | JSON 계약 임의 변경, Validation 실패 무시, UI 렌더링 |
-| Repository | PostgreSQL 조회/저장, ML Output 조회, interaction_logs 저장 | 비즈니스 판단, LLM 호출, UI 의존, SQL 하드코딩 |
-| Adapter | KAG_STATE/RAG_STATE 반환, Mock/Real 구현체 분리 | Service Layer 변경을 요구하는 구현체 결합 |
-| Validator | Contract, Response, Provenance 검증 | 검증 실패 무시 |
-| Agent | Intent, Curation, Recommendation, Response 생성 흐름 담당 | 근거 없는 추천 생성, 내부 코드명 노출 |
+### 기능별 상세 설계
 
-## DB 기준
+#### 메인 추천 페이지
 
-DB는 PostgreSQL 기준으로 설계합니다.
+| 구성요소 | 설계 |
+|---------|------|
+| 추천 섹션 | 개인화 추천 / 새로운 취향 탐색 / 신규 발매 — 3개 섹션 병렬 표시 |
+| 취향 배지 | SESSION_CONTEXT의 mood·genre 태그를 헤더에 배지로 표시 |
+| 오늘의 테마 | 날짜·취향 기반 테마 메시지 |
+| 캐릭터 DJ 배너 | Agent 추천 메시지 표시, 챗봇으로 이동 버튼 |
+| 상태 관리 | React Query (staleTime 5분) + `useRequestId()` 훅으로 retry 시 동일 ID 재사용 |
+| session_degraded | Redis 장애 시 경고 배너 상단 노출 |
 
-필수 테이블:
+#### 챗봇 페이지
 
-- `users`
-- `ml_outputs`
-- `music_catalog`
-- `interaction_logs`
+| 구성요소 | 설계 |
+|---------|------|
+| 메시지 전송 | `useMutation` 기반 — `isPending` 가드로 중복 전송 차단 |
+| 낙관적 업데이트 | `appendTurn`으로 서버 응답 전 UI 즉시 반영 |
+| 히스토리 로드 | 마운트 1회 `useQuery` — Redis 세션 히스토리 조회 |
+| 자동 스크롤 | 메시지 추가마다 하단 자동 스크롤 |
+| 관련 추천 카드 | 마지막 챗봇 응답의 `display_recommendations`를 카드로 표시 |
+| request_id | 전송마다 `generateRequestId()`로 새 ID 생성 |
 
-선택 테이블:
+#### 음악 상세 모달
 
-- `llm_call_logs`
-- `validation_logs`
+| 구성요소 | 설계 |
+|---------|------|
+| 데이터 소스 우선순위 | 1순위: 최근 RAG_STATE evidence / 2순위: music_catalog / 3순위: minimal metadata |
+| URL 연동 | `?detail={content_id}` — pushState로 딥링크·뒤로가기 지원 |
+| request_id | `useRequestIdPerKey(contentId)` — 곡 변경 시 새 ID, 같은 곡 retry는 동일 ID |
+| view log | `user_id` 있을 때 interaction_logs에 비동기 저장 |
 
-`ML Output`, `KAG_STATE`, `RAG_STATE`, `RESPONSE_STATE`는 JSONB로 원본을 보존합니다. `interaction_logs`는 append-only 방식으로 저장합니다.
+---
 
-Source Layer는 Spotify/KKBOX 원천 데이터와 전처리 산출물을 보존하는 계층입니다. Runtime Service Flow는 Source Layer 테이블을 직접 조회하지 않고, `music_catalog`, `ml_outputs`, `interaction_logs` 같은 Runtime Contract 테이블을 Repository Layer를 통해 사용합니다. SQL 상수는 기존 규칙대로 `app/repositories/query_constants.py`에서 관리합니다.
+### 데이터 설계
 
-## Source Layer 데이터 적재
+#### Redis 세션 구조 (세션당 6개 키)
 
-기본 경로는 수동 적재입니다.
+| 키 | 용도 | TTL |
+|----|------|-----|
+| `rimas:session:{id}:history` | 대화 히스토리 list (최대 50턴) | 세션 TTL |
+| `rimas:session:{id}:context` | SESSION_CONTEXT JSON | 세션 TTL |
+| `rimas:session:{id}:latest:kag_state` | 최근 KAG_STATE | 세션 TTL |
+| `rimas:session:{id}:latest:rag_state` | 최근 RAG_STATE | 세션 TTL |
+| `rimas:session:{id}:latest:response_state` | 최근 RESPONSE_STATE | 세션 TTL |
+| `rimas:session:{id}:recommendation:metadata` | 추천 메타데이터 | 세션 TTL |
+
+#### PostgreSQL 주요 테이블
+
+| 테이블 | 용도 |
+|--------|------|
+| `users` | 사용자 기본 정보 |
+| `music_catalog` | 음악 메타데이터 (title, artist, genre, mood, release_date) |
+| `interaction_logs` | KAG/RAG/Response state 압축 로그, view log, latency |
+| `chat_sessions` | 세션 메타데이터 (flush 시 upsert) |
+| `chat_session_turns` | 대화 turn 영속 기록 |
+
+---
+
+### Frontend 아키텍처
+
+```
+src/
+  pages/        MainRecommendationPage, ChatbotPage
+  components/   recommendation/ · chatbot/ — 페이지 단위 컴포넌트 분리
+  api/          chatbot · recommendation · musicDetailApi — axios 래퍼
+  stores/       chatStore (Zustand) · sessionStore — 전역 상태
+  hooks/        useRequestId · useRequestIdPerKey — requestId 훅
+  utils/        generateRequestId — crypto.randomUUID 기반 ID 생성
+  types/        API 응답 TypeScript 타입 (session_degraded 포함)
+```
+
+**상태 관리 전략**
+- API 서버 상태: React Query (`useQuery` / `useMutation`)
+- 챗봇 히스토리: Zustand chatStore (`appendTurn`으로 낙관적 업데이트)
+- 입력값: 지역 `useState` — 타이핑마다 전역 재렌더 방지
+
+---
+
+## 기술 스택
+
+| 구분 | 기술 |
+|------|------|
+| Backend | Python 3.12+, FastAPI |
+| Frontend | React, TypeScript, Vite |
+| Cache | Redis |
+| Database | PostgreSQL |
+| LLM | OpenAI GPT-4.1-mini (optional) |
+| Graph DB | Neo4j (Real KAG — 미구현) |
+| Search | Elasticsearch (Real RAG — 미구현) |
+| 상태 관리 | React Query, Zustand |
+| 컨테이너 | Docker Compose |
+
+---
+
+## Runtime Flow
+
+### Main Recommendation
+
+```text
+React Main Page
+-> GET /api/recommendations/main?user_id=&session_id=&request_id=
+-> Redis health check (session_degraded 플래그)
+-> Session Context (Redis)
+-> OrchestratorAgent.run_recommendation
+   -> InputPlannerAgent (LLM optional → rule-based fallback)
+   -> KagDispatchAgent  -> KAG_STATE
+   -> RagDispatchAgent  -> RAG_STATE
+-> ViewModelBuilder (personalized / discovery / new_release 섹션)
+-> latest_state_cache.save_latest_states (Redis)
+-> Response: { status, session_degraded, page_type, view_model }
+```
+
+### Chatbot
+
+```text
+React Chatbot Page
+-> POST /api/chatbot/respond
+-> Redis health check (session_degraded 플래그)
+-> Session Context (Redis)
+-> OrchestratorAgent.run_chatbot
+   -> InputPlannerAgent (LLM optional → rule-based fallback)
+   -> KagDispatchAgent  -> KAG_STATE
+   -> ContractValidator
+   -> RagDispatchAgent  -> RAG_STATE
+   -> IntentAgent
+   -> RecommendationAgent (최대 5곡 선택)
+   -> ResponseGenerator (LLM)
+   -> ResponseValidator + ProvenanceValidator
+-> session_history_cache.append_turn (Redis)
+-> latest_state_cache.save_latest_states (Redis)
+-> LoggingService → interaction_logs (PostgreSQL)
+-> Response: { status, session_degraded, response_state, latency_ms }
+```
+
+### Music Detail
+
+```text
+Recommendation Card Click
+-> GET /api/music/detail/{content_id}?user_id=&session_id=&request_id=
+-> latest_state_cache.get_latest_rag_state (Redis, session_id 있을 때)
+-> MusicDetailService.get_detail(recent_rag_state)
+   1순위: latest RAG_STATE evidence
+   2순위: music_catalog fallback
+   3순위: minimal metadata
+-> (user_id 있을 때) interaction_logs view log 저장
+-> Response: { status, music_detail }
+```
+
+### Session Flush
+
+```text
+POST /api/sessions/{session_id}/flush?user_id=&flush_logs=false
+-> session_history_cache.get_history (Redis)
+-> PostgreSQL: chat_sessions upsert + chat_session_turns insert
+-> (flush_logs=true, local/dev 환경만) interaction_logs DELETE WHERE session_id=?
+-> session_history_cache.clear_session (Redis history + context)
+-> latest_state_cache.clear_latest_states (Redis latest kag/rag/response/metadata)
+-> Response: { session_id, flushed, logs_deleted }
+```
+
+---
+
+## API 엔드포인트
+
+| Method | Path | 설명 |
+|--------|------|------|
+| GET | `/health` | 서버 상태 확인 |
+| GET | `/api/recommendations/main` | 메인 추천 페이지 뷰모델 |
+| POST | `/api/chatbot/respond` | 챗봇 메시지 처리 |
+| GET | `/api/sessions/{session_id}/history` | Redis 세션 히스토리 |
+| POST | `/api/sessions/{session_id}/flush` | Redis → PostgreSQL 플러시 |
+| DELETE | `/api/sessions/{session_id}` | Redis 세션 삭제 |
+| GET | `/api/music/detail/{content_id}` | 음악 상세 뷰모델 |
+
+---
+
+## 구현 현황
+
+### 완료
+
+| 구분 | 내용 |
+|------|------|
+| Agent 흐름 | Orchestrator → InputPlanner → KAG → RAG → Intent → Recommendation → ResponseGenerator → Validators |
+| Mock Adapter | MockKagAdapter, MockRagAdapter (고정 데이터, Real 연결 전 전체 흐름 검증용) |
+| Redis 세션 | 히스토리, 컨텍스트, latest KAG/RAG/RESPONSE state, 추천 메타데이터 |
+| Session flush | Redis → PostgreSQL, 완료 후 6개 Redis 키 전체 삭제 |
+| flush_logs | `flush_logs=true` — local/dev 전용, session_id 기준 interaction_logs 삭제 |
+| session_degraded | Redis 장애 시 응답 wrapper 최상위에 플래그 포함, 추천 흐름은 계속 진행 |
+| Music Detail | latest RAG_STATE 연결 (session_id), view log 저장 (user_id) |
+| LLM Planner | optional OpenAI 의도 분류, 실패 시 rule-based fallback |
+| 스키마 확장 | KAG_STATE optional 필드 5개, RAG_STATE optional 필드 4개 |
+| Contract Validator | KAG/RAG/session_context 계약 검증 + optional 타입 검증 |
+| prod fail-fast | 필수 env 누락 시 서버 시작 즉시 실패 |
+| 정책 문서 | `docs/policies/` (RecommendationPolicy, RankingPolicy, PromptPolicy) |
+| Frontend | React 메인 추천 페이지, 챗봇 페이지, 음악 상세 모달 |
+| Frontend request_id | `generateRequestId` 유틸, `useRequestId` / `useRequestIdPerKey` 훅, 전 API에 request_id 전달, `session_degraded` 배너 표시 |
+
+### 미구현 (stub)
+
+| 구분 | 내용 |
+|------|------|
+| Real KAG Adapter | Neo4j 기반 그래프 탐색 (`NotImplementedError`) |
+| Real RAG Adapter | Elasticsearch 기반 하이브리드 검색 (`NotImplementedError`) |
+
+---
+
+## 실행
 
 ```powershell
-docker compose up -d db
-docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/load_kkbox_seed.sql
-docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/load_spotify_catalog.sql
-if (Test-Path data\load\spotify_lyrics_load.csv) { docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/load_spotify_lyrics.sql }
-if (Test-Path data\load\spotify_emotions_load.csv) { docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/load_spotify_emotions.sql }
-docker compose exec db psql -U rimas -d rimas -f /workspace/db/load/verify_source_load.sql
+docker compose down -v
+docker compose up --build
 ```
 
-필수 CSV:
+서비스 확인:
 
-- `seed/users.csv`
-- `seed/kkbox_user_features.csv`
-- `data/load/spotify_tracks_load.csv`
-- `data/load/spotify_audio_features_load.csv`
-- `data/load/music_catalog_load.csv`
+```
+Frontend:                   http://localhost:5173
+Backend health:             http://localhost:8000/health
+Main Recommendation API:    http://localhost:8000/api/recommendations/main?user_id=user_001&session_id=session_001
+Neo4j Browser:              http://localhost:7474
+Elasticsearch:              http://localhost:9200
+```
 
-선택 CSV:
+---
 
-- `data/load/spotify_lyrics_load.csv`
-- `data/load/spotify_emotions_load.csv`
-
-선택 CSV는 파일이 있을 때만 별도 SQL로 적재합니다. 선택 CSV가 없으면 `spotify_lyrics`, `spotify_emotions` 적재만 건너뛰고 필수 Source Layer와 `music_catalog` 적재는 계속 사용할 수 있습니다.
-
-Docker 초기화 자동 적재는 새 PostgreSQL volume에서만 실행됩니다. 기존 volume에는 `/docker-entrypoint-initdb.d` 스크립트가 다시 실행되지 않습니다. 처음부터 다시 적재해야 하면 데이터가 삭제된다는 점을 확인한 뒤 `docker compose down -v`를 사용합니다.
-
-raw 데이터와 생성된 load CSV는 git에 포함하지 않습니다. `data/load/.gitkeep`, `seed/.gitkeep`만 저장소에 유지합니다.
-
-## 프로젝트 구조
+## 주요 폴더
 
 ```text
 app/
-  main.py
-  common/              # 공통 상수, enum, 기본 state
-  pages/
-  ui/
-    components/
-    styles/
-  services/
-  agents/
-    base_agent.py      # Agent ABC (BaseAgent)
-    prompts/
-  adapters/
-    kag_adapter.py     # KagAdapter ABC
-    rag_adapter.py     # RagAdapter ABC
-    mock_kag_adapter.py
-    mock_rag_adapter.py
-    real_kag_adapter.py  # 설계 진행 중
-    real_rag_adapter.py  # 설계 진행 중
-  kag/
-    README.md
-  rag/
-    README.md
-  validators/
-    base_validator.py  # Validator ABC (BaseValidator)
-  repositories/
-    base_repository.py # Repository ABC (BaseRepository, _cursor 공통 구현)
-  schemas/
-  contracts/           # JSON 필드명 및 도메인 enum (ContractValidator의 source of truth)
-  json_templates/
-  config/
+  agents/          Orchestrator, InputPlanner, KAG/RAG Dispatch, Intent, Recommendation, Response
+  api/             FastAPI routes (chatbot, recommendation, session, music)
+  cache/           Redis 클라이언트, 세션 히스토리, latest state 캐시
+  config/          settings.py (환경 변수, prod fail-fast)
+  kag/adapters/    KAG adapter (Mock / Real stub)
+  llm/             OpenAI LLM 클라이언트
+  policies/        추천·랭킹 정책 (Python)
+  prompts/         LLM 프롬프트 (InputPlanner)
+  rag/adapters/    RAG adapter (Mock / Real stub)
+  repositories/    PostgreSQL query constants, 카탈로그·로그 레포지토리
+  services/        비즈니스 서비스 (chatbot, recommendation, flush, logging, detail)
+  validators/      Contract, Response, Provenance Validator
+
+frontend/
+  src/api/         API clients (chatbot, recommendation, musicDetail)
+  src/components/  UI components (chatbot, recommendation)
+  src/hooks/       useRequestId 훅
+  src/pages/       MainRecommendationPage, ChatbotPage
+  src/stores/      Zustand stores (chat, session)
+  src/utils/       generateRequestId 유틸
+
 docs/
-tests/
+  policies/        RecommendationPolicy, RankingPolicy, PromptPolicy
+  rimas_v_4_integrated_design_updated_final_.md
 ```
 
-## Common constants and state
+---
 
-Current contract ownership:
+## 정책 문서
 
-- `app/common/enums.py`: common `status` enum (`ResponseStatus`)
-- `app/common/constants.py`: `DEFAULT_USER_ID`, enum-based common `status` values (`ALLOWED_STATUSES`)
-- `app/common/default_state.py`: `SESSION_DEFAULTS`, `MOCK_ML_OUTPUT`, `FALLBACK_RESPONSE_STATE`, `resolve_ml_output()`
-- `app/common/labels.py`: recommendation category display labels
-- `app/contracts/fields.py`: JSON input/output field enums — `ContractValidator`의 필수 필드 정의의 source of truth
-- `app/contracts/enums.py`: contract value enums (`IntentType`, `CurationMode`, `RecommendationCategory`, `ResponseTone`)
-- `app/json_templates/`: JSON template examples
-
-공통 계약 상수와 기본 state는 `app/common/`에서 관리합니다.
-
-- `app/common/constants.py`: `DEFAULT_USER_ID`, 공통 `status` 허용값
-- `app/common/default_state.py`: `SESSION_DEFAULTS`, `MOCK_ML_OUTPUT`, `FALLBACK_RESPONSE_STATE`, `resolve_ml_output()`
-  - `MOCK_ML_OUTPUT`: DB 연결 없이 동작할 때 사용하는 Mock ML 데이터 (기본값이 아닌 Mock 데이터임을 명시)
-  - `resolve_ml_output(user_id, ml_output_repository=None)`: Repository 유무에 관계없이 ML Output을 반환하는 공통 헬퍼 함수
-- `app/common/labels.py`: 추천 category 표시 label
-
-레이어 책임이 명확한 상수는 기존 위치를 유지합니다.
-
-- SQL 쿼리 상수는 Repository Layer 책임이므로 `app/repositories/query_constants.py`에 둡니다.
-- UI 색상, spacing, radius 같은 theme 상수는 UI Layer 책임이므로 `app/ui/styles/theme.py`에 둡니다.
-
-## KAG/RAG 업로드 구조
-
-KAG와 RAG의 실제 구현 업로드와 검토를 쉽게 하기 위해 다음 폴더를 분리했습니다.
-
-- `app/kag/`: KAG 관련 구현 파일을 배치할 패키지
-- `app/rag/`: RAG 관련 구현 파일을 배치할 패키지
-
-각 폴더는 Python 패키지로 import 가능하도록 `__init__.py`를 포함합니다.
-기존 Service Layer는 `app.adapters`의 `KagAdapter`, `RagAdapter`, Mock/Real Adapter 경계를 통해 KAG/RAG를 호출하는 구조를 유지합니다.
-향후 `RealKagAdapter`, `RealRagAdapter`에서 `app.kag`, `app.rag` 내부 구현을 연결하더라도 Service Layer import 경로를 직접 변경하지 않는 방향이 기본 원칙입니다.
-
-각 폴더의 README는 기존 설계 문서 기준 기능정의서입니다.
-
-- `app/kag/README.md`: KAG 역할, 입력/출력, 계층 관계, 제한 사항, 검증 기준
-- `app/rag/README.md`: RAG 역할, 입력/출력, evidence/provenance 기준, 제한 사항, 검증 기준
-
-KAG/RAG 책임 분리는 다음 기준을 따릅니다.
-
-- KAG는 사용자 상태, 사용자 입력, ML Output을 기반으로 추천 방향과 큐레이션 경로를 결정합니다.
-- RAG는 KAG_STATE가 결정한 방향에 맞춰 추천 후보, 추천 근거, 음악 정보 설명 근거를 제공합니다.
-- LLM은 추천 후보를 새로 만들지 않고 KAG/RAG/ML 근거 안에서 자연어 응답만 생성합니다.
-- UI는 Service Layer가 만든 View Model을 표시하며 KAG/RAG 원본을 수정하지 않습니다.
-
-## 구현 순서 원칙
-
-`docs/WBS v2.md` 기준 구현 순서는 다음을 따릅니다.
-
-1. 계약 먼저: Schema
-2. 데이터 먼저: DB + Mock
-3. 흐름 먼저: Service
-4. 검증 먼저: Validator
-5. 그 다음 LLM
-6. 마지막 UI
-
-금지:
-
-- UI 먼저 만들기
-- LLM 먼저 붙이기
-- Schema 없이 구현하기
-
-## 코드 구조 원칙
-
-### 계층 간 추상화
-
-각 계층에는 ABC(Abstract Base Class)가 정의되어 있으며, 구현체는 반드시 ABC를 상속합니다.
-
-| 계층 | ABC | 핵심 추상 메서드 |
-| --- | --- | --- |
-| Agent | `BaseAgent` (`app/agents/base_agent.py`) | `run(**kwargs) → dict` |
-| Validator | `BaseValidator` (`app/validators/base_validator.py`) | `validate(**kwargs) → dict` |
-| Repository | `BaseRepository` (`app/repositories/base_repository.py`) | `_cursor()` (공통 구현 제공) |
-| Adapter | `KagAdapter`, `RagAdapter` (`app/adapters/`) | `build_state(...)` |
-
-Validator의 `validate()` 반환 형식은 `{"passed": bool, "errors": list[str]}`으로 통일합니다.
-
-### 의존성 주입 원칙
-
-Service 생성자는 모든 외부 의존성을 파라미터로 받습니다. 기본값은 Mock 구현체이며, 프로덕션 환경에서는 Real 구현체를 명시적으로 주입합니다.
-
-```python
-# 테스트: Mock이 기본값으로 동작
-service = ChatbotService()
-
-# 프로덕션: Real 구현체를 명시적으로 주입
-service = ChatbotService(
-    kag_adapter=RealKagAdapter(...),
-    rag_adapter=RealRagAdapter(...),
-    ml_output_repository=MlOutputRepository(connection),
-)
-```
-
-### contracts/fields.py 연결 원칙
-
-`ContractValidator`의 필수 필드 목록은 `app/contracts/fields.py`의 Enum을 source of truth로 사용합니다. 필드 추가/변경은 `contracts/fields.py`만 수정하면 Validator에 자동 반영됩니다.
-
-## 설계 문서
-
-- [Design.md](docs/Design.md)
-- [Service Flow 설계.md](docs/Service%20Flow%20설계.md)
-- [DB Schema 상세 설계.md](docs/DB%20Schema%20상세%20설계.md)
-- [JSON Schema  Pydantic Schem.md](docs/JSON%20Schema%20%20Pydantic%20Schem.md)
-- [Common Constants State.md](docs/Common%20Constants%20State.md)
-- [Agent Prompt 상세 설계.md](docs/Agent%20Prompt%20상세%20설계.md)
-- [WBS v2.md](docs/WBS%20v2.md)
+- [RecommendationPolicy](docs/policies/RecommendationPolicy.md) — 카테고리 우선순위, 최대 추천 수
+- [RankingPolicy](docs/policies/RankingPolicy.md) — 점수 계산 공식
+- [PromptPolicy](docs/policies/PromptPolicy.md) — LLM 적용 범위, enum 검증, fallback 정책
