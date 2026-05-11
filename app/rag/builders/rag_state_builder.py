@@ -1,7 +1,5 @@
 class RagStateBuilder:
-    """RAG_STATE JSON 계약을 조립하는 순수 빌더.
-    DB / Elasticsearch 의존 없음 — 데이터를 받아 구조를 만들 뿐이다.
-    """
+    """RAG_STATE JSON 계약을 조립하는 순수 빌더."""
 
     @staticmethod
     def build(
@@ -13,9 +11,15 @@ class RagStateBuilder:
         reason_items: list[str],
         information_evidence: list[dict] | None = None,
         scripts: dict | None = None,
+        query: str = "",
+        normalized_query: str = "",
+        retrieval_metadata: dict | None = None,
+        retrieval_trace: dict | None = None,
     ) -> dict:
         return {
             "status": "success",
+            "query": query,
+            "normalized_query": normalized_query,
             "recommendation_context": {
                 "context_type": context_type,
                 "base_context": base_context,
@@ -27,6 +31,8 @@ class RagStateBuilder:
                 "reason_items": reason_items,
             },
             "information_evidence": information_evidence or [],
+            "retrieval_metadata": retrieval_metadata or {},
+            "retrieval_trace": retrieval_trace or {},
             "recommendation_scripts": scripts or {
                 "dj_intro": "기존에 좋아하던 분위기는 유지하면서 조금 새로운 결의 음악을 골라봤어요.",
                 "personalized_message": "먼저 익숙하게 들을 수 있는 곡을 추천할게요.",
@@ -40,9 +46,13 @@ class RagStateBuilder:
     def failure(reason: str) -> dict:
         return {
             "status": "error",
+            "query": "",
+            "normalized_query": "",
             "error_reason": reason,
             "recommended_content_evidence": [],
             "recommendation_reason": {"summary": "", "reason_items": []},
             "information_evidence": [],
+            "retrieval_metadata": {},
+            "retrieval_trace": {},
             "recommendation_scripts": {},
         }

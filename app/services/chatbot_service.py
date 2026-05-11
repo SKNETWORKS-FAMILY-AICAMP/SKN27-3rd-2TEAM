@@ -2,6 +2,7 @@ import logging
 import time
 
 from app.agents.orchestrator_agent import OrchestratorAgent
+from app.cache import latest_state_cache, redis_client
 from app.services import session_cache_service
 from app.services.logging_service import LoggingService
 
@@ -9,14 +10,7 @@ logger = logging.getLogger("rimas.service.chatbot")
 
 
 class ChatbotService:
-    """챗봇 메시지 처리 — 1 API 호출 = 1 turn.
-
-    흐름:
-      Redis에서 SESSION_CONTEXT 로드 (DB 조회 없음)
-      → OrchestratorAgent (KAG → RAG → Intent → Rec → LLM → Validate)
-      → Redis에 turn 저장 + SESSION_CONTEXT 업데이트
-      → interaction_log 비동기 저장 (선택)
-    """
+    """챗봇 메시지 처리 서비스."""
 
     def __init__(
         self,
@@ -28,11 +22,9 @@ class ChatbotService:
 
     def submit_message(self, user_id: str, session_id: str, user_input: str) -> dict:
         start = time.perf_counter()
+        session_degraded = not redis_client.is_healthy()
 
-        # 1. Redis에서 SESSION_CONTEXT 로드 — DB 조회 없음
         session_context = session_cache_service.load_context(session_id)
-
-        # 2. Orchestrator 실행 (KAG → RAG → LLM → Validate)
         result = self._orchestrator.run_chatbot(
             user_id=user_id,
             session_id=session_id,
@@ -45,7 +37,6 @@ class ChatbotService:
         rag_state = meta.get("rag_state", {})
         latency_ms = meta.get("latency_ms", round((time.perf_counter() - start) * 1000, 1))
 
-        # 3. Redis에 turn 저장 + SESSION_CONTEXT 업데이트 (1번만)
         session_cache_service.save_turn_and_update_context(
             session_id=session_id,
             user_input=user_input,
@@ -54,7 +45,20 @@ class ChatbotService:
             rag_state=rag_state,
         )
 
-        # 4. interaction_log 저장 (실패해도 응답은 반환)
+        # 응답 생성 직후 latest state를 저장한다.
+        latest_state_cache.save_latest_states(
+            session_id=session_id,
+            kag_state=kag_state,
+            rag_state=rag_state,
+            response_state=result,
+            recommendation_metadata={
+                "source_type": "chatbot",
+                "user_id": user_id,
+                "latency_ms": latency_ms,
+            },
+        )
+
+        # interaction_log 저장 실패는 응답을 막지 않는다.
         if self._logging_service:
             try:
                 self._logging_service.save(
@@ -77,6 +81,7 @@ class ChatbotService:
 
         return {
             "status": result.get("status", "error"),
+            "session_degraded": session_degraded,
             "response_state": result,
             "latency_ms": latency_ms,
         }

@@ -1,5 +1,8 @@
 import os
 
+APP_ENV = os.getenv("APP_ENV", "local").lower()
+_PROD_ENVS = {"prod", "production"}
+
 # PostgreSQL
 DB_HOST = os.getenv("RIMAS_DB_HOST", "localhost")
 DB_PORT = int(os.getenv("RIMAS_DB_PORT", "5432"))
@@ -27,7 +30,25 @@ RIMAS_LLM_MODEL = os.getenv("RIMAS_LLM_MODEL", "gpt-4.1-mini")
 RIMAS_LLM_TIMEOUT = float(os.getenv("RIMAS_LLM_TIMEOUT_SECONDS", "30"))
 
 # CORS
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+_cors_default = "" if APP_ENV in _PROD_ENVS else "http://localhost:5173"
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", _cors_default).split(",")
+
+# ── prod fail-fast ────────────────────────────────────────────────────────────
+if APP_ENV in _PROD_ENVS:
+    _missing = [
+        name for name, value in [
+            ("RIMAS_DB_PASSWORD", DB_PASSWORD),
+            ("RIMAS_NEO4J_PASSWORD", RIMAS_NEO4J_PASSWORD),
+            ("OPENAI_API_KEY", OPENAI_API_KEY),
+            ("CORS_ORIGINS", os.getenv("CORS_ORIGINS", "")),
+        ]
+        if not value
+    ]
+    if _missing:
+        raise EnvironmentError(
+            f"[RIMAS] prod 환경에서 필수 환경 변수가 누락되었습니다: {', '.join(_missing)}"
+        )
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 def get_database_config() -> dict:

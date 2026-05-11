@@ -27,6 +27,7 @@ export interface MainViewModel {
 
 export interface MainRecommendationResponse {
   status: string;
+  session_degraded?: boolean;
   page_type: string;
   view_model: MainViewModel;
 }
@@ -69,6 +70,7 @@ export interface ResponseState {
 
 export interface ChatbotResponse {
   status: string;
+  session_degraded?: boolean;
   response_state: ResponseState;
   latency_ms: number;
 }

@@ -16,5 +16,9 @@ class RecommendationReasonSchema(BaseModel):
 
 class RagStateSchema(BaseModel):
     status: str
+    query: str = ""
+    normalized_query: str = ""
     recommended_content_evidence: list[RagEvidenceSchema] = Field(default_factory=list)
     recommendation_reason: RecommendationReasonSchema
+    retrieval_metadata: dict = Field(default_factory=dict)
+    retrieval_trace: dict = Field(default_factory=dict)

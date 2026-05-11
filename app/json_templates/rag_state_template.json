@@ -1,5 +1,7 @@
 {
   "status": "success",
+  "query": "calm indie music",
+  "normalized_query": "calm indie music",
   "recommended_content_evidence": [
     {
       "content_id": "track_001",
@@ -17,5 +19,7 @@
   ],
   "recommendation_reason": {
     "summary": "사용자의 최근 선호 분위기와 연결되는 곡"
-  }
+  },
+  "retrieval_metadata": {},
+  "retrieval_trace": {}
 }

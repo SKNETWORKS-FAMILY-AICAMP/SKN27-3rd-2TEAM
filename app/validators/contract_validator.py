@@ -8,6 +8,19 @@ logger = logging.getLogger("rimas.validator.contract")
 
 _KAG_REQUIRED = tuple(f.value for f in KagStateField)
 _RAG_REQUIRED = tuple(f.value for f in RagStateField)
+_KAG_OPTIONAL_TYPES = {
+    "traversal_reason": str,
+    "matched_nodes": list,
+    "excluded_nodes": list,
+    "candidate_tracks": list,
+    "diversity_metadata": dict,
+}
+_RAG_OPTIONAL_TYPES = {
+    "query": str,
+    "normalized_query": str,
+    "retrieval_metadata": dict,
+    "retrieval_trace": dict,
+}
 
 
 class ContractValidator(BaseValidator):
@@ -36,14 +49,24 @@ class ContractValidator(BaseValidator):
         result = self._check_fields(kag_state, _KAG_REQUIRED)
         if not result["passed"]:
             return result
-        # content_ids는 리스트여야 한다
         if not isinstance(kag_state.get("recommended_content_ids"), list):
             return {"passed": False, "errors": ["recommended_content_ids must be a list"]}
+        optional_type_error = self._validate_optional_kag_types(kag_state)
+        if optional_type_error:
+            return {"passed": False, "errors": [optional_type_error]}
         return result
+
+    def _validate_optional_kag_types(self, kag_state: dict) -> str | None:
+        for field_name, expected_type in _KAG_OPTIONAL_TYPES.items():
+            if field_name not in kag_state:
+                continue
+            if not isinstance(kag_state[field_name], expected_type):
+                return f"{field_name} must be a {expected_type.__name__}"
+        return None
 
     def _validate_rag(self, rag_state: dict) -> dict:
         if not rag_state:
-            return {"passed": True, "errors": []}  # RAG가 아직 없을 경우 허용
+            return {"passed": True, "errors": []}
         result = self._check_fields(rag_state, _RAG_REQUIRED)
         if not result["passed"]:
             return result
@@ -53,7 +76,18 @@ class ContractValidator(BaseValidator):
         ]
         if len(content_ids) != len(set(content_ids)):
             return {"passed": False, "errors": ["recommended_content_evidence has duplicate content_id"]}
+        optional_type_error = self._validate_optional_rag_types(rag_state)
+        if optional_type_error:
+            return {"passed": False, "errors": [optional_type_error]}
         return result
+
+    def _validate_optional_rag_types(self, rag_state: dict) -> str | None:
+        for field_name, expected_type in _RAG_OPTIONAL_TYPES.items():
+            if field_name not in rag_state:
+                continue
+            if not isinstance(rag_state[field_name], expected_type):
+                return f"{field_name} must be a {expected_type.__name__}"
+        return None
 
     def _check_fields(self, payload: dict, required_fields: tuple) -> dict:
         if not isinstance(payload, dict):

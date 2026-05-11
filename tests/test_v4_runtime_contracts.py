@@ -3,8 +3,10 @@ from pydantic import ValidationError
 
 from app.schemas.intent_state_schema import IntentStateSchema
 from app.schemas.kag_input_schema import KagInputSchema
+from app.schemas.kag_state_schema import KagStateSchema
 from app.schemas.music_detail_schema import MusicDetailViewModelSchema
 from app.schemas.rag_input_schema import RagInputSchema
+from app.schemas.rag_state_schema import RagStateSchema
 from app.services.compact_state_builder import CompactStateBuilder
 from app.services.request_lifecycle_cache import DuplicateRequestError, RequestLifecycleCache
 
@@ -41,6 +43,30 @@ def test_kag_input_json_does_not_accept_generated_track_identity_fields():
         )
 
 
+def test_kag_state_schema_preserves_optional_traversal_fields():
+    kag_state = KagStateSchema(
+        status="success",
+        recommendation_goal={"primary_goal": "discovery_recommendation"},
+        recommended_content_ids=["track_001"],
+        recommendation_category="discovery_candidate",
+        route="safe_discovery",
+        target_section="discovery_section",
+        traversal_reason="recent mood to candidate track traversal",
+        matched_nodes=[{"type": "mood", "value": "calm"}],
+        excluded_nodes=[{"type": "artist", "value": "blocked_artist"}],
+        candidate_tracks=[{"content_id": "track_001", "score": 0.91}],
+        diversity_metadata={"strategy": "balanced_genre"},
+    )
+
+    dumped = kag_state.model_dump()
+
+    assert dumped["traversal_reason"] == "recent mood to candidate track traversal"
+    assert dumped["matched_nodes"] == [{"type": "mood", "value": "calm"}]
+    assert dumped["excluded_nodes"] == [{"type": "artist", "value": "blocked_artist"}]
+    assert dumped["candidate_tracks"] == [{"content_id": "track_001", "score": 0.91}]
+    assert dumped["diversity_metadata"] == {"strategy": "balanced_genre"}
+
+
 def test_rag_input_json_requires_content_id_match_constraint():
     rag_input = RagInputSchema(
         request_id="req_001",
@@ -55,6 +81,34 @@ def test_rag_input_json_requires_content_id_match_constraint():
     )
 
     assert rag_input.retrieval_constraints.require_content_id_match is True
+
+
+def test_rag_state_schema_preserves_optional_retrieval_fields():
+    rag_state = RagStateSchema(
+        status="success",
+        query="calm indie music",
+        normalized_query="calm indie music",
+        recommended_content_evidence=[
+            {
+                "content_id": "track_001",
+                "title": "Midnight Loop",
+                "artist": "Nova Lane",
+                "genre": ["indie"],
+                "mood": ["calm"],
+                "evidence_summary": "calm indie evidence",
+            }
+        ],
+        recommendation_reason={"summary": "matched by mood"},
+        retrieval_metadata={"source": "mock_catalog"},
+        retrieval_trace={"strategy": "mock_retrieval"},
+    )
+
+    dumped = rag_state.model_dump()
+
+    assert dumped["query"] == "calm indie music"
+    assert dumped["normalized_query"] == "calm indie music"
+    assert dumped["retrieval_metadata"] == {"source": "mock_catalog"}
+    assert dumped["retrieval_trace"] == {"strategy": "mock_retrieval"}
 
 
 def test_compact_state_builder_removes_internal_trace_fields():

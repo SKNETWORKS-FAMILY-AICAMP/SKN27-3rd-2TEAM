@@ -102,3 +102,31 @@ def test_contract_validator_rejects_invalid_kag_status():
     )
 
     assert result["passed"] is False
+
+
+def test_contract_validator_rejects_invalid_extended_kag_state_trace_fields():
+    kag = _minimal_kag_state()
+    kag["candidate_tracks"] = {"content_id": "track_001"}
+
+    result = ContractValidator().validate(
+        session_context=_session_context(),
+        kag_state=kag,
+        rag_state=_minimal_rag_state(),
+    )
+
+    assert result["passed"] is False
+    assert any("candidate_tracks" in error for error in result["errors"])
+
+
+def test_contract_validator_rejects_invalid_extended_rag_state_retrieval_fields():
+    rag = _minimal_rag_state()
+    rag["retrieval_metadata"] = []
+
+    result = ContractValidator().validate(
+        session_context=_session_context(),
+        kag_state=_minimal_kag_state(),
+        rag_state=rag,
+    )
+
+    assert result["passed"] is False
+    assert any("retrieval_metadata" in error for error in result["errors"])

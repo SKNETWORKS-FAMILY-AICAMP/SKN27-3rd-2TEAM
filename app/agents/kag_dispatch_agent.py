@@ -16,10 +16,21 @@ class KagDispatchAgent(BaseAgent):
     def __init__(self, kag_adapter: KagAdapter | None = None):
         self._adapter = kag_adapter or MockKagAdapter()
 
-    def run(self, user_id: str, user_input: str, session_context: dict) -> dict:
+    def run(
+        self,
+        user_id: str,
+        user_input: str,
+        session_context: dict,
+        kag_input_json: dict | None = None,
+    ) -> dict:
         start = time.perf_counter()
         try:
-            kag_state = self._adapter.build_state(user_id, user_input, session_context)
+            normalized_input = (
+                (kag_input_json or {})
+                .get("query_context", {})
+                .get("normalized_query", user_input)
+            )
+            kag_state = self._adapter.build_state(user_id, normalized_input, session_context)
             ms = round((time.perf_counter() - start) * 1000, 1)
             logger.info(
                 "kag_dispatch_ok",

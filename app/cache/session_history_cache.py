@@ -8,24 +8,23 @@ import logging
 from datetime import datetime, timezone
 
 from app.cache import redis_client
+from app.cache.redis_keys import session_context_key, session_history_key
 from app.config.settings import REDIS_SESSION_TTL
 
 logger = logging.getLogger("rimas.session")
 
-_HISTORY_KEY = "rimas:session:{sid}:history"
-_CONTEXT_KEY = "rimas:session:{sid}:context"
 _MAX_HISTORY = 50  # Redis에 보관할 최대 턴 수
 
 
 def get_history(session_id: str) -> list[dict]:
     """최신 순으로 저장된 리스트를 시간순(오래된 것이 앞)으로 반환."""
-    key = _HISTORY_KEY.format(sid=session_id)
+    key = session_history_key(session_id)
     items = redis_client.cache_lrange(key, 0, _MAX_HISTORY - 1)
     return list(reversed(items))  # lpush → newest first → reverse for chronological
 
 
 def append_turn(session_id: str, user_input: str, response_state: dict) -> None:
-    key = _HISTORY_KEY.format(sid=session_id)
+    key = session_history_key(session_id)
     turn = {
         "user_input": user_input,
         "chatbot_response": response_state.get("chatbot_response", ""),
@@ -37,7 +36,7 @@ def append_turn(session_id: str, user_input: str, response_state: dict) -> None:
 
 
 def get_context(session_id: str) -> dict:
-    key = _CONTEXT_KEY.format(sid=session_id)
+    key = session_context_key(session_id)
     ctx = redis_client.cache_get(key)
     if ctx is None:
         logger.debug("session_context_cold_start", extra={"session_id": session_id})
@@ -46,7 +45,7 @@ def get_context(session_id: str) -> dict:
 
 
 def set_context(session_id: str, context: dict) -> None:
-    key = _CONTEXT_KEY.format(sid=session_id)
+    key = session_context_key(session_id)
     redis_client.cache_set(key, context, ttl=REDIS_SESSION_TTL)
 
 
@@ -69,8 +68,8 @@ def update_context_from_turn(session_id: str, kag_state: dict, rag_state: dict) 
 
 
 def clear_session(session_id: str) -> None:
-    redis_client.cache_delete(_HISTORY_KEY.format(sid=session_id))
-    redis_client.cache_delete(_CONTEXT_KEY.format(sid=session_id))
+    redis_client.cache_delete(session_history_key(session_id))
+    redis_client.cache_delete(session_context_key(session_id))
     logger.info("session_cleared", extra={"session_id": session_id})
 
 

@@ -12,6 +12,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { fetchSessionHistory, sendChatMessage } from "../api/chatbot";
 import { useChatStore } from "../stores/chatStore";
 import { useSessionStore } from "../stores/sessionStore";
+import { generateRequestId } from "../utils/requestId";
 import { ChatHistory } from "../components/chatbot/ChatHistory";
 import { ChatInput } from "../components/chatbot/ChatInput";
 import { ChatbotHeader } from "../components/chatbot/ChatbotHeader";
@@ -43,12 +44,15 @@ export function ChatbotPage() {
   }, [history]);
 
   const mutation = useMutation({
-    mutationFn: ({ userInput }: { userInput: string }) =>
-      sendChatMessage(userId, sessionId, userInput),
+    mutationFn: ({ userInput, requestId }: { userInput: string; requestId: string }) =>
+      sendChatMessage(userId, sessionId, userInput, requestId),
     onMutate: () => setLoading(true),
     onSuccess: (data, variables) => {
       const rs = data.response_state;
       appendTurn(variables.userInput, rs.chatbot_response, rs.display_recommendations);
+      if (data.session_degraded) {
+        console.warn("[ChatbotPage] session_degraded: Redis 세션이 일시적으로 불안정합니다.");
+      }
       setLoading(false);
     },
     onError: (err) => {
@@ -61,7 +65,8 @@ export function ChatbotPage() {
     const trimmed = input.trim();
     if (!trimmed || mutation.isPending) return;
     setInput("");
-    mutation.mutate({ userInput: trimmed });
+    // 전송마다 새 requestId 생성 — 같은 메시지를 두 번 누른 경우 백엔드가 409로 차단
+    mutation.mutate({ userInput: trimmed, requestId: generateRequestId() });
   }, [input, mutation]);
 
   const lastTurn = history[history.length - 1];

@@ -16,6 +16,6 @@ class RealRagAdapter(RagAdapter):
     def __init__(self, es_client=None):
         self._es = es_client
 
-    def build_state(self, kag_state: dict) -> dict:
+    def build_state(self, kag_state: dict, rag_input_json: dict | None = None) -> dict:
         # TODO: Elasticsearch Hybrid Retrieval + Reranking 구현
         raise NotImplementedError("RealRagAdapter is not yet implemented")

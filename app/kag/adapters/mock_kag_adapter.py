@@ -17,15 +17,24 @@ class MockKagAdapter(KagAdapter):
         )
 
         category = self._decide_category(primary_goal)
+        recommended_content_ids = ["track_001", "track_002", "track_003"]
         return {
             "status": "success",
             "recommendation_goal": {
                 "primary_goal": primary_goal,
             },
-            "recommended_content_ids": ["track_001", "track_002", "track_003"],
+            "recommended_content_ids": recommended_content_ids,
             "recommendation_category": category,
             "route": self._decide_route(primary_goal),
             "target_section": self._decide_target_section(category),
+            "traversal_reason": f"mock traversal for {primary_goal}",
+            "matched_nodes": [],
+            "excluded_nodes": [],
+            "candidate_tracks": [
+                {"content_id": content_id}
+                for content_id in recommended_content_ids
+            ],
+            "diversity_metadata": {"source": "mock"},
         }
 
     def _decide_primary_goal(self, user_input: str) -> str:

@@ -27,11 +27,12 @@ def get_history(
 def flush(
     session_id: str,
     user_id: str = Query(..., description="사용자 ID"),
+    flush_logs: bool = Query(False, description="interaction_logs 삭제 여부 (local/dev 환경에서만 허용)"),
 ):
     """Redis 세션을 PostgreSQL로 플러시하고 캐시를 삭제한다."""
-    logger.info("flush_request", extra={"session_id": session_id, "user_id": user_id})
+    logger.info("flush_request", extra={"session_id": session_id, "user_id": user_id, "flush_logs": flush_logs})
     try:
-        result = flush_session(session_id=session_id, user_id=user_id)
+        result = flush_session(session_id=session_id, user_id=user_id, flush_logs=flush_logs)
         return {"session_id": session_id, **result}
     except Exception as exc:
         logger.error("flush_error", extra={"session_id": session_id, "error": str(exc)}, exc_info=True)

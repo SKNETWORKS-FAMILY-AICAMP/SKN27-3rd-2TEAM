@@ -15,7 +15,11 @@ class StubOrchestrator:
         if self._error:
             raise self._error
         result = dict(self._response_state)
-        result["_meta"] = {"kag_state": {}, "rag_state": {}, "latency_ms": 50.0}
+        result["_meta"] = {
+            "kag_state": {"status": "success", "kind": "kag"},
+            "rag_state": {"status": "success", "kind": "rag"},
+            "latency_ms": 50.0,
+        }
         return result
 
 
@@ -29,6 +33,14 @@ class StubSessionCacheService:
         return {"session_id": session_id, "recent_genres": [], "recent_artists": [], "recent_moods": [], "conversation_summary": ""}
 
     def save_turn_and_update_context(self, **kwargs):
+        self.saved.append(kwargs)
+
+
+class StubLatestStateCache:
+    def __init__(self):
+        self.saved = []
+
+    def save_latest_states(self, **kwargs):
         self.saved.append(kwargs)
 
 
@@ -51,8 +63,52 @@ class PassingValidator:
         return {"passed": True, "errors": []}
 
 
+class StubInputPlanner:
+    def __init__(self, calls):
+        self.calls = calls
+
+    def run(self, user_id, session_id, request_id, user_input, session_context):
+        self.calls.append("input_planner")
+        return {
+            "intent_state": {
+                "intent_type": "discovery_recommendation",
+                "confidence": 0.82,
+                "normalized_query": user_input,
+                "detected_moods": ["night"],
+                "detected_genres": ["indie"],
+                "detected_situations": [],
+                "requires_kag": True,
+                "requires_rag": True,
+            },
+            "kag_input_json": {
+                "request_id": request_id,
+                "user_id": user_id,
+                "session_id": session_id,
+                "intent_type": "discovery_recommendation",
+                "query_context": {
+                    "normalized_query": user_input,
+                    "mood_candidates": ["night"],
+                    "genre_candidates": ["indie"],
+                    "situation_candidates": [],
+                },
+                "constraints": {
+                    "allow_discovery": True,
+                    "allow_new_release": True,
+                    "max_candidates": 10,
+                },
+            },
+        }
+
+
 class StubKagAgent:
-    def run(self, user_id, user_input, session_context):
+    def __init__(self, calls=None):
+        self.calls = calls
+        self.received_kag_input_json = None
+
+    def run(self, user_id, user_input, session_context, kag_input_json=None):
+        if self.calls is not None:
+            self.calls.append("kag")
+        self.received_kag_input_json = kag_input_json
         return {
             "status": "success",
             "recommendation_goal": {"primary_goal": "discovery_recommendation"},
@@ -64,7 +120,27 @@ class StubKagAgent:
 
 
 class StubRagAgent:
-    def run(self, kag_state):
+    def __init__(self):
+        self.received_rag_input_json = None
+        self.received_kag_input_json = None
+
+    def run(
+        self,
+        kag_state,
+        user_id=None,
+        session_id=None,
+        request_id=None,
+        intent_state=None,
+        kag_input_json=None,
+    ):
+        self.received_kag_input_json = kag_input_json
+        self.received_rag_input_json = {
+            "user_id": user_id,
+            "session_id": session_id,
+            "request_id": request_id,
+            "intent_type": (intent_state or {}).get("intent_type"),
+            "query_text": (kag_input_json or {}).get("query_context", {}).get("normalized_query"),
+        }
         return {
             "status": "success",
             "recommended_content_evidence": [
@@ -81,7 +157,11 @@ class StubRagAgent:
 
 
 class StubIntentAgent:
-    def run(self, user_input, kag_state=None, rag_state=None):
+    def __init__(self):
+        self.received_intent_state = None
+
+    def run(self, user_input, kag_state=None, rag_state=None, intent_state=None):
+        self.received_intent_state = intent_state
         return {"status": "success", "intent_type": "discovery_recommendation"}
 
 
@@ -130,7 +210,9 @@ class StubResponseGenerator:
 
 def test_chatbot_service_returns_status_and_response_state(monkeypatch):
     stub_cache = StubSessionCacheService()
+    latest_cache = StubLatestStateCache()
     monkeypatch.setattr("app.services.chatbot_service.session_cache_service", stub_cache)
+    monkeypatch.setattr("app.services.chatbot_service.latest_state_cache", latest_cache)
 
     orchestrator = StubOrchestrator(_valid_response_state())
     result = ChatbotService(orchestrator=orchestrator).submit_message(
@@ -140,6 +222,15 @@ def test_chatbot_service_returns_status_and_response_state(monkeypatch):
     assert result["status"] == "success"
     assert result["response_state"]["chatbot_response"] == "큐레이터 응답"
     assert "latency_ms" in result
+    assert latest_cache.saved[0]["session_id"] == "session_abc"
+    assert latest_cache.saved[0]["kag_state"] == {"status": "success", "kind": "kag"}
+    assert latest_cache.saved[0]["rag_state"] == {"status": "success", "kind": "rag"}
+    assert latest_cache.saved[0]["response_state"] == result["response_state"]
+    assert latest_cache.saved[0]["recommendation_metadata"] == {
+        "source_type": "chatbot",
+        "user_id": "user_001",
+        "latency_ms": 50.0,
+    }
     assert orchestrator.called_with == ("user_001", "session_abc", "추천해줘")
 
 
@@ -164,6 +255,37 @@ def test_orchestrator_passes_session_context_to_contract_validator():
     )
 
     assert validator.calls[0][0] == session_context
+
+
+def test_orchestrator_runs_input_planner_before_kag_and_passes_kag_input_json():
+    calls = []
+    kag_agent = StubKagAgent(calls)
+    rag_agent = StubRagAgent()
+    intent_agent = StubIntentAgent()
+
+    orchestrator = OrchestratorAgent(
+        input_planner=StubInputPlanner(calls),
+        kag_agent=kag_agent,
+        rag_agent=rag_agent,
+        intent_agent=intent_agent,
+        recommendation_agent=StubRecommendationAgent(),
+        response_generator=StubResponseGenerator(),
+        contract_validator=PassingValidator(),
+    )
+
+    orchestrator.run_chatbot(
+        user_id="user_001",
+        session_id="session_001",
+        user_input="새로운 밤 인디 음악 추천해줘",
+        session_context={"session_id": "session_001"},
+    )
+
+    assert calls[:2] == ["input_planner", "kag"]
+    assert kag_agent.received_kag_input_json["intent_type"] == "discovery_recommendation"
+    assert kag_agent.received_kag_input_json["query_context"]["genre_candidates"] == ["indie"]
+    assert rag_agent.received_kag_input_json["intent_type"] == "discovery_recommendation"
+    assert rag_agent.received_rag_input_json["query_text"] == "새로운 밤 인디 음악 추천해줘"
+    assert intent_agent.received_intent_state["intent_type"] == "discovery_recommendation"
 
 
 def test_chatbot_service_calls_logging_service_on_success(monkeypatch):

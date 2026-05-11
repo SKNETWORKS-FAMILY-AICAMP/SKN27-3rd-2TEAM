@@ -51,10 +51,23 @@ class StubSessionCacheService:
         }
 
 
+class StubLatestStateCache:
+    def __init__(self):
+        self.saved = []
+
+    def save_latest_states(self, **kwargs):
+        self.saved.append(kwargs)
+
+
 def test_main_recommendation_service_returns_page_view_model(monkeypatch):
+    latest_cache = StubLatestStateCache()
     monkeypatch.setattr(
         "app.services.main_recommendation_service.session_cache_service",
         StubSessionCacheService(),
+    )
+    monkeypatch.setattr(
+        "app.services.main_recommendation_service.latest_state_cache",
+        latest_cache,
     )
 
     view_model = MainRecommendationService(orchestrator=StubOrchestrator()).get_page_view_model(
@@ -69,3 +82,12 @@ def test_main_recommendation_service_returns_page_view_model(monkeypatch):
     assert "new_release" in view_model
     assert "recommendation_groups" not in view_model
     assert "debug" in view_model
+    assert latest_cache.saved[0]["session_id"] == "session_abc"
+    assert latest_cache.saved[0]["kag_state"] == view_model["debug"]["kag_state"]
+    assert latest_cache.saved[0]["rag_state"] == view_model["debug"]["rag_state"]
+    assert latest_cache.saved[0]["response_state"] == view_model
+    assert latest_cache.saved[0]["recommendation_metadata"] == {
+        "source_type": "main_recommendation",
+        "user_id": "user_001",
+        "latency_ms": view_model["debug"]["latency_ms"],
+    }

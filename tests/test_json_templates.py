@@ -13,11 +13,20 @@ EXPECTED_TEMPLATE_FIELDS = {
         "recommendation_category",
         "route",
         "target_section",
+        "traversal_reason",
+        "matched_nodes",
+        "excluded_nodes",
+        "candidate_tracks",
+        "diversity_metadata",
     },
     "rag_state_template.json": {
         "status",
+        "query",
+        "normalized_query",
         "recommended_content_evidence",
         "recommendation_reason",
+        "retrieval_metadata",
+        "retrieval_trace",
     },
     "intent_result_template.json": {
         "status",
@@ -71,6 +80,10 @@ class JsonTemplateTest(unittest.TestCase):
 
         self.assertEqual(set(template["recommendation_goal"].keys()), {"primary_goal"})
         self.assertIsInstance(template["recommended_content_ids"], list)
+        self.assertIsInstance(template["matched_nodes"], list)
+        self.assertIsInstance(template["excluded_nodes"], list)
+        self.assertIsInstance(template["candidate_tracks"], list)
+        self.assertIsInstance(template["diversity_metadata"], dict)
         self.assertEqual(template["route"], "safe_discovery")
 
     def test_rag_template_has_content_evidence_shape(self):
@@ -89,6 +102,8 @@ class JsonTemplateTest(unittest.TestCase):
                 "evidence_summary",
             },
         )
+        self.assertIsInstance(template["retrieval_metadata"], dict)
+        self.assertIsInstance(template["retrieval_trace"], dict)
 
     def _load_template(self, filename):
         with (TEMPLATE_DIR / filename).open(encoding="utf-8") as template_file:

@@ -58,6 +58,24 @@ class RdbRepositoryTest(unittest.TestCase):
             ],
         )
 
+    def test_music_catalog_repository_finds_by_content_id(self):
+        expected = {"content_id": "track_001"}
+        connection = FakeConnection(fetchone_result=expected)
+        repository = MusicCatalogRepository(connection)
+
+        result = repository.find_by_content_id("track_001")
+
+        self.assertEqual(result, expected)
+        self.assertEqual(
+            connection.cursor_instance.executed,
+            [
+                (
+                    query_constants.SELECT_MUSIC_BY_CONTENT_ID,
+                    {"content_id": "track_001"},
+                )
+            ],
+        )
+
     def test_interaction_log_repository_saves_and_commits(self):
         connection = FakeConnection()
         repository = InteractionLogRepository(connection)

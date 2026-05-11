@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.services.chatbot_service import ChatbotService
+from app.services.request_lifecycle_cache import DuplicateRequestError, request_lifecycle_cache
 
 logger = logging.getLogger("rimas.api.chatbot")
 router = APIRouter()
@@ -15,6 +16,7 @@ class ChatRequest(BaseModel):
     user_id: str = Field(..., description="사용자 ID")
     session_id: str = Field(..., description="세션 ID")
     user_input: str = Field(..., min_length=1, description="사용자 입력 메시지")
+    request_id: str | None = Field(None, description="중복 요청 차단용 요청 ID")
 
 
 @router.post("/respond")
@@ -29,6 +31,11 @@ def respond(req: ChatRequest):
         "chatbot_request",
         extra={"user_id": req.user_id, "session_id": req.session_id},
     )
+    if req.request_id:
+        try:
+            request_lifecycle_cache.start(req.request_id)
+        except DuplicateRequestError as exc:
+            raise HTTPException(status_code=409, detail="중복 요청이 처리 중입니다.") from exc
     try:
         result = _service.submit_message(
             user_id=req.user_id,
@@ -39,3 +46,6 @@ def respond(req: ChatRequest):
     except Exception as exc:
         logger.error("chatbot_error", extra={"error": str(exc)}, exc_info=True)
         raise HTTPException(status_code=500, detail="챗봇 서비스 오류가 발생했습니다.")
+    finally:
+        if req.request_id:
+            request_lifecycle_cache.finish(req.request_id)

@@ -12,7 +12,10 @@ def test_mock_rag_adapter_returns_only_docs_allowed_recommendation_categories():
     }
     kag_state = MockKagAdapter().build_state("user_001", "", session_context)
 
-    rag_state = MockRagAdapter().build_state(kag_state)
+    rag_state = MockRagAdapter().build_state(
+        kag_state,
+        rag_input_json={"query_text": "calm rnb recommendation"},
+    )
 
     categories = {
         evidence["recommendation_category"]
@@ -29,3 +32,7 @@ def test_mock_rag_adapter_returns_only_docs_allowed_recommendation_categories():
     assert {"content_id", "title", "artist", "evidence_summary"} <= set(
         rag_state["recommended_content_evidence"][0]
     )
+    assert rag_state["query"] == "calm rnb recommendation"
+    assert rag_state["normalized_query"] == "calm rnb recommendation"
+    assert isinstance(rag_state["retrieval_metadata"], dict)
+    assert isinstance(rag_state["retrieval_trace"], dict)

@@ -9,5 +9,24 @@
   ],
   "recommendation_category": "discovery_candidate",
   "route": "safe_discovery",
-  "target_section": "discovery_section"
+  "target_section": "discovery_section",
+  "traversal_reason": "recent mood to candidate track traversal",
+  "matched_nodes": [
+    {
+      "type": "mood",
+      "value": "calm"
+    }
+  ],
+  "excluded_nodes": [],
+  "candidate_tracks": [
+    {
+      "content_id": "track_001"
+    },
+    {
+      "content_id": "track_002"
+    }
+  ],
+  "diversity_metadata": {
+    "strategy": "balanced_genre"
+  }
 }

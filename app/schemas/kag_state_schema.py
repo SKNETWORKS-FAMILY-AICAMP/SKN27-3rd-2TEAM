@@ -12,3 +12,8 @@ class KagStateSchema(BaseModel):
     recommendation_category: str
     route: str
     target_section: str
+    traversal_reason: str = ""
+    matched_nodes: list[dict] = Field(default_factory=list)
+    excluded_nodes: list[dict] = Field(default_factory=list)
+    candidate_tracks: list[dict] = Field(default_factory=list)
+    diversity_metadata: dict = Field(default_factory=dict)

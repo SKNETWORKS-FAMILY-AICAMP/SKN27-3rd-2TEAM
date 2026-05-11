@@ -6,6 +6,7 @@ import { CharacterDjBanner } from "../components/recommendation/CharacterDjBanne
 import { MusicDetailModal } from "../components/recommendation/MusicDetailModal";
 import { RecommendationSection } from "../components/recommendation/RecommendationSection";
 import { TopTasteHeader } from "../components/recommendation/TopTasteHeader";
+import { useRequestId, useRequestIdPerKey } from "../hooks/useRequestId";
 import { useSessionStore } from "../stores/sessionStore";
 
 interface Props {
@@ -18,15 +19,25 @@ export function MainRecommendationPage({ onChatOpen }: Props) {
     return new URLSearchParams(window.location.search).get("detail");
   });
 
+  // 메인 추천: 마운트 수명 동안 동일 requestId 유지 → retry 시 백엔드 중복 차단 연동
+  const mainRequestId = useRequestId();
+  // 음악 상세: content_id가 바뀔 때마다 새 requestId 생성
+  const detailRequestId = useRequestIdPerKey(detailContentId);
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ["main-recommendations", userId, sessionId],
-    queryFn: () => fetchMainRecommendations(userId, sessionId),
+    queryFn: () => fetchMainRecommendations(userId, sessionId, mainRequestId),
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
   const detailQuery = useQuery({
     queryKey: ["music-detail", detailContentId],
-    queryFn: () => fetchMusicDetail(detailContentId ?? ""),
+    queryFn: () =>
+      fetchMusicDetail(detailContentId ?? "", {
+        userId,
+        sessionId,
+        requestId: detailRequestId,
+      }),
     enabled: Boolean(detailContentId),
     staleTime: 5 * 60 * 1000,
     retry: 1,
@@ -66,6 +77,11 @@ export function MainRecommendationPage({ onChatOpen }: Props) {
 
   return (
     <div className="main-page">
+      {data.session_degraded && (
+        <div className="session-degraded-banner">
+          세션 서버와 연결이 원활하지 않아 개인화 기능이 일부 제한될 수 있습니다.
+        </div>
+      )}
       <TopTasteHeader tasteBadges={vm.taste_badges} todayTheme={vm.today_theme} />
       <CharacterDjBanner message={vm.character_message} onChatOpen={onChatOpen} />
 

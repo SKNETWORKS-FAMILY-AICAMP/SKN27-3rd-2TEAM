@@ -19,3 +19,8 @@ def test_mock_kag_adapter_returns_kag_state():
     assert kag_state["route"] == "safe_discovery"
     assert kag_state["target_section"] == "discovery_section"
     assert isinstance(kag_state["recommended_content_ids"], list)
+    assert isinstance(kag_state["traversal_reason"], str)
+    assert isinstance(kag_state["matched_nodes"], list)
+    assert isinstance(kag_state["excluded_nodes"], list)
+    assert isinstance(kag_state["candidate_tracks"], list)
+    assert isinstance(kag_state["diversity_metadata"], dict)

@@ -4,6 +4,7 @@ import time
 from uuid import uuid4
 
 from app.config.settings import create_database_connection
+from app.repositories import query_constants
 from app.services.compact_state_builder import CompactStateBuilder
 
 logger = logging.getLogger("rimas.service.logging")
@@ -30,32 +31,31 @@ class LoggingService:
             with conn:
                 with conn.cursor() as cur:
                     cur.execute(
-                        """
-                        INSERT INTO interaction_logs
-                            (log_id, request_id, user_id, session_id, user_input,
-                             page_type, status, response_type, intent_type,
-                             compact_kag_state_json, compact_rag_state_json, compact_response_state_json,
-                             validation_status, validation_result_json, latency_ms, created_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s,
-                                %s::jsonb, %s::jsonb, %s::jsonb, %s, %s::jsonb, %s, NOW())
-                        """,
-                        (
-                            f"log_{uuid4().hex}",
-                            response_state.get("request_id") or f"req_{uuid4().hex}",
-                            user_id,
-                            session_id,
-                            user_input,
-                            "chatbot_page",
-                            response_state.get("status", "error"),
-                            response_state.get("response_type"),
-                            response_state.get("intent_type"),
-                            json.dumps(compact["kag_state"], ensure_ascii=False),
-                            json.dumps(compact["rag_state"], ensure_ascii=False),
-                            json.dumps(compact["response_state"], ensure_ascii=False),
-                            "success" if response_state.get("status") == "success" else "fallback",
-                            json.dumps({"status": response_state.get("status")}, ensure_ascii=False),
-                            int(latency_ms),
-                        ),
+                        query_constants.INSERT_INTERACTION_LOG,
+                        {
+                            "log_id": f"log_{uuid4().hex}",
+                            "request_id": response_state.get("request_id") or f"req_{uuid4().hex}",
+                            "user_id": user_id,
+                            "session_id": session_id,
+                            "user_input": user_input,
+                            "page_type": "chatbot_page",
+                            "status": response_state.get("status", "error"),
+                            "response_type": response_state.get("response_type"),
+                            "intent_type": response_state.get("intent_type"),
+                            "validation_status": "success"
+                            if response_state.get("status") == "success"
+                            else "fallback",
+                            "error_type": response_state.get("error_type"),
+                            "compact_kag_state_json": json.dumps(compact["kag_state"], ensure_ascii=False),
+                            "compact_rag_state_json": json.dumps(compact["rag_state"], ensure_ascii=False),
+                            "compact_response_state_json": json.dumps(
+                                compact["response_state"], ensure_ascii=False
+                            ),
+                            "validation_result_json": json.dumps(
+                                {"status": response_state.get("status")}, ensure_ascii=False
+                            ),
+                            "latency_ms": int(latency_ms),
+                        },
                     )
             conn.close()
             ms = round((time.perf_counter() - start) * 1000, 1)

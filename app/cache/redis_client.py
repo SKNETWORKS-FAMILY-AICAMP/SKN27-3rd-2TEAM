@@ -94,3 +94,10 @@ def cache_llen(key: str) -> int:
     except Exception as exc:
         logger.error("cache_llen_error", extra={"key": key, "error": str(exc)}, exc_info=True)
         return 0
+
+
+def is_healthy() -> bool:
+    try:
+        return get_client().ping()
+    except Exception:
+        return False

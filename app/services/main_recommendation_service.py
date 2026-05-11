@@ -2,6 +2,7 @@ import logging
 import time
 
 from app.agents.orchestrator_agent import OrchestratorAgent
+from app.cache import latest_state_cache, redis_client
 from app.services import session_cache_service
 
 logger = logging.getLogger("rimas.service.main_recommendation")
@@ -16,8 +17,9 @@ class MainRecommendationService:
     def __init__(self, orchestrator: OrchestratorAgent | None = None):
         self._orchestrator = orchestrator or OrchestratorAgent()
 
-    def get_page_view_model(self, user_id: str, session_id: str) -> dict:
+    def get_page_view_model(self, user_id: str, session_id: str) -> tuple[dict, bool]:
         start = time.perf_counter()
+        session_degraded = not redis_client.is_healthy()
 
         session_context = session_cache_service.load_context(session_id)
 
@@ -36,7 +38,19 @@ class MainRecommendationService:
             extra={"user_id": user_id, "session_id": session_id, "ms": ms},
         )
 
-        return self._build_view_model(user_id, session_context, kag_state, rag_state, ms)
+        view_model = self._build_view_model(user_id, session_context, kag_state, rag_state, ms)
+        latest_state_cache.save_latest_states(
+            session_id=session_id,
+            kag_state=kag_state,
+            rag_state=rag_state,
+            response_state=view_model,
+            recommendation_metadata={
+                "source_type": "main_recommendation",
+                "user_id": user_id,
+                "latency_ms": ms,
+            },
+        )
+        return view_model, session_degraded
 
     @staticmethod
     def _build_view_model(

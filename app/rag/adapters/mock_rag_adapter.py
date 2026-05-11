@@ -12,7 +12,7 @@ class MockRagAdapter(RagAdapter):
     실제 DB 연결 없이 전체 Agent 흐름 검증용.
     """
 
-    def build_state(self, kag_state: dict) -> dict:
+    def build_state(self, kag_state: dict, rag_input_json: dict | None = None) -> dict:
         if not kag_state:
             raise ValueError("kag_state is required")
 
@@ -23,6 +23,7 @@ class MockRagAdapter(RagAdapter):
         logger.debug("rag_mock_build", extra={"primary_goal": primary_goal})
 
         evidence = self._mock_evidence(genres, moods)
+        query = (rag_input_json or {}).get("query_text", "")
         return RagStateBuilder.build(
             context_type=primary_goal,
             base_context=f"{'/'.join(genres)} 취향과 {'/'.join(moods)} 분위기를 기준으로 추천 근거를 제공한다.",
@@ -34,6 +35,10 @@ class MockRagAdapter(RagAdapter):
                 f"{'/'.join(moods)} 분위기를 유지하면서 확장 가능한 곡을 포함했다.",
                 "최근 업데이트된 곡 중 기존 취향과 일부 맞는 곡을 포함했다.",
             ],
+            query=query,
+            normalized_query=query,
+            retrieval_metadata={},
+            retrieval_trace={},
         )
 
     @staticmethod

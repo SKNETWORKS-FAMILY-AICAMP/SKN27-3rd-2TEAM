@@ -1,14 +1,16 @@
 from app.agents.base_agent import BaseAgent
+from app.policies.ranking_policy import score_for_rank
+from app.policies.recommendation_policy import (
+    CATEGORY_SECTION_MAP,
+    DEFAULT_CATEGORY_PRIORITY,
+    DEFAULT_SECTION,
+    INTENT_CATEGORY_PRIORITY,
+    MAX_SELECTED_RECOMMENDATIONS,
+)
 
 
 class RecommendationAgent(BaseAgent):
     """RAG evidence에서 최종 표시 추천만 선택한다."""
-
-    _CATEGORY_SECTION_MAP = {
-        "personalized_match": "personalized",
-        "discovery_candidate": "discovery",
-        "new_release": "new_release",
-    }
 
     def run(self, intent_result: dict, rag_state: dict) -> dict:
         intent_type = intent_result.get("intent_type", "personalized_recommendation")
@@ -24,12 +26,7 @@ class RecommendationAgent(BaseAgent):
         }
 
     def _select(self, intent_type: str, evidence: list[dict]) -> list[dict]:
-        if intent_type == "new_release_recommendation":
-            priority = ["new_release", "personalized_match", "discovery_candidate"]
-        elif intent_type in {"new_taste_discovery", "discovery_recommendation"}:
-            priority = ["discovery_candidate", "personalized_match", "new_release"]
-        else:
-            priority = ["personalized_match", "discovery_candidate", "new_release"]
+        priority = INTENT_CATEGORY_PRIORITY.get(intent_type, DEFAULT_CATEGORY_PRIORITY)
 
         ordered: list[dict] = []
         used_ids: set[str] = set()
@@ -40,7 +37,7 @@ class RecommendationAgent(BaseAgent):
                     ordered.append(self._to_selected(item, rank=len(ordered) + 1))
                     used_ids.add(content_id)
 
-        return ordered[:5]
+        return ordered[:MAX_SELECTED_RECOMMENDATIONS]
 
     @staticmethod
     def _to_selected(item: dict, rank: int) -> dict:
@@ -49,10 +46,10 @@ class RecommendationAgent(BaseAgent):
             "content_id": item["content_id"],
             "title": item["title"],
             "artist": item["artist"],
-            "section": RecommendationAgent._CATEGORY_SECTION_MAP.get(category, "personalized"),
+            "section": CATEGORY_SECTION_MAP.get(category, DEFAULT_SECTION),
             "recommendation_category": category,
             "display_reason": item.get("evidence_summary", ""),
             "rank": rank,
-            "score": round(max(0.1, 1.0 - ((rank - 1) * 0.05)), 2),
+            "score": score_for_rank(rank),
             "source": {"kag": False, "rag": True},
         }
