@@ -29,6 +29,9 @@ class KagCypherQuery:
     다를 수 있으므로 어댑터/서비스에서 필요 시 매핑한다.
     """
 
+    #############################################################
+    # 쿼리 / 파라미터 조립 함수 
+    #############################################################
     @staticmethod
     def _assemble_query(*blocks: str) -> str:
         """비어 있지 않은 블록만 줄바꿈으로 이어 최종 Cypher 문자열을 만든다."""
@@ -48,6 +51,10 @@ class KagCypherQuery:
         for p in param_parts:
             merged.update(p)
         return merged
+
+    #############################################################
+    # 조립할 쿼리 조각 가공 함수 
+    #############################################################
 
     # ----- 개인화: 입력 가공 -----
     @staticmethod
@@ -118,7 +125,11 @@ WHERE NOT g.genre IN $exclude_genres"""
             )
         return "RETURN mc.track_id AS track_id", "ORDER BY mc.track_popularity DESC"
 
-    # ----- 공개 빌더 -----
+
+
+    #############################################################
+    # ----- 실행 쿼리 목록 -----
+    #############################################################
     @staticmethod
     def user_info(row: dict) -> tuple[str, dict]:
         """

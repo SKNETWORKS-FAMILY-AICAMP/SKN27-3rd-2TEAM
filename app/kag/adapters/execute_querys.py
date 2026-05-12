@@ -29,19 +29,40 @@ def _records_to_track_ids(records: list) -> list[str]:
     return out
 
 
+def _result_cap_from_row(row: dict | None) -> int:
+    """KagCypherQuery._limit_from_row와 동일한 상한 규칙(쿼리 LIMIT과 맞춤)."""
+    if not row:
+        return 10
+    raw = row.get("limit", 10)
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        n = 10
+    return max(1, min(n, 500))
+
+
+def _trim_track_ids_to_limit(track_ids: list[str], row: dict) -> list[str]:
+    """쿼리 LIMIT과 동일한 상한으로 결과 개수를 맞춘다."""
+    cap = _result_cap_from_row(row)
+    return track_ids[:cap]
+
+
 def execute_personalized_track_ids(conn: Neo4j_Connection, row: dict) -> list[str]:
     query, parameters = KagCypherQuery.personalized_recommendation_candidates(row)
-    return _records_to_track_ids(conn.execute_query(query, parameters))
+    raw = _records_to_track_ids(conn.execute_query(query, parameters))
+    return _trim_track_ids_to_limit(raw, row)
 
 
 def execute_new_release_track_ids(conn: Neo4j_Connection, row: dict) -> list[str]:
     query, parameters = KagCypherQuery.new_release_recommendation_candidates(row)
-    return _records_to_track_ids(conn.execute_query(query, parameters))
+    raw = _records_to_track_ids(conn.execute_query(query, parameters))
+    return _trim_track_ids_to_limit(raw, row)
 
 
 def execute_discovery_track_ids(conn: Neo4j_Connection, row: dict) -> list[str]:
     query, parameters = KagCypherQuery.discovery_recommendation_candidates(row)
-    return _records_to_track_ids(conn.execute_query(query, parameters))
+    raw = _records_to_track_ids(conn.execute_query(query, parameters))
+    return _trim_track_ids_to_limit(raw, row)
 
 
 def route_kag_query_executor(primary_goal: str) -> TrackIdExecutor:
@@ -92,7 +113,11 @@ def execute_kag_track_ids(
     session_context: dict,
     neo4j_connection: Neo4j_Connection,
 ) -> list[str]:
-    """세션·kag_input_json에서 row를 만들고, primary_goal에 따라 쿼리를 실행해 ``track_id`` 리스트를 반환한다."""
+    """세션·kag_input_json에서 row를 만들고, primary_goal에 따라 쿼리를 실행해 ``track_id`` 리스트를 반환한다.
+
+    반환 길이는 ``constraints.max_candidates``에서 온 ``row[\"limit\"]`` 이하로 잘린다 (쿼리 LIMIT과 동일 규칙).
+    DB 매칭이 적으면 그보다 짧을 수 있다.
+    """
     row = _query_row_from_session(session_context)
     executor = route_kag_query_executor(primary_goal)
 
@@ -136,6 +161,17 @@ def _sample_session_context_for_smoke() -> dict:
         },
     }
 
+def _log_smoke_track_ids(label: str, track_ids: list[str], limit_cap: int) -> None:
+    """스모크: limit 상한과 실제 길이·전체 ID 목록을 한 번에 표시한다."""
+    logger.info(
+        "%s limit_cap=%s count=%s track_ids=%s",
+        label,
+        limit_cap,
+        len(track_ids),
+        track_ids,
+    )
+
+
 def _run_smoke_tests() -> None:
     """Neo4j에 연결해 KagCypherQuery + execute_kag_track_ids 경로를 점검한다.
 
@@ -147,24 +183,31 @@ def _run_smoke_tests() -> None:
     conn = Neo4j_Connection()
 
     logger.info("smoke: execute_kag_track_ids (session_context 기반)")
+    row_from_session = _query_row_from_session(session_ctx)
+    session_limit = _result_cap_from_row(row_from_session)
     for goal in (
         "personalized_recommendation",
         "new_release_recommendation",
         "discovery_recommendation",
     ):
         track_ids = execute_kag_track_ids(goal, session_ctx, conn)
-        logger.info("  primary_goal=%s count=%s sample=%s", goal, len(track_ids), track_ids[:3])
+        _log_smoke_track_ids(f"  primary_goal={goal}", track_ids, session_limit)
 
-    logger.info("smoke: 개별 실행기 + 직접 row (장르 폴백/신곡/제외 장르)")
-    row_fallback = {"genre_candidates": [], "mood_candidates": [], "limit": 5}
-    ids_p = execute_personalized_track_ids(conn, row_fallback)
-    logger.info("  personalized(fallback popularity) count=%s sample=%s", len(ids_p), ids_p[:3])
+    # logger.info("smoke: 개별 실행기 + 직접 row (장르 폴백/신곡/제외 장르)")
+    # row_fallback = {"genre_candidates": [], "mood_candidates": [], "limit": 5}
+    # lim_fb = _result_cap_from_row(row_fallback)
+    # ids_p = execute_personalized_track_ids(conn, row_fallback)
+    # _log_smoke_track_ids("  personalized(fallback popularity)", ids_p, lim_fb)
 
-    ids_rel = execute_new_release_track_ids(conn, {"limit": 5})
-    logger.info("  new_release count=%s sample=%s", len(ids_rel), ids_rel[:3])
+    # row_rel = {"limit": 5}
+    # lim_rel = _result_cap_from_row(row_rel)
+    # ids_rel = execute_new_release_track_ids(conn, row_rel)
+    # _log_smoke_track_ids("  new_release", ids_rel, lim_rel)
 
-    ids_dis = execute_discovery_track_ids(conn, {"exclude_genres": ["pop"], "limit": 5})
-    logger.info("  discovery(exclude pop) count=%s sample=%s", len(ids_dis), ids_dis[:3])
+    # row_dis = {"exclude_genres": ["pop"], "limit": 5}
+    # lim_dis = _result_cap_from_row(row_dis)
+    # ids_dis = execute_discovery_track_ids(conn, row_dis)
+    # _log_smoke_track_ids("  discovery(exclude pop)", ids_dis, lim_dis)
 
     logger.info("smoke: 완료")
 
