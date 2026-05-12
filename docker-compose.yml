@@ -97,10 +97,17 @@ services:
       discovery.type: single-node
       xpack.security.enabled: "false"
       ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      logger.org.elasticsearch.plugins: WARN
+      logger.org.elasticsearch.env: WARN
     ports:
       - "${ELASTICSEARCH_PORT:-9200}:9200"
     volumes:
       - rimas_elasticsearch_data:/usr/share/elasticsearch/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health >/dev/null || exit 1"]
       interval: 10s
