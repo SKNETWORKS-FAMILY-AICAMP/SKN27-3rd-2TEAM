@@ -42,8 +42,10 @@ def main():
     # import_column(path="music_catalog.csv", column_name="playlist_subgenre", query_params=Query.subgenres)
     # import_column(path="music_catalog.csv", column_name="track_album_release_date", query_params=Query.year)
 
-    ######################## 검색 시나리오에 따른 분류 노드 / 엣지 추가 ##############################
-    # 모든 시나리오를 enum으로 취급해서 하나의 노드로 연결
+    ######################## 검색 시나리오 dim_* 분류 (music_catalog_scenarios.csv) ##############################
+    # 열마다 별도 노드 라벨(DimWeather, DimSeason, …)로 tag_id 값을 적재하고,
+    # MusicCatalog에는 HAS_DIM_WEATHER 등 차원별 관계로 연결한다.
+    # 선행: music_catalog.csv로 MusicCatalog 트랙 노드가 이미 있어야 track_id 매칭된다.
     # import_music_catalog_scenarios()
 
 
