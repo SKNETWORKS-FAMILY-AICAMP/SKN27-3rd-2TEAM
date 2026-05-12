@@ -1,47 +1,19 @@
 {
-    "request_id": "req_001",
-    "user_id": "user_001",
-    "page_type": "chatbot_page",
-    "user_input": "내 취향이랑 다른 노래 추천해줘",
-    "ml_output": {
-      "status": "success",
-      "user_id": "user_001",
-      "taste_profile": {
-        "preferred_genres": ["rnb", "indie"],
-        "preferred_artists": ["artist_a"],
-        "preferred_moods": ["calm", "night"],
-        "preferred_tempo": "medium"
-      },
-      "behavior_profile": {
-        "recent_listening_level": "medium",
-        "recent_discovery_level": "low",
-        "repeat_listening_ratio": 0.72,
-        "new_artist_acceptance": 0.34
-      },
-      "recommendation_profile": {
-        "personalization_strength": "high",
-        "discovery_readiness": "medium",
-        "new_release_affinity": "medium"
-      }
-    },
-    "session_context": {
-      "recent_genres": ["indie"],
-      "recent_artists": [],
-      "recent_moods": ["calm"],
-      "conversation_summary": "사용자는 차분한 분위기의 음악을 선호함"
-    },
-    "constraints": {
-      "max_recommendations": 5,
-      "allowed_categories": [
-        "personalized_match",
-        "similar_taste",
-        "new_release",
-        "discovery_candidate",
-        "information_related"
-      ],
-      "allowed_target_pages": [
-        "main_recommendation_page",
-        "chatbot_page"
-      ]
-    }
-  }
+  "status": "success",
+  "recommendation_goal": {
+    "primary_goal": "new_taste_discovery"
+  },
+  "recommended_content_ids": ["track_001", "track_002", "track_003"],
+  "recommendation_category": "discovery_candidate",
+  "route": "safe_discovery",
+  "target_section": "discovery_section",
+  "traversal_reason": "mock traversal for new_taste_discovery",
+  "matched_nodes": [],
+  "excluded_nodes": [],
+  "candidate_tracks": [
+    { "content_id": "track_001" },
+    { "content_id": "track_002" },
+    { "content_id": "track_003" }
+  ],
+  "diversity_metadata": { "source": "mock" }
+}
