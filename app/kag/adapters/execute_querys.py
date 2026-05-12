@@ -1,4 +1,7 @@
-"""Neo4j KAG 후보 쿼리 실행. 어댑터는 ``execute_kag_track_ids``만 호출하면 ``track_id`` 리스트를 받는다."""
+"""Neo4j KAG 후보 쿼리 실행.
+
+쿼리 문자열·파라미터 조립은 `app.kag.querys.KagCypherQuery`에서 담당한다.
+어댑터는 ``execute_kag_track_ids``만 호출하면 ``track_id`` 리스트를 받는다."""
 
 from __future__ import annotations
 
@@ -92,12 +95,93 @@ def execute_kag_track_ids(
     """세션·kag_input_json에서 row를 만들고, primary_goal에 따라 쿼리를 실행해 ``track_id`` 리스트를 반환한다."""
     row = _query_row_from_session(session_context)
     executor = route_kag_query_executor(primary_goal)
-    
+
     try:
         return executor(neo4j_connection, row)
     except Exception:
         logger.exception(
             "kag_neo4j_query_failed",
             extra={"primary_goal": primary_goal},
+        )
+        raise
+
+
+
+###############################################################
+# 쿼리 실행 검증용 코드 (최종 구현 완료되면 제거해야 함)
+# python -m app.kag.adapters.execute_querys
+###############################################################
+def _sample_session_context_for_smoke() -> dict:
+    """kag_input.json과 유사한 임시 세션(kag_input_json + recent_genres)."""
+    return {
+        "session_id": "session_smoke",
+        "recent_genres": ["pop"],
+        "user_id": "user_smoke",
+        "kag_input_json": {
+            "request_id": "req_smoke",
+            "user_id": "user_smoke",
+            "session_id": "session_smoke",
+            "intent_type": "personalized_recommendation",
+            "query_context": {
+                "normalized_query": "인디 차분한 음악",
+                "mood_candidates": ["calm"],
+                "genre_candidates": ["indie", "rock"],
+                "situation_candidates": [],
+            },
+            "constraints": {
+                "allow_discovery": True,
+                "allow_new_release": True,
+                "max_candidates": 5,
+            },
+        },
+    }
+
+def _run_smoke_tests() -> None:
+    """Neo4j에 연결해 KagCypherQuery + execute_kag_track_ids 경로를 점검한다.
+
+    - 환경 변수: NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
+    - 그래프에 MusicCatalog / HAS_GENRE 등이 적재되어 있어야 행이 나온다. 비어 있으면 ``[]`` 이어도 예외 없이 성공이다.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+    session_ctx = _sample_session_context_for_smoke()
+    conn = Neo4j_Connection()
+
+    logger.info("smoke: execute_kag_track_ids (session_context 기반)")
+    for goal in (
+        "personalized_recommendation",
+        "new_release_recommendation",
+        "discovery_recommendation",
+    ):
+        track_ids = execute_kag_track_ids(goal, session_ctx, conn)
+        logger.info("  primary_goal=%s count=%s sample=%s", goal, len(track_ids), track_ids[:3])
+
+    logger.info("smoke: 개별 실행기 + 직접 row (장르 폴백/신곡/제외 장르)")
+    row_fallback = {"genre_candidates": [], "mood_candidates": [], "limit": 5}
+    ids_p = execute_personalized_track_ids(conn, row_fallback)
+    logger.info("  personalized(fallback popularity) count=%s sample=%s", len(ids_p), ids_p[:3])
+
+    ids_rel = execute_new_release_track_ids(conn, {"limit": 5})
+    logger.info("  new_release count=%s sample=%s", len(ids_rel), ids_rel[:3])
+
+    ids_dis = execute_discovery_track_ids(conn, {"exclude_genres": ["pop"], "limit": 5})
+    logger.info("  discovery(exclude pop) count=%s sample=%s", len(ids_dis), ids_dis[:3])
+
+    logger.info("smoke: 완료")
+
+
+if __name__ == "__main__":
+
+    ###############################################################
+    # 쿼리 실행 검증용 코드 (최종 구현 완료되면 제거해야 함)
+    # python -m app.kag.adapters.execute_querys
+    ###############################################################
+    try:
+        _run_smoke_tests()
+    except Exception as exc:
+        logging.basicConfig(level=logging.INFO)
+        logging.getLogger(__name__).error(
+            "smoke 실패: Neo4j 환경·데이터를 확인하세요. (%s: %s)",
+            type(exc).__name__,
+            exc,
         )
         raise
