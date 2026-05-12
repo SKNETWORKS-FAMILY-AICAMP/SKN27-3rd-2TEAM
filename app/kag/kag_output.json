@@ -2,13 +2,13 @@
   "kag_state": {
     "status": "success",
     "recommendation_goal": {
-      "primary_goal": "new_taste_discovery"
+      "primary_goal": "discovery_recommendation"
     },
     "recommended_content_ids": ["track_001", "track_002", "track_003"],
     "recommendation_category": "discovery_candidate",
     "route": "safe_discovery",
     "target_section": "discovery_section",
-    "traversal_reason": "mock traversal for new_taste_discovery",
+    "traversal_reason": "mock traversal for discovery_recommendation",
     "matched_nodes": [],
     "excluded_nodes": [],
     "candidate_tracks": [
@@ -23,7 +23,7 @@
     "query": "",
     "normalized_query": "",
     "recommendation_context": {
-      "context_type": "new_taste_discovery",
+      "context_type": "discovery_recommendation",
       "base_context": " 취향과  분위기를 기준으로 추천 근거를 제공한다.",
       "source_type": "mock_catalog"
     },

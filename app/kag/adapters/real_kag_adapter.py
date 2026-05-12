@@ -1,11 +1,6 @@
 from app.kag.adapters.kag_adapter import KagAdapter
 from app.kag.connection import Neo4j_Connection
-from app.kag.constant import (
-    primary_goal_from_user_input,
-    recommendation_category_for_primary_goal,
-    route_for_primary_goal,
-    target_section_for_category,
-)
+from app.kag.constant import KagSessionInput
 
 
 class RealKagAdapter(KagAdapter):
@@ -18,8 +13,9 @@ class RealKagAdapter(KagAdapter):
         if not user_id:
             raise ValueError("user_id is required")
 
-        primary_goal = self._decide_primary_goal(user_input)
-        category = self._decide_category(primary_goal)
+        ext = KagSessionInput(session_context)
+        primary_goal = ext.primary_goal()
+        category = ext.recommendation_category()
         recommended_content_ids = self._get_recommended_content_ids(primary_goal)
 
         return {
@@ -29,8 +25,8 @@ class RealKagAdapter(KagAdapter):
             },
             "recommended_content_ids": recommended_content_ids,
             "recommendation_category": category,
-            "route": self._decide_route(primary_goal),
-            "target_section": self._decide_target_section(category),
+            "route": ext.route(),
+            "target_section": ext.target_section(),
             "traversal_reason": f"mock traversal for {primary_goal}",
             "matched_nodes": [],
             "excluded_nodes": [],
@@ -40,18 +36,6 @@ class RealKagAdapter(KagAdapter):
             ],
             "diversity_metadata": {"source": "SpotifySong_Catalog"},
         }
-
-    def _decide_primary_goal(self, user_input: str) -> str:
-        return primary_goal_from_user_input(user_input)
-
-    def _decide_category(self, primary_goal: str) -> str:
-        return recommendation_category_for_primary_goal(primary_goal)
-
-    def _decide_route(self, primary_goal: str) -> str:
-        return route_for_primary_goal(primary_goal)
-
-    def _decide_target_section(self, category: str) -> str:
-        return target_section_for_category(category)
 
     def _get_recommended_content_ids(self, primary_goal: str) -> list[str]:
         raise NotImplementedError("Neo4j 기반 recommended_content_ids 조회 미구현")

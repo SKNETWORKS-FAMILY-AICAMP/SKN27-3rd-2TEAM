@@ -2,6 +2,7 @@
   "notes": [
     "OrchestratorAgent.run_chatbot → KagDispatchAgent.run(user_id, user_input, session_context, kag_input_json)에 대응하는 입력 묶음 샘플이다.",
     "kag_input_json은 InputPlannerAgent가 KagInputSchema.model_dump()로 만든 dict와 동일하다. 스키마 정의: app/schemas/kag_input_schema.py",
+    "RealKagAdapter는 session_context에 kag_input_json 키로 위 payload가 들어 있다는 전제에서 intent_type과 동일 문자열이 primary_goal이 된다(1:1). (세션에 넣지 않으면 intent 없음 → 개인화 기본값)",
     "같은 턴의 intent_state(IntentStateSchema)는 KAG 호출 인자에 없고, 이후 RagDispatchAgent 등에서 사용된다. app/schemas/intent_state_schema.py",
     "KagAdapter.build_state의 user_query: (kag_input_json.query_context.normalized_query가 dict에 없을 때만 user_input). 값이 빈 문자열이면 그대로 어댑터에 전달된다."
   ],
@@ -13,23 +14,23 @@
       "recent_genres": ["indie"],
       "recent_artists": [],
       "recent_moods": ["calm"],
-      "conversation_summary": "사용자는 차분한 분위기 음악 선호"
-    },
-    "kag_input_json": {
-      "request_id": "req_001",
-      "user_id": "user_001",
-      "session_id": "session_001",
-      "intent_type": "personalized_recommendation",
-      "query_context": {
-        "normalized_query": "내 취향이랑 다른 노래 추천해줘",
-        "mood_candidates": ["calm"],
-        "genre_candidates": ["indie"],
-        "situation_candidates": []
-      },
-      "constraints": {
-        "allow_discovery": true,
-        "allow_new_release": true,
-        "max_candidates": 10
+      "conversation_summary": "사용자는 차분한 분위기 음악 선호",
+      "kag_input_json": {
+        "request_id": "req_001",
+        "user_id": "user_001",
+        "session_id": "session_001",
+        "intent_type": "personalized_recommendation",
+        "query_context": {
+          "normalized_query": "내 취향이랑 다른 노래 추천해줘",
+          "mood_candidates": ["calm"],
+          "genre_candidates": ["indie"],
+          "situation_candidates": []
+        },
+        "constraints": {
+          "allow_discovery": true,
+          "allow_new_release": true,
+          "max_candidates": 10
+        }
       }
     }
   },

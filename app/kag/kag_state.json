@@ -1,13 +1,13 @@
 {
   "status": "success",
   "recommendation_goal": {
-    "primary_goal": "new_taste_discovery"
+    "primary_goal": "discovery_recommendation"
   },
   "recommended_content_ids": ["track_001", "track_002", "track_003"],
   "recommendation_category": "discovery_candidate",
   "route": "safe_discovery",
   "target_section": "discovery_section",
-  "traversal_reason": "mock traversal for new_taste_discovery",
+  "traversal_reason": "mock traversal for discovery_recommendation",
   "matched_nodes": [],
   "excluded_nodes": [],
   "candidate_tracks": [
