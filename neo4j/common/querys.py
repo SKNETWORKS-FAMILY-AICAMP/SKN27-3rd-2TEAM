@@ -20,27 +20,20 @@ from common.constant import (
 ####################################################################
 # 실행할 쿼리 목록 정의
 ####################################################################
-class Query:
-    """CSV 한 행(pandas Series)마다 노드 적재용 query와 파라미터를 반환한다.
-    import_data(..., row_query=Query.<메서드>)처럼 콜러블을 넘긴다.
 
-    참고: @property는 row 인자를 받을 수 없어 @staticmethod로 둔다.
-    """
+from common.utils import extract_release_year, scalar_or_none
+
+
+class Query:
+    """music_catalog.csv 적재에 필요한 Cypher query와 파라미터를 만든다."""
 
     @staticmethod
     def music_catalog(rows: list[dict]) -> tuple[str, dict]:
-        """
-        Kaggle/Spotify 포맷 music_catalog.csv 데이터를
-        UNWIND 기반으로 MusicCatalog 노드에 적재한다.
-        """
-
         query = """
         UNWIND $rows AS row
 
         MERGE (mc:MusicCatalog {track_id: row.track_id})
-
         SET mc.name = row.track_name,
-            mc.track_id = row.track_id,
             mc.track_name = row.track_name,
             mc.track_artist = row.track_artist,
             mc.track_popularity = row.track_popularity,
@@ -69,36 +62,35 @@ class Query:
             "rows": [
                 {
                     "track_id": str(row["track_id"]).strip(),
-                    "track_name": scalar_or_none(row["track_name"]),
-                    "track_artist": scalar_or_none(row["track_artist"]),
-                    "track_popularity": scalar_or_none(row["track_popularity"]),
-                    "track_album_id": scalar_or_none(row["track_album_id"]),
-                    "track_album_name": scalar_or_none(row["track_album_name"]),
-                    "track_album_release_date": scalar_or_none(row["track_album_release_date"]),
-                    "playlist_name": scalar_or_none(row["playlist_name"]),
-                    "playlist_id": scalar_or_none(row["playlist_id"]),
-                    "playlist_genre": scalar_or_none(row["playlist_genre"]),
-                    "playlist_subgenre": scalar_or_none(row["playlist_subgenre"]),
-                    "danceability": scalar_or_none(row["danceability"]),
-                    "energy": scalar_or_none(row["energy"]),
-                    "key": scalar_or_none(row["key"]),
-                    "loudness": scalar_or_none(row["loudness"]),
-                    "mode": scalar_or_none(row["mode"]),
-                    "speechiness": scalar_or_none(row["speechiness"]),
-                    "acousticness": scalar_or_none(row["acousticness"]),
-                    "instrumentalness": scalar_or_none(row["instrumentalness"]),
-                    "liveness": scalar_or_none(row["liveness"]),
-                    "valence": scalar_or_none(row["valence"]),
-                    "tempo": scalar_or_none(row["tempo"]),
-                    "duration_ms": scalar_or_none(row["duration_ms"]),
+                    "track_name": scalar_or_none(row.get("track_name")),
+                    "track_artist": scalar_or_none(row.get("track_artist")),
+                    "track_popularity": scalar_or_none(row.get("track_popularity")),
+                    "track_album_id": scalar_or_none(row.get("track_album_id")),
+                    "track_album_name": scalar_or_none(row.get("track_album_name")),
+                    "track_album_release_date": scalar_or_none(row.get("track_album_release_date")),
+                    "playlist_name": scalar_or_none(row.get("playlist_name")),
+                    "playlist_id": scalar_or_none(row.get("playlist_id")),
+                    "playlist_genre": scalar_or_none(row.get("playlist_genre")),
+                    "playlist_subgenre": scalar_or_none(row.get("playlist_subgenre")),
+                    "danceability": scalar_or_none(row.get("danceability")),
+                    "energy": scalar_or_none(row.get("energy")),
+                    "key": scalar_or_none(row.get("key")),
+                    "loudness": scalar_or_none(row.get("loudness")),
+                    "mode": scalar_or_none(row.get("mode")),
+                    "speechiness": scalar_or_none(row.get("speechiness")),
+                    "acousticness": scalar_or_none(row.get("acousticness")),
+                    "instrumentalness": scalar_or_none(row.get("instrumentalness")),
+                    "liveness": scalar_or_none(row.get("liveness")),
+                    "valence": scalar_or_none(row.get("valence")),
+                    "tempo": scalar_or_none(row.get("tempo")),
+                    "duration_ms": scalar_or_none(row.get("duration_ms")),
                 }
                 for row in rows
+                if scalar_or_none(row.get("track_id")) is not None
             ]
         }
 
         return query, parameters
-
-############################################ 컬럼별 노드 적제 ############################################
 
     @staticmethod
     def genres(values: list[str]) -> tuple[str, dict]:
@@ -106,8 +98,7 @@ class Query:
         UNWIND $values AS value
         MERGE (:Genre {genre: value})
         """
-        parameters = {"values": values}
-        return query, parameters
+        return query, {"values": Query._clean_unique(values)}
 
     @staticmethod
     def artists(values: list[str]) -> tuple[str, dict]:
@@ -115,8 +106,7 @@ class Query:
         UNWIND $values AS value
         MERGE (:Artist {artist: value})
         """
-        parameters = {"values": values}
-        return query, parameters
+        return query, {"values": Query._clean_unique(values)}
 
     @staticmethod
     def subgenres(values: list[str]) -> tuple[str, dict]:
@@ -124,8 +114,7 @@ class Query:
         UNWIND $values AS value
         MERGE (:SubGenre {subgenre: value})
         """
-        parameters = {"values": values}
-        return query, parameters
+        return query, {"values": Query._clean_unique(values)}
 
     @staticmethod
     def year(values: list[str | None]) -> tuple[str, dict]:
@@ -133,141 +122,115 @@ class Query:
         UNWIND $years AS year
         MERGE (:ReleaseYear {year: year})
         """
-
-        years = [
-            extract_release_year(value)
+        years = {
+            year
             for value in values
-            if extract_release_year(value) is not None
-        ]
-
-        parameters = {"years": list(set(years))}
-        return query, parameters
-
-    @staticmethod
-    def mood(values: list[KagMoodLabel | str]) -> tuple[str, dict]:
-        query = """
-        UNWIND $values AS value
-        MERGE (:Mood {mood: value})
-        """
-
-        mood_values = [
-            value.value if isinstance(value, KagMoodLabel) else str(value)
-            for value in values
-        ]
-
-        parameters = {"values": list(set(mood_values))}
-        return query, parameters
-
-    @staticmethod
-    def tempo(values: list[KagTempoLabel | str]) -> tuple[str, dict]:
-        query = """
-        UNWIND $values AS value
-        MERGE (:Tempo {tempo: value})
-        """
-
-        tempo_values = [
-            value.value if isinstance(value, KagTempoLabel) else str(value)
-            for value in values
-        ]
-
-        parameters = {"values": list(set(tempo_values))}
-        return query, parameters
-
-
-
-############################################ 데이터 엣지 연결 ############################################
+            if (year := extract_release_year(value)) is not None
+        }
+        return query, {"years": sorted(years)}
 
     @staticmethod
     def edge_has_genre(rows: list[dict]) -> tuple[str, dict]:
-        """
-        기존 MusicCatalog 노드와 기존 Genre 노드를
-        UNWIND 기반으로 연결하는 쿼리.
-        """
-
         query = """
         UNWIND $rows AS row
 
         MATCH (mc:MusicCatalog {track_id: row.track_id})
         MATCH (g:Genre {genre: row.genre})
-
         MERGE (mc)-[:HAS_GENRE]->(g)
         """
-
-        parameters = {
-            "rows": [
-                {
-                    "track_id": str(row["track_id"]),
-                    "genre": row["playlist_genre"],
-                }
-                for row in rows
-            ]
-        }
-
-        return query, parameters
+        return query, {"rows": Query._track_value_rows(rows, "playlist_genre", "genre")}
 
     @staticmethod
     def edge_has_subgenre(rows: list[dict]) -> tuple[str, dict]:
-        """
-        기존 MusicCatalog 노드와 기존 SubGenre 노드를
-        UNWIND 기반으로 연결하는 쿼리.
-        """
-
         query = """
         UNWIND $rows AS row
 
         MATCH (mc:MusicCatalog {track_id: row.track_id})
         MATCH (sg:SubGenre {subgenre: row.subgenre})
-
         MERGE (mc)-[:HAS_SUBGENRE]->(sg)
         """
-
-        parameters = {
-            "rows": [
-                {
-                    "track_id": str(row["track_id"]),
-                    "subgenre": row["playlist_subgenre"],
-                }
-                for row in rows
-                if row.get("track_id") is not None
-                and row.get("playlist_subgenre") is not None
-            ]
-        }
-
-        return query, parameters
+        return query, {"rows": Query._track_value_rows(rows, "playlist_subgenre", "subgenre")}
 
     @staticmethod
     def edge_performed_by(rows: list[dict]) -> tuple[str, dict]:
-        """
-        기존 MusicCatalog 노드와 기존 Artist 노드를
-        UNWIND 기반으로 연결하는 쿼리.
-        """
-
         query = """
         UNWIND $rows AS row
 
         MATCH (mc:MusicCatalog {track_id: row.track_id})
         MATCH (a:Artist {artist: row.artist})
-
         MERGE (mc)-[:PERFORMED_BY]->(a)
+        """
+        return query, {"rows": Query._track_value_rows(rows, "track_artist", "artist")}
+
+    @staticmethod
+    def edge_released_in(rows: list[dict]) -> tuple[str, dict]:
+        query = """
+        UNWIND $rows AS row
+
+        MATCH (mc:MusicCatalog {track_id: row.track_id})
+        MATCH (y:ReleaseYear {year: row.year})
+        MERGE (mc)-[:RELEASED_IN]->(y)
         """
 
         parameters = {
             "rows": [
-                {
-                    "track_id": str(row["track_id"]),
-                    "artist": row["track_artist"],
-                }
+                {"track_id": track_id, "year": year}
                 for row in rows
-                if row.get("track_id") is not None
-                and row.get("track_artist") is not None
+                if (track_id := Query._clean(row.get("track_id"))) is not None
+                and (year := extract_release_year(row.get("track_album_release_date"))) is not None
             ]
         }
-
         return query, parameters
 
+    @staticmethod
+    def edge_has_genre_subgenre(rows: list[dict]) -> tuple[str, dict]:
+        query = """
+        UNWIND $rows AS row
 
+        MATCH (g:Genre {genre: row.genre})
+        MATCH (sg:SubGenre {subgenre: row.subgenre})
+        MERGE (g)-[:GENRE_INCLUDES_SUBGENRE]->(sg)
+        """
 
+        parameters = {
+            "rows": [
+                {"genre": genre, "subgenre": subgenre}
+                for row in rows
+                if (genre := Query._clean(row.get("genres"))) is not None
+                and (subgenre := Query._clean(row.get("subgenres"))) is not None
+            ]
+        }
+        return query, parameters
 
+    @staticmethod
+    def _clean(value) -> str | None:
+        value = scalar_or_none(value)
+        if value is None:
+            return None
+
+        text = str(value).strip()
+        return text or None
+
+    @staticmethod
+    def _clean_unique(values: list[str]) -> list[str]:
+        return sorted({
+            cleaned
+            for value in values
+            if (cleaned := Query._clean(value)) is not None
+        })
+
+    @staticmethod
+    def _track_value_rows(
+        rows: list[dict],
+        source_column: str,
+        target_key: str,
+    ) -> list[dict]:
+        return [
+            {"track_id": track_id, target_key: value}
+            for row in rows
+            if (track_id := Query._clean(row.get("track_id"))) is not None
+            and (value := Query._clean(row.get(source_column))) is not None
+        ]
 
 ############################################ 서브노드 간 엣지 연결 #########################################
 
