@@ -57,7 +57,7 @@ def main():
     # import_data(path="music_catalog.csv", query_params=Query.edge_performed_by)
 
 
-    ######################## 분류 라벨 (music_catalog_scenarios.csv · classified_catalog 열) ##############################
+    ######################## 분류 라벨 (music_catalog_labels.csv · classified_catalog 열) ##############################
     # 각 열마다 Label* 값 노드를 MERGE하고 MusicCatalog에는 HAS_LABEL_* 로 연결한다.
     # 선행: music_catalog.csv로 MusicCatalog 노드 필요.
     import_music_catalog_labels()

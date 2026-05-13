@@ -121,7 +121,6 @@ def import_music_catalog_labels(batch_size: int = 1000) -> None:
     from common.querys import Query
 
     df = pd.read_csv(get_filepath(MUSIC_CATALOG_SCENARIOS_CSV_FILENAME))
-    df = df[:5] # 테스트 용으로 5열 까지만 
     tag_pairs: set[tuple[str, str]] = set()
     link_rows: list[dict] = []
 
