@@ -172,6 +172,8 @@ class KagQueryTools:
         예상 질문:
         - "2020년 이후 힙합 중 Drake 비슷한 곡 찾아줘"
         - "pop 장르에서 여성 보컬 느낌 곡 보여줘"
+        - "2019년에 발매된 남성 가수 노래 찾아줘"
+        - "2020년에 발매된 pop장르 노래 알려줘"
         """
         return KagQueryTools.execute(
             KagQueryTemplateConstants.Q_SEARCH_003,
@@ -192,9 +194,8 @@ class KagQueryTools:
         예상 질문:
         - Ditto랑 비슷한 노래 찾아줘
         - Hype Boy랑 비슷한 곡 보여줘
-        - 이 노래랑 분위기 비슷한 음악 있어?
-        - Attention 같은 느낌의 노래 찾아줘
-        - Shape of You랑 연결 요소가 비슷한 곡 보여줘
+        - 이 가수의 노래와 비슷한 분위기를 가지는 노래 알려줘
+        - 내가 이 노래를 좋아하는데 이 노래와 비슷한 분위기를 가지는 노래 알려줘
         """
         return KagQueryTools.execute(KagQueryTemplateConstants.Q_SEARCH_004, {"keyword": keyword, "limit": limit}, conn)
 
@@ -203,11 +204,10 @@ class KagQueryTools:
         """장르·아티스트·연도별 곡 수 집계 상위 그룹을 조회한다. stat_type: genre | artist | year.
 
         예상 질문:
-        - 곡 수가 가장 많은 장르가 뭐야?
-        - 가장 많이 등장하는 장르 보여줘
-        - 데이터에 어떤 장르가 많아?
+        - 특정 장르에 해당하는 곡 알려줘
         - 아티스트별 곡 수 보여줘
-        - 장르별 음악 개수 알려줘
+        - 인기있는 장르 알려줘
+        - 해당 연도 혹은 해당 달에 발매된 노래 알려줘
         """
         return KagQueryTools.execute(KagQueryTemplateConstants.Q_SEARCH_005, {"stat_type": stat_type, "limit": limit}, conn)
 
@@ -222,11 +222,12 @@ class KagQueryTools:
         """연결 차원 노드 속성 값으로 역방향 곡 검색을 수행한다.
 
         예상 질문:
-        - 비 오는 날과 연결된 음악 보여줘
+        - 날씨와 연결된 음악 보여줘
         - 운동할 때 듣기 좋은 음악 찾아줘
-        - sad랑 연결된 노래 있어?
-        - 밤에 어울리는 음악 보여줘
-        - 집중할 때 연결된 곡 찾아줘
+        - 우울할 때 듣는 노래 있어?
+        - 새벽에 어울리는 음악 알려줘
+        - 집중할 때 듣기 좋은 음악 찾아줘
+        - 
         """
         return KagQueryTools.execute(
             KagQueryTemplateConstants.Q_SEARCH_006,
@@ -249,11 +250,8 @@ class KagQueryTools:
         """두 곡이 공유하는 중간 특성 노드를 조회한다.
 
         예상 질문:
-        - Ditto랑 Hype Boy 공통점 뭐야?
-        - Attention이랑 OMG가 공유하는 정보 있어?
-        - 두 곡의 공통 장르 알려줘
-        - Shape of You랑 비슷하게 연결된 요소가 뭐야?
-        - 이 두 노래가 같이 묶이는 이유가 있어?
+        - 내가 특정가수를 좋아하는데 이 가수와 장르가 비슷한 가수 노래 알려줘
+        - 이 장르를 좋아하는데 이 장르를 노래하는 가수의 곡을 알려줘
         """
         return KagQueryTools.execute(
             KagQueryTemplateConstants.Q_SEARCH_007,
@@ -261,33 +259,33 @@ class KagQueryTools:
             conn,
         )
 
-    @staticmethod
-    def tool_q_search_008_music_path_lookup(
-        conn: Neo4j_Connection,
-        keyword: str,
-        target_label: str | None = None,
-        max_depth: int = 3,
-        limit: int = 10,
-    ) -> list[dict]:
-        """기준 곡에서 출발하는 그래프 경로를 길이 상한 내에서 조회한다.
+    # @staticmethod
+    # def tool_q_search_008_music_path_lookup(
+    #     conn: Neo4j_Connection,
+    #     keyword: str,
+    #     target_label: str | None = None,
+    #     max_depth: int = 3,
+    #     limit: int = 10,
+    # ) -> list[dict]:
+    #     """기준 곡에서 출발하는 그래프 경로를 길이 상한 내에서 조회한다.
 
-        예상 질문:
-        - Ditto에서 연결 경로 보여줘
-        - 이 노래가 어떤 노드를 통해 추천되는지 보여줘
-        - Hype Boy의 그래프 연결 구조 보여줘
-        - 이 곡에서 감정 노드까지 가는 경로 보여줘
-        - Attention이 어떤 장르와 상황으로 연결되는지 보여줘
-        """
-        return KagQueryTools.execute(
-            KagQueryTemplateConstants.Q_SEARCH_008,
-            {
-                "keyword": keyword,
-                "target_label": target_label,
-                "max_depth": max_depth,
-                "limit": limit,
-            },
-            conn,
-        )
+    #     예상 질문:
+    #     - Ditto에서 연결 경로 보여줘
+    #     - 이 노래가 어떤 노드를 통해 추천되는지 보여줘
+    #     - Hype Boy의 그래프 연결 구조 보여줘
+    #     - 이 곡에서 감정 노드까지 가는 경로 보여줘
+    #     - Attention이 어떤 장르와 상황으로 연결되는지 보여줘
+    #     """
+    #     return KagQueryTools.execute(
+    #         KagQueryTemplateConstants.Q_SEARCH_008,
+    #         {
+    #             "keyword": keyword,
+    #             "target_label": target_label,
+    #             "max_depth": max_depth,
+    #             "limit": limit,
+    #         },
+    #         conn,
+    #     )
 
     @staticmethod
     def tool_q_search_009_artist_music_lookup(conn: Neo4j_Connection, artist: str, limit: int = 30) -> list[dict]:
@@ -300,6 +298,7 @@ class KagQueryTools:
         예상 질문:
         - "Taylor Swift 노래 추천해줘"
         - "아이유 곡 목록 보여줘"
+        - "Ed Sheeran 노래 추천해줘"
         """
         return KagQueryTools.execute(KagQueryTemplateConstants.Q_SEARCH_009, {"artist": artist, "limit": limit}, conn)
 
@@ -318,6 +317,7 @@ class KagQueryTools:
         - 힙합 중 유명한 곡 찾아줘
         - Taylor Swift 노래 중 인기곡 보여줘
         - subgenre 기준으로 인기곡 찾아줘
+        - 발매 연도 혹은 달 기준 인기곡 알려줘
         """
         return KagQueryTools.execute(
             KagQueryTemplateConstants.Q_SEARCH_010,
@@ -325,34 +325,34 @@ class KagQueryTools:
             conn,
         )
 
-    @staticmethod
-    def tool_q_search_011_temporal_music_lookup(
-        conn: Neo4j_Connection,
-        year: int | None = None,
-        start_year: int | None = None,
-        end_year: int | None = None,
-        limit: int = 20,
-    ) -> list[dict]:
-        """특정 연도 또는 연도 구간 기준으로 곡을 조회한다.
+    # @staticmethod
+    # def tool_q_search_011_temporal_music_lookup(
+    #     conn: Neo4j_Connection,
+    #     year: int | None = None,
+    #     start_year: int | None = None,
+    #     end_year: int | None = None,
+    #     limit: int = 20,
+    # ) -> list[dict]:
+    #     """특정 연도 또는 연도 구간 기준으로 곡을 조회한다.
 
-        용도:
-        - 시대/시점 조건이 핵심인 탐색 요청을 처리한다.
-        - 단일 연도 검색과 기간 검색을 모두 지원한다.
+    #     용도:
+    #     - 시대/시점 조건이 핵심인 탐색 요청을 처리한다.
+    #     - 단일 연도 검색과 기간 검색을 모두 지원한다.
 
-        예상 질문:
-        - "2018년 노래 추천해줘"
-        - "2010~2015 사이 인기곡 알려줘"
-        """
-        return KagQueryTools.execute(
-            KagQueryTemplateConstants.Q_SEARCH_011,
-            {
-                "year": year,
-                "start_year": start_year,
-                "end_year": end_year,
-                "limit": limit,
-            },
-            conn,
-        )
+    #     예상 질문:
+    #     - "2018년 노래 추천해줘"
+    #     - "2010~2015 사이 인기곡 알려줘"
+    #     """
+    #     return KagQueryTools.execute(
+    #         KagQueryTemplateConstants.Q_SEARCH_011,
+    #         {
+    #             "year": year,
+    #             "start_year": start_year,
+    #             "end_year": end_year,
+    #             "limit": limit,
+    #         },
+    #         conn,
+    #     )
 
     @staticmethod
     def tool_q_search_012_composite_condition_search(
@@ -384,31 +384,31 @@ class KagQueryTools:
             conn,
         )
 
-    @staticmethod
-    def tool_q_search_013_high_connection_music_lookup(conn: Neo4j_Connection, limit: int = 20) -> list[dict]:
-        """관계 수가 많은 곡(그래프 허브에 가까운 트랙)을 조회한다.
+    # @staticmethod
+    # def tool_q_search_013_high_connection_music_lookup(conn: Neo4j_Connection, limit: int = 20) -> list[dict]:
+    #     """관계 수가 많은 곡(그래프 허브에 가까운 트랙)을 조회한다.
 
-        예상 질문:
-        - 가장 많이 연결된 음악 보여줘
-        - 그래프에서 중심에 가까운 노래가 뭐야?
-        - 연결 정보가 많은 곡 알려줘
-        - 추천 근거가 많은 음악 찾아줘
-        - 노드 연결이 많은 음악 순위 보여줘
-        """
-        return KagQueryTools.execute(KagQueryTemplateConstants.Q_SEARCH_013, {"limit": limit}, conn)
+    #     예상 질문:
+    #     - 가장 많이 연결된 음악 보여줘
+    #     - 그래프에서 중심에 가까운 노래가 뭐야?
+    #     - 연결 정보가 많은 곡 알려줘
+    #     - 추천 근거가 많은 음악 찾아줘
+    #     - 노드 연결이 많은 음악 순위 보여줘
+    #     """
+    #     return KagQueryTools.execute(KagQueryTemplateConstants.Q_SEARCH_013, {"limit": limit}, conn)
 
-    @staticmethod
-    def tool_q_search_014_relation_type_lookup(conn: Neo4j_Connection, keyword: str, limit: int = 20) -> list[dict]:
-        """기준 곡에 연결된 관계 타입 목록을 조회한다.
+    # @staticmethod
+    # def tool_q_search_014_relation_type_lookup(conn: Neo4j_Connection, keyword: str, limit: int = 20) -> list[dict]:
+    #     """기준 곡에 연결된 관계 타입 목록을 조회한다.
 
-        예상 질문:
-        - Ditto는 어떤 관계들이 있어?
-        - 이 노래랑 연결된 엣지 타입 보여줘
-        - Hype Boy의 관계 종류 알려줘
-        - 이 곡은 어떤 정보랑 연결될 수 있어?
-        - Attention의 연결 타입 목록 보여줘
-        """
-        return KagQueryTools.execute(KagQueryTemplateConstants.Q_SEARCH_014, {"keyword": keyword, "limit": limit}, conn)
+    #     예상 질문:
+    #     - Ditto는 어떤 관계들이 있어?
+    #     - 이 노래랑 연결된 엣지 타입 보여줘
+    #     - Hype Boy의 관계 종류 알려줘
+    #     - 이 곡은 어떤 정보랑 연결될 수 있어?
+    #     - Attention의 연결 타입 목록 보여줘
+    #     """
+    #     return KagQueryTools.execute(KagQueryTemplateConstants.Q_SEARCH_014, {"keyword": keyword, "limit": limit}, conn)
 
     @staticmethod
     def tool_q_rec_001_genre_based_recommendation(conn: Neo4j_Connection, genre: str, limit: int = 10) -> list[dict]:
@@ -499,7 +499,7 @@ class KagQueryTools:
 
         예상 질문:
         - "팝 중에서 인기 많은 곡 추천해줘"
-        - "OO 아티스트 느낌으로 대중적인 곡 찾아줘"
+        - "OO 아티스트의의 대중적인 곡 찾아줘"
         """
         return KagQueryTools.execute(
             KagQueryTemplateConstants.Q_REC_006,
@@ -524,9 +524,8 @@ class KagQueryTools:
         """아티스트당 대표곡 1곡씩 모아 다양성 있는 추천 목록을 만든다.
 
         예상 질문:
-        - 다양하게 노래 추천해줘
+        - Pop장르에 해당하는 노래 다양하게 추천해줘
         - 아티스트 안 겹치게 추천해줘
-        - pop 노래 여러 가수로 추천해줘
         - 비슷한 노래 말고 다양하게 보여줘
         - 장르 안에서 다양하게 골라줘
         """
