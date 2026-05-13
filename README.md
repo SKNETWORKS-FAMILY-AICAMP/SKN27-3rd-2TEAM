@@ -127,7 +127,8 @@ ResponseValidator + ProvenanceValidator
 
 | 구성요소 | 설계 |
 |---------|------|
-| 추천 섹션 | 개인화 추천 / 새로운 취향 탐색 / 신규 발매 — 3개 섹션 병렬 표시 |
+| 추천 섹션 | 전체 추천 화면에서는 개인화 추천 / 새로운 취향 탐색 / 신규 발매 3개 섹션을 함께 표시 |
+| 카테고리 진입 | 홈 별자리 노드에서 개인화 추천 / 새로운 취향 / 신규 발매를 선택하면 해당 카테고리 섹션만 표시 |
 | 취향 배지 | SESSION_CONTEXT의 mood·genre 태그를 헤더에 배지로 표시 |
 | 오늘의 테마 | 날짜·취향 기반 테마 메시지 |
 | 캐릭터 DJ 배너 | Agent 추천 메시지 표시, 챗봇으로 이동 버튼 |
@@ -186,7 +187,7 @@ ResponseValidator + ProvenanceValidator
 ```
 src/
   pages/        MainRecommendationPage, ChatbotPage
-  components/   recommendation/ · chatbot/ — 페이지 단위 컴포넌트 분리
+  components/   home/ · recommendation/ · chatbot/ · background/ · mascot/ — 페이지/역할 단위 컴포넌트 분리
   api/          chatbot · recommendation · musicDetailApi — axios 래퍼
   stores/       chatStore (Zustand) · sessionStore — 전역 상태
   hooks/        useRequestId · useRequestIdPerKey — requestId 훅
@@ -317,7 +318,7 @@ POST /api/sessions/{session_id}/flush?user_id=&flush_logs=false
 | Contract Validator | KAG/RAG/session_context 계약 검증 + optional 타입 검증 |
 | prod fail-fast | 필수 env 누락 시 서버 시작 즉시 실패 |
 | 정책 문서 | `docs/policies/` (RecommendationPolicy, RankingPolicy, PromptPolicy) |
-| Frontend | React 메인 추천 페이지, 챗봇 페이지, 음악 상세 모달 |
+| Frontend | 홈 별자리 네비게이션, React 메인 추천 페이지, 카테고리별 추천 화면, 챗봇 페이지, 음악 상세 모달 |
 | Frontend request_id | `generateRequestId` 유틸, `useRequestId` / `useRequestIdPerKey` 훅, 전 API에 request_id 전달, `session_degraded` 배너 표시 |
 
 ### 미구현 (stub)
@@ -367,7 +368,7 @@ app/
 
 frontend/
   src/api/         API clients (chatbot, recommendation, musicDetail)
-  src/components/  UI components (chatbot, recommendation)
+  src/components/  UI components (home, chatbot, recommendation, background, mascot)
   src/hooks/       useRequestId 훅
   src/pages/       MainRecommendationPage, ChatbotPage
   src/stores/      Zustand stores (chat, session)

@@ -1,5 +1,6 @@
 import { memo } from "react";
 import type { RecommendationCard as CardType } from "../../types";
+import { GlassPanel } from "../ui/GlassPanel";
 import { RecommendationCard } from "./RecommendationCard";
 
 interface Props {
@@ -18,7 +19,7 @@ export const RecommendationSection = memo(function RecommendationSection({
   if (!cards || cards.length === 0) return null;
 
   return (
-    <section className="rec-section">
+    <GlassPanel className="rec-section" intensity="base">
       <div className="rec-section__header">
         {label && <span className="rec-section__label">{label}</span>}
         <h2 className="rec-section__title">{title}</h2>
@@ -28,6 +29,6 @@ export const RecommendationSection = memo(function RecommendationSection({
           <RecommendationCard key={card.content_id} card={card} onOpenDetail={onOpenDetail} />
         ))}
       </div>
-    </section>
+    </GlassPanel>
   );
 });

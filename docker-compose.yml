@@ -16,7 +16,7 @@ services:
       RIMAS_NEO4J_PASSWORD: ${RIMAS_NEO4J_PASSWORD:-rimas_neo4j_password}
       RIMAS_ELASTICSEARCH_URL: http://elasticsearch:9200
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      CORS_ORIGINS: "http://localhost:5173"
+      CORS_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173"
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -38,7 +38,7 @@ services:
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     environment:
-      VITE_API_URL: "http://localhost:8000"
+      VITE_API_URL: "http://127.0.0.1:8000"
     volumes:
       - ./frontend:/app
       - /app/node_modules

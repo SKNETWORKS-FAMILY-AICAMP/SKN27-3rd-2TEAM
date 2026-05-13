@@ -1,5 +1,6 @@
 import { memo } from "react";
 import type { KeyboardEvent } from "react";
+import { DreamButton } from "../ui/DreamButton";
 
 interface Props {
   value: string;
@@ -27,13 +28,13 @@ export const ChatInput = memo(function ChatInput({ value, onChange, onSend, disa
         disabled={disabled}
         rows={2}
       />
-      <button
+      <DreamButton
         className="chat-input__send"
         onClick={onSend}
         disabled={disabled || !value.trim()}
       >
         {disabled ? "..." : "전송"}
-      </button>
+      </DreamButton>
     </div>
   );
 });
