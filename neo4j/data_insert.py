@@ -8,7 +8,7 @@ from common.querys import Query
 from common.utils import (
     import_data,
     import_column,
-    import_music_catalog_scenarios,
+    import_music_catalog_labels,
     remove_duplicate_genre_subgenre,
     get_filepath,
 )
@@ -52,16 +52,15 @@ def main():
     ############################### 엣지 연결 ############################################
     # 데이터 전체를 주회해야 하므로 import_data 를 통해 실행하게 됨 
     # 다만 각 쿼리 내부에 연결 여부를 매핑하는 함수가 들어있어야 한다. 조건에 맞으면 연결 / 아니면 pass 
-    import_data(path="music_catalog.csv", query_params=Query.edge_has_genre)
-    import_data(path="music_catalog.csv", query_params=Query.edge_has_subgenre)
-    import_data(path="music_catalog.csv", query_params=Query.edge_performed_by)
+    # import_data(path="music_catalog.csv", query_params=Query.edge_has_genre)
+    # import_data(path="music_catalog.csv", query_params=Query.edge_has_subgenre)
+    # import_data(path="music_catalog.csv", query_params=Query.edge_performed_by)
 
 
-    ######################## 검색 시나리오 dim_* 분류 (music_catalog_scenarios.csv) ##############################
-    # 열마다 별도 노드 라벨(DimWeather, DimSeason, …)로 tag_id 값을 적재하고,
-    # MusicCatalog에는 HAS_DIM_WEATHER 등 차원별 관계로 연결한다.
-    # 선행: music_catalog.csv로 MusicCatalog 트랙 노드가 이미 있어야 track_id 매칭된다.
-    # import_music_catalog_scenarios()
+    ######################## 분류 라벨 (music_catalog_labels.csv · classified_catalog 열) ##############################
+    # 각 열마다 Label* 값 노드를 MERGE하고 MusicCatalog에는 HAS_LABEL_* 로 연결한다.
+    # 선행: music_catalog.csv로 MusicCatalog 노드 필요.
+    import_music_catalog_labels()
 
 
 

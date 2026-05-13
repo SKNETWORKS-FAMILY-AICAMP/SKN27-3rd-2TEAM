@@ -541,23 +541,23 @@ search_music_by_composite_conditions(
 
 ```cypher
 MATCH (m:MusicCatalog)
-OPTIONAL MATCH (m)-[]-(g:Genre)
-OPTIONAL MATCH (m)-[]-(mood:Mood)
-OPTIONAL MATCH (m)-[]-(s:Situation)
-OPTIONAL MATCH (m)-[]-(w:Weather)
+OPTIONAL MATCH (m)-[:HAS_GENRE]-(g:Genre)
+OPTIONAL MATCH (m)-[:HAS_LABEL_EMOTION]-(emo:LabelEmotion)
+OPTIONAL MATCH (m)-[:HAS_LABEL_EXERCISE|HAS_LABEL_COMMUTE|HAS_LABEL_HOME|HAS_LABEL_FOCUS|HAS_LABEL_SPECIAL|HAS_LABEL_TIME|HAS_LABEL_SEASON|HAS_LABEL_EMOTION_SIT]-(s)
+OPTIONAL MATCH (m)-[:HAS_LABEL_WEATHER]-(w:LabelWeather)
 WITH m,
   max(CASE WHEN $genre IS NOT NULL AND toLower(g.genre) = toLower($genre) THEN 1 ELSE 0 END) AS genre_match,
-  max(CASE WHEN $mood IS NOT NULL AND toLower(mood.name) = toLower($mood) THEN 1 ELSE 0 END) AS mood_match,
-  max(CASE WHEN $situation IS NOT NULL AND toLower(s.name) = toLower($situation) THEN 1 ELSE 0 END) AS situation_match,
-  max(CASE WHEN $weather IS NOT NULL AND toLower(w.name) = toLower($weather) THEN 1 ELSE 0 END) AS weather_match
+  max(CASE WHEN $mood IS NOT NULL AND toLower(emo.name) CONTAINS toLower($mood) THEN 1 ELSE 0 END) AS mood_match,
+  max(CASE WHEN $situation IS NOT NULL AND toLower(s.name) CONTAINS toLower($situation) THEN 1 ELSE 0 END) AS situation_match,
+  max(CASE WHEN $weather IS NOT NULL AND toLower(w.name) CONTAINS toLower($weather) THEN 1 ELSE 0 END) AS weather_match
 WITH m, genre_match + mood_match + situation_match + weather_match AS matched_count
 WHERE matched_count > 0
 RETURN
-  m.content_id AS content_id,
+  m.track_id AS track_id,
   m.track_name AS track_name,
   m.track_artist AS track_artist,
   matched_count,
-  m.track_popularity AS popularity
+  coalesce(m.track_popularity, 0) AS popularity
 ORDER BY matched_count DESC, popularity DESC
 LIMIT coalesce($limit, 20)
 ```
@@ -689,13 +689,13 @@ recommend_by_mood(mood: str, limit: int = 10)
 ### Cypher
 
 ```cypher
-MATCH (m:MusicCatalog)-[]-(mood:Mood)
-WHERE toLower(mood.name) CONTAINS toLower($mood)
+MATCH (m:MusicCatalog)-[:HAS_LABEL_EMOTION]-(emo:LabelEmotion)
+WHERE toLower(emo.name) CONTAINS toLower($mood)
 RETURN DISTINCT
-  m.content_id AS content_id,
+  m.track_id AS track_id,
   m.track_name AS track_name,
   m.track_artist AS track_artist,
-  mood.name AS matched_mood,
+  emo.name AS matched_mood,
   coalesce(m.track_popularity, 0) AS popularity,
   10 + coalesce(m.track_popularity, 0) AS recommendation_score
 ORDER BY recommendation_score DESC
@@ -931,20 +931,20 @@ recommend_by_hybrid_context(
 
 ```cypher
 MATCH (m:MusicCatalog)
-OPTIONAL MATCH (m)-[]-(g:Genre)
-OPTIONAL MATCH (m)-[]-(mood:Mood)
-OPTIONAL MATCH (m)-[]-(s:Situation)
-OPTIONAL MATCH (m)-[]-(w:Weather)
+OPTIONAL MATCH (m)-[:HAS_GENRE]-(g:Genre)
+OPTIONAL MATCH (m)-[:HAS_LABEL_EMOTION]-(emo:LabelEmotion)
+OPTIONAL MATCH (m)-[:HAS_LABEL_EXERCISE|HAS_LABEL_COMMUTE|HAS_LABEL_HOME|HAS_LABEL_FOCUS|HAS_LABEL_SPECIAL|HAS_LABEL_TIME|HAS_LABEL_SEASON|HAS_LABEL_EMOTION_SIT]-(s)
+OPTIONAL MATCH (m)-[:HAS_LABEL_WEATHER]-(w:LabelWeather)
 WITH m,
   max(CASE WHEN $genre IS NOT NULL AND toLower(g.genre) = toLower($genre) THEN 1 ELSE 0 END) AS genre_match,
-  max(CASE WHEN $mood IS NOT NULL AND toLower(mood.name) = toLower($mood) THEN 1 ELSE 0 END) AS mood_match,
-  max(CASE WHEN $situation IS NOT NULL AND toLower(s.name) = toLower($situation) THEN 1 ELSE 0 END) AS situation_match,
-  max(CASE WHEN $weather IS NOT NULL AND toLower(w.name) = toLower($weather) THEN 1 ELSE 0 END) AS weather_match
+  max(CASE WHEN $mood IS NOT NULL AND toLower(emo.name) CONTAINS toLower($mood) THEN 1 ELSE 0 END) AS mood_match,
+  max(CASE WHEN $situation IS NOT NULL AND toLower(s.name) CONTAINS toLower($situation) THEN 1 ELSE 0 END) AS situation_match,
+  max(CASE WHEN $weather IS NOT NULL AND toLower(w.name) CONTAINS toLower($weather) THEN 1 ELSE 0 END) AS weather_match
 WITH m,
   genre_match + mood_match + situation_match + weather_match AS matched_count
 WHERE matched_count > 0
 RETURN
-  m.content_id AS content_id,
+  m.track_id AS track_id,
   m.track_name AS track_name,
   m.track_artist AS track_artist,
   matched_count,

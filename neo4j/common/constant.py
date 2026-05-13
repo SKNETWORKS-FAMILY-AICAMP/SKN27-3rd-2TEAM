@@ -15,19 +15,16 @@ class KagNodeLabel(str, Enum):
     MOOD = "Mood"
     TEMPO = "Tempo"
     RELEASE_YEAR = "ReleaseYear"
-    DIM_WEATHER = "DimWeather"
-    DIM_SEASON = "DimSeason"
-    DIM_EMOTION = "DimEmotion"
-    DIM_TIME_OF_DAY = "DimTimeOfDay"
-    DIM_ENERGY_LEVEL = "DimEnergyLevel"
-    DIM_CTX_COMMUTE = "DimCtxCommute"
-    DIM_CTX_HOME = "DimCtxHome"
-    DIM_CTX_FOCUS = "DimCtxFocus"
-    DIM_CTX_EXERCISE = "DimCtxExercise"
-    DIM_CTX_SOCIAL = "DimCtxSocial"
-    DIM_CTX_EMOTION_SIT = "DimCtxEmotionSit"
-    DIM_CTX_TRAVEL = "DimCtxTravel"
-    DIM_CTX_SPECIAL = "DimCtxSpecial"
+    LABEL_EMOTION = "LabelEmotion"
+    LABEL_EMOTION_SITUATION = "LabelEmotionSituation"
+    LABEL_TIME = "LabelTime"
+    LABEL_FOCUS = "LabelFocus"
+    LABEL_EXERCISE = "LabelExercise"
+    LABEL_HOME = "LabelHome"
+    LABEL_COMMUTE = "LabelCommute"
+    LABEL_SPECIAL = "LabelSpecial"
+    LABEL_WEATHER = "LabelWeather"
+    LABEL_SEASON = "LabelSeason"
 
 ###########################################################
 # relationship 타입
@@ -41,19 +38,16 @@ class KagRelationType(str, Enum):
     HAS_MOOD = "HAS_MOOD"
     HAS_TEMPO = "HAS_TEMPO"
     RELEASED_IN = "RELEASED_IN"
-    HAS_DIM_WEATHER = "HAS_DIM_WEATHER"
-    HAS_DIM_SEASON = "HAS_DIM_SEASON"
-    HAS_DIM_EMOTION = "HAS_DIM_EMOTION"
-    HAS_DIM_TIME_OF_DAY = "HAS_DIM_TIME_OF_DAY"
-    HAS_DIM_ENERGY_LEVEL = "HAS_DIM_ENERGY_LEVEL"
-    HAS_DIM_CTX_COMMUTE = "HAS_DIM_CTX_COMMUTE"
-    HAS_DIM_CTX_HOME = "HAS_DIM_CTX_HOME"
-    HAS_DIM_CTX_FOCUS = "HAS_DIM_CTX_FOCUS"
-    HAS_DIM_CTX_EXERCISE = "HAS_DIM_CTX_EXERCISE"
-    HAS_DIM_CTX_SOCIAL = "HAS_DIM_CTX_SOCIAL"
-    HAS_DIM_CTX_EMOTION_SIT = "HAS_DIM_CTX_EMOTION_SIT"
-    HAS_DIM_CTX_TRAVEL = "HAS_DIM_CTX_TRAVEL"
-    HAS_DIM_CTX_SPECIAL = "HAS_DIM_CTX_SPECIAL"
+    HAS_LABEL_EMOTION = "HAS_LABEL_EMOTION"
+    HAS_LABEL_EMOTION_SIT = "HAS_LABEL_EMOTION_SIT"
+    HAS_LABEL_TIME = "HAS_LABEL_TIME"
+    HAS_LABEL_FOCUS = "HAS_LABEL_FOCUS"
+    HAS_LABEL_EXERCISE = "HAS_LABEL_EXERCISE"
+    HAS_LABEL_HOME = "HAS_LABEL_HOME"
+    HAS_LABEL_COMMUTE = "HAS_LABEL_COMMUTE"
+    HAS_LABEL_SPECIAL = "HAS_LABEL_SPECIAL"
+    HAS_LABEL_WEATHER = "HAS_LABEL_WEATHER"
+    HAS_LABEL_SEASON = "HAS_LABEL_SEASON"
 
 
 ###########################################################
@@ -80,7 +74,7 @@ class KagTempoLabel(str, Enum):
 
 
 ###########################################################
-# 시나리오 분류 tag_id ↔ 한글 (spotify_music_recommendation_guide 기반)
+# 시나리오 라벨(tag_id) ↔ 한글 레거시 키 (가이드·옛 접두사 체계, 참고용)
 ###########################################################
 TAG_LABELS_KO: dict[str, str] = {
     "weather_sunny": "맑음",
@@ -138,51 +132,45 @@ TAG_LABELS_KO: dict[str, str] = {
 
 
 ###########################################################
-# 시나리오 분류 출력 스키마·파일명 (classified_catalog)
+# 카테고리 라벨 열 스키마·파일명 (classified_catalog.CATEGORY_PRIORITY 열 순)
 ###########################################################
-SCENARIO_KEY_COLUMN: str = "track_id"
-SCENARIO_CSV_TAG_SEPARATOR: str = ";"
-SCENARIO_DIM_COLUMNS: tuple[str, ...] = (
-    "dim_weather",
-    "dim_season",
-    "dim_emotion",
-    "dim_time_of_day",
-    "dim_energy_level",
-    "dim_ctx_commute",
-    "dim_ctx_home",
-    "dim_ctx_focus",
-    "dim_ctx_exercise",
-    "dim_ctx_social",
-    "dim_ctx_emotion_sit",
-    "dim_ctx_travel",
-    "dim_ctx_special",
+LABEL_CSV_KEY_COLUMN: str = "track_id"
+LABEL_CSV_TAG_SEPARATOR: str = ";"
+LABEL_CATEGORY_COLUMNS: tuple[str, ...] = (
+    "emotion",
+    "emotion_situation",
+    "time",
+    "focus",
+    "exercise",
+    "home",
+    "commute",
+    "special",
+    "weather",
+    "season",
 )
 
-# CSV dim_* 컬럼명 → (값 노드 라벨, MusicCatalog에서 값 노드로 가는 관계 타입)
-SCENARIO_DIM_TO_LABEL_AND_REL: dict[str, tuple[KagNodeLabel, KagRelationType]] = {
-    "dim_weather": (KagNodeLabel.DIM_WEATHER, KagRelationType.HAS_DIM_WEATHER),
-    "dim_season": (KagNodeLabel.DIM_SEASON, KagRelationType.HAS_DIM_SEASON),
-    "dim_emotion": (KagNodeLabel.DIM_EMOTION, KagRelationType.HAS_DIM_EMOTION),
-    "dim_time_of_day": (KagNodeLabel.DIM_TIME_OF_DAY, KagRelationType.HAS_DIM_TIME_OF_DAY),
-    "dim_energy_level": (KagNodeLabel.DIM_ENERGY_LEVEL, KagRelationType.HAS_DIM_ENERGY_LEVEL),
-    "dim_ctx_commute": (KagNodeLabel.DIM_CTX_COMMUTE, KagRelationType.HAS_DIM_CTX_COMMUTE),
-    "dim_ctx_home": (KagNodeLabel.DIM_CTX_HOME, KagRelationType.HAS_DIM_CTX_HOME),
-    "dim_ctx_focus": (KagNodeLabel.DIM_CTX_FOCUS, KagRelationType.HAS_DIM_CTX_FOCUS),
-    "dim_ctx_exercise": (KagNodeLabel.DIM_CTX_EXERCISE, KagRelationType.HAS_DIM_CTX_EXERCISE),
-    "dim_ctx_social": (KagNodeLabel.DIM_CTX_SOCIAL, KagRelationType.HAS_DIM_CTX_SOCIAL),
-    "dim_ctx_emotion_sit": (
-        KagNodeLabel.DIM_CTX_EMOTION_SIT,
-        KagRelationType.HAS_DIM_CTX_EMOTION_SIT,
+# music_catalog_scenarios.csv 열 이름 → (값 노드 Neo4j 라벨, MusicCatalog→값 노드 관계 타입)
+LABEL_CATEGORY_TO_NODE_AND_REL: dict[str, tuple[KagNodeLabel, KagRelationType]] = {
+    "emotion": (KagNodeLabel.LABEL_EMOTION, KagRelationType.HAS_LABEL_EMOTION),
+    "emotion_situation": (
+        KagNodeLabel.LABEL_EMOTION_SITUATION,
+        KagRelationType.HAS_LABEL_EMOTION_SIT,
     ),
-    "dim_ctx_travel": (KagNodeLabel.DIM_CTX_TRAVEL, KagRelationType.HAS_DIM_CTX_TRAVEL),
-    "dim_ctx_special": (KagNodeLabel.DIM_CTX_SPECIAL, KagRelationType.HAS_DIM_CTX_SPECIAL),
+    "time": (KagNodeLabel.LABEL_TIME, KagRelationType.HAS_LABEL_TIME),
+    "focus": (KagNodeLabel.LABEL_FOCUS, KagRelationType.HAS_LABEL_FOCUS),
+    "exercise": (KagNodeLabel.LABEL_EXERCISE, KagRelationType.HAS_LABEL_EXERCISE),
+    "home": (KagNodeLabel.LABEL_HOME, KagRelationType.HAS_LABEL_HOME),
+    "commute": (KagNodeLabel.LABEL_COMMUTE, KagRelationType.HAS_LABEL_COMMUTE),
+    "special": (KagNodeLabel.LABEL_SPECIAL, KagRelationType.HAS_LABEL_SPECIAL),
+    "weather": (KagNodeLabel.LABEL_WEATHER, KagRelationType.HAS_LABEL_WEATHER),
+    "season": (KagNodeLabel.LABEL_SEASON, KagRelationType.HAS_LABEL_SEASON),
 }
 
-if set(SCENARIO_DIM_TO_LABEL_AND_REL.keys()) != set(SCENARIO_DIM_COLUMNS):
-    raise RuntimeError("SCENARIO_DIM_COLUMNS와 SCENARIO_DIM_TO_LABEL_AND_REL 키가 일치해야 합니다.")
+if set(LABEL_CATEGORY_TO_NODE_AND_REL.keys()) != set(LABEL_CATEGORY_COLUMNS):
+    raise RuntimeError("LABEL_CATEGORY_COLUMNS와 LABEL_CATEGORY_TO_NODE_AND_REL 키가 일치해야 합니다.")
 
-SCENARIO_COL_TAGS_ALL: str = "scenario_tags_all"
-SCENARIO_COL_TAG_COUNT: str = "scenario_tag_count"
+LABEL_COL_TAGS_ALL: str = "scenario_tags_all"
+LABEL_COL_TAG_COUNT: str = "scenario_tag_count"
 
 # neo4j/data 내 CSV·neo4j 루트 MD 파일명
 MUSIC_CATALOG_CSV_FILENAME: str = "music_catalog.csv"

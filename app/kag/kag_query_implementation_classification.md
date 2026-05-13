@@ -9,6 +9,7 @@
 - 쿼리 문자열과 파라미터 템플릿은 `constant`에서 관리한다.
 - Tool 함수는 `constant`에서 템플릿을 조회해 바인딩 후 실행한다.
 - 즉, 실행 로직과 쿼리 템플릿 정의를 분리하는 구조는 유지한다.
+- 시나리오 태그(날씨·감정·상황 등)는 Neo4j `Label*` 노드 `name`과 맞는 **영문 저장 토큰**을 쓴다. 한글 발화는 `constant.resolve_scenario_param`과 `KAG_SCENARIO_ALIAS_KO_TO_KEY`로 치환한다. 감정 매칭은 `HAS_LABEL_EMOTION` / `LabelEmotion`이다.
 
 ---
 
