@@ -672,23 +672,28 @@ def build_music_catalog_labels_df(
     df: pd.DataFrame,
     *,
     tag_sep: str = ";",
+    track_id_col: str = "track_id",
 ) -> pd.DataFrame:
     """
     `music_catalog` 피처가 담긴 DataFrame에서 트랙별로 카테고리 라벨 키를 집계한다.
 
-    - 행: 입력과 동일한 순서의 `track_id`
+    - 행·키: 입력의 ``track_id_col`` 값을 **재매핑·재생성하지 않고 그대로** 출력한다.
+      Neo4j `MusicCatalog`와 맞추려면 입력은 **`music_catalog.csv`를 읽은 DataFrame**이어야 한다.
     - 열: `CATEGORY_PRIORITY`에 등장하는 카테고리명을 우선순위(값이 작을수록 앞) 순으로 배치
     - 셀: 해당 카테고리의 `CONDITIONS` 영문 키 중 조건을 만족하는 것만 모아 `tag_sep`로 이어붙임
           (예: home 열 → ``chores`` 또는 ``chores;cooking``). 하나도 없으면 빈 문자열.
     """
     categories_ordered = sorted(CATEGORY_PRIORITY.keys(), key=lambda c: CATEGORY_PRIORITY[c])
 
+    if track_id_col not in df.columns:
+        raise ValueError(f"컬럼 '{track_id_col}'이(가) 없습니다. 카탈로그 CSV에 track_id가 있어야 합니다.")
+
     if df.empty:
         return pd.DataFrame(columns=["track_id", *categories_ordered])
 
     work = df.reset_index(drop=True)
     n = len(work)
-    out: dict[str, object] = {"track_id": work["track_id"].dropna().astype(str).tolist()}
+    out: dict[str, object] = {"track_id": work[track_id_col].dropna().astype(str).tolist()}
 
     for cat in categories_ordered:
         buckets: list[set[str]] = [set() for _ in range(n)]
@@ -702,14 +707,44 @@ def build_music_catalog_labels_df(
     return pd.DataFrame(out)
 
 
+def _looks_like_catalog_track_id(s: str) -> bool:
+    """이 레포 `music_catalog.csv`의 내장 track_id(nl 접두)처럼 보이는지 간단 검사."""
+    t = str(s).strip()
+    return len(t) >= 12 and t.startswith("nl")
+
+
 if __name__ == "__main__":
     ########################################################
-    # 실행 시 음악 데이터 읽어서 분류로 추출 
+    # 실행 시 music_catalog.csv를 읽고, 같은 track_id로 라벨 CSV를 덮어쓴다.
+    # 다른 소스(JSON 등) Spotify ID 행만으로 라벨을 만들면 Neo4j와 불일치하므로 이 경로만 사용한다.
     ########################################################
     _DATA_DIR = Path(__file__).resolve().parent.parent / "data"
     _catalog_csv = _DATA_DIR / "music_catalog.csv"
     _out_csv = _DATA_DIR / "music_catalog_scenarios.csv"
 
     df_catalog = pd.read_csv(_catalog_csv)
+    sample_ids = df_catalog["track_id"].dropna().astype(str).head(200)
+    if len(sample_ids) > 0 and sum(1 for x in sample_ids if _looks_like_catalog_track_id(x)) < len(
+        sample_ids
+    ) * 0.5:
+        raise SystemExit(
+            "music_catalog.csv의 track_id 상당수가 카탈로그 내장 형식(nl…)이 아닙니다. "
+            "Neo4j에 적재한 MusicCatalog.track_id와 동일한 CSV인지 확인하세요."
+        )
+
     df_labels = build_music_catalog_labels_df(df_catalog)
     df_labels.to_csv(_out_csv, index=False)
+
+    merged = pd.merge(
+        df_catalog[["track_id"]],
+        df_labels[["track_id"]],
+        on="track_id",
+        how="outer",
+        indicator=True,
+    )
+    if not merged["_merge"].eq("both").all():
+        bad = merged[merged["_merge"] != "both"]
+        raise SystemExit(f"카탈로그와 라벨 행 불일치: {len(bad)}행 — track_id 집합이 달라졌습니다.")
+    print(
+        f"Wrote {_out_csv} ({len(df_labels)} rows); track_id 컬럼은 music_catalog.csv와 1:1 동일합니다."
+    )
