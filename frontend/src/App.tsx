@@ -24,9 +24,6 @@ function AppContent() {
   const { userId, setUserId } = useSessionStore();
   const { theme, toggle } = useThemeStore();
 
-  const isRecommendationPage =
-    page === "main" || page === "personalized" || page === "discovery" || page === "newRelease";
-
   return (
     <div className="app">
       {page !== "home" && (
@@ -35,12 +32,12 @@ function AppContent() {
             RIMAS
           </button>
           <button
-            className={`nav-btn${isRecommendationPage ? " nav-btn--active" : ""}`}
+            className="nav-btn"
             onClick={() => {
-              setPage("main");
+              setPage("home");
             }}
           >
-            추천
+            홈
           </button>
           <button
             className={`nav-btn${page === "chatbot" ? " nav-btn--active" : ""}`}
