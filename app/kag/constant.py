@@ -1,6 +1,6 @@
 """KAG Query 템플릿·그래프 스키마 상수.
 
-`neo4j/common/constant.py`와 도메인은 같으나 앱 패키지(`app`)는 독립적으로 유지한다.
+`neo4j/common/querys.py`의 MERGE/MATCH와 문자 단위로 맞춘다(예: 서브장르 노드 `SubGenre`, 관계 `HAS_SUBGENRE`).
 노드 라벨·관계 타입·그래프 프로퍼티·쿼리 결과 컬럼명은 여기서만 정의하고 Cypher에는 하드코딩하지 않는다.
 """
 
@@ -12,81 +12,225 @@ from typing import ClassVar
 # node 타입
 ###########################################################
 class KagNodeLabel(str, Enum):
-    """Neo4j 노드 라벨 (스키마와 동일하게 유지)."""
+    """Neo4j 노드 라벨 (neo4j/common/querys.py 적재 Cypher 기준)."""
 
     MUSIC_CATALOG = "MusicCatalog"
     GENRE = "Genre"
-    PLAYLIST_SUBGENRE = "PlaylistSubGenre"
+    SUBGENRE = "SubGenre"
     ARTIST = "Artist"
-    MOOD = "Mood"
-    TEMPO = "Tempo"
     RELEASE_YEAR = "ReleaseYear"
-    DIM_WEATHER = "DimWeather"
-    DIM_SEASON = "DimSeason"
-    DIM_EMOTION = "DimEmotion"
-    DIM_TIME_OF_DAY = "DimTimeOfDay"
-    DIM_ENERGY_LEVEL = "DimEnergyLevel"
-    DIM_CTX_COMMUTE = "DimCtxCommute"
-    DIM_CTX_HOME = "DimCtxHome"
-    DIM_CTX_FOCUS = "DimCtxFocus"
-    DIM_CTX_EXERCISE = "DimCtxExercise"
-    DIM_CTX_SOCIAL = "DimCtxSocial"
-    DIM_CTX_EMOTION_SIT = "DimCtxEmotionSit"
-    DIM_CTX_TRAVEL = "DimCtxTravel"
-    DIM_CTX_SPECIAL = "DimCtxSpecial"
+    LABEL_EMOTION = "LabelEmotion"
+    LABEL_EMOTION_SITUATION = "LabelEmotionSituation"
+    LABEL_TIME = "LabelTime"
+    LABEL_FOCUS = "LabelFocus"
+    LABEL_EXERCISE = "LabelExercise"
+    LABEL_HOME = "LabelHome"
+    LABEL_COMMUTE = "LabelCommute"
+    LABEL_SPECIAL = "LabelSpecial"
+    LABEL_WEATHER = "LabelWeather"
+    LABEL_SEASON = "LabelSeason"
 
 
 ###########################################################
 # relationship 타입
 ###########################################################
 class KagRelationType(str, Enum):
-    """Neo4j 관계 타입 (스키마와 동일하게 유지)."""
+    """Neo4j 관계 타입 (neo4j/common/querys.py 적재 Cypher 기준)."""
 
     HAS_GENRE = "HAS_GENRE"
-    HAS_PLAYLIST_SUBGENRE = "HAS_PLAYLIST_SUBGENRE"
+    HAS_SUBGENRE = "HAS_SUBGENRE"
+    GENRE_INCLUDES_SUBGENRE = "GENRE_INCLUDES_SUBGENRE"
     PERFORMED_BY = "PERFORMED_BY"
-    HAS_MOOD = "HAS_MOOD"
-    HAS_TEMPO = "HAS_TEMPO"
     RELEASED_IN = "RELEASED_IN"
-    HAS_DIM_WEATHER = "HAS_DIM_WEATHER"
-    HAS_DIM_SEASON = "HAS_DIM_SEASON"
-    HAS_DIM_EMOTION = "HAS_DIM_EMOTION"
-    HAS_DIM_TIME_OF_DAY = "HAS_DIM_TIME_OF_DAY"
-    HAS_DIM_ENERGY_LEVEL = "HAS_DIM_ENERGY_LEVEL"
-    HAS_DIM_CTX_COMMUTE = "HAS_DIM_CTX_COMMUTE"
-    HAS_DIM_CTX_HOME = "HAS_DIM_CTX_HOME"
-    HAS_DIM_CTX_FOCUS = "HAS_DIM_CTX_FOCUS"
-    HAS_DIM_CTX_EXERCISE = "HAS_DIM_CTX_EXERCISE"
-    HAS_DIM_CTX_SOCIAL = "HAS_DIM_CTX_SOCIAL"
-    HAS_DIM_CTX_EMOTION_SIT = "HAS_DIM_CTX_EMOTION_SIT"
-    HAS_DIM_CTX_TRAVEL = "HAS_DIM_CTX_TRAVEL"
-    HAS_DIM_CTX_SPECIAL = "HAS_DIM_CTX_SPECIAL"
+    HAS_LABEL_EMOTION = "HAS_LABEL_EMOTION"
+    HAS_LABEL_EMOTION_SIT = "HAS_LABEL_EMOTION_SIT"
+    HAS_LABEL_TIME = "HAS_LABEL_TIME"
+    HAS_LABEL_FOCUS = "HAS_LABEL_FOCUS"
+    HAS_LABEL_EXERCISE = "HAS_LABEL_EXERCISE"
+    HAS_LABEL_HOME = "HAS_LABEL_HOME"
+    HAS_LABEL_COMMUTE = "HAS_LABEL_COMMUTE"
+    HAS_LABEL_SPECIAL = "HAS_LABEL_SPECIAL"
+    HAS_LABEL_WEATHER = "HAS_LABEL_WEATHER"
+    HAS_LABEL_SEASON = "HAS_LABEL_SEASON"
 
 
 def _cypher_rel_type_union(relations: tuple[KagRelationType, ...]) -> str:
     return "|".join(r.value for r in relations)
 
 
-# Q_REC_003 · 상황 매칭에 쓰는 컨텍스트 관계 묶음
+# Q_REC_003 · 상황 매칭: 시나리오 열 기준 활동·시간·계절 등 (time·season 포함)
 KAG_QUERY_SITUATION_CONTEXT_REL_TYPES: tuple[KagRelationType, ...] = (
-    KagRelationType.HAS_DIM_CTX_EXERCISE,
-    KagRelationType.HAS_DIM_CTX_COMMUTE,
-    KagRelationType.HAS_DIM_CTX_HOME,
-    KagRelationType.HAS_DIM_CTX_SOCIAL,
-    KagRelationType.HAS_DIM_CTX_FOCUS,
-    KagRelationType.HAS_DIM_CTX_TRAVEL,
-    KagRelationType.HAS_DIM_CTX_SPECIAL,
+    KagRelationType.HAS_LABEL_EXERCISE,
+    KagRelationType.HAS_LABEL_COMMUTE,
+    KagRelationType.HAS_LABEL_HOME,
+    KagRelationType.HAS_LABEL_FOCUS,
+    KagRelationType.HAS_LABEL_SPECIAL,
+    KagRelationType.HAS_LABEL_TIME,
+    KagRelationType.HAS_LABEL_SEASON,
 )
 
 KAG_CYPHER_SITUATION_REL_PATTERN: str = _cypher_rel_type_union(KAG_QUERY_SITUATION_CONTEXT_REL_TYPES)
 
-# Q_REC_008 하이브리드 — 감정 상황 차원 포함
+# Q_REC_008 하이브리드 — 감정 상황 열(emotion_situation) 포함
 KAG_QUERY_HYBRID_SITUATION_REL_TYPES: tuple[KagRelationType, ...] = (
     *KAG_QUERY_SITUATION_CONTEXT_REL_TYPES,
-    KagRelationType.HAS_DIM_CTX_EMOTION_SIT,
+    KagRelationType.HAS_LABEL_EMOTION_SIT,
 )
 
 KAG_CYPHER_HYBRID_SITUATION_REL_PATTERN: str = _cypher_rel_type_union(KAG_QUERY_HYBRID_SITUATION_REL_TYPES)
+
+
+###########################################################
+# LLM·에이전트 참조: 태그 설명·한글↔저장 토큰 (neo4j 모듈 미import, 수동 동기화)
+###########################################################
+
+# 접두사 tag_id → 한글. 구버전/문서용. 현재 CSV/그래프 `name`은 영문 짧은 토큰인 경우가 많음(classified_catalog).
+KAG_SCENARIO_TAG_LABELS_KO: dict[str, str] = {
+    "weather_sunny": "맑음",
+    "weather_rain": "비",
+    "weather_snow": "눈",
+    "weather_cloudy": "흐림",
+    "season_spring": "봄",
+    "season_summer": "여름",
+    "season_autumn": "가을",
+    "season_winter": "겨울",
+    "emotion_lonely": "외로움",
+    "emotion_melancholy": "우울함",
+    "emotion_hyped": "신남(감정)",
+    "emotion_thrill": "설렘",
+    "time_morning": "아침",
+    "time_afternoon": "오후",
+    "time_evening": "저녁",
+    "time_night": "밤",
+    "time_dawn": "새벽",
+    "energy_level_calm": "잔잔함",
+    "energy_level_moderate": "보통",
+    "energy_level_hyped": "신남(에너지)",
+    "commute_to_work": "출근길",
+    "commute_from_work": "퇴근길",
+    "commute_public": "대중교통",
+    "commute_drive": "드라이브",
+    "home_chores": "집안일",
+    "home_cooking": "요리",
+    "home_shower": "샤워",
+    "home_rest": "쉬는 중",
+    "home_sleep": "잠들기 전",
+    "focus_study": "공부/독서",
+    "focus_office": "코딩/업무",
+    "focus_deadline": "과제 마감",
+    "exercise_gym": "운동",
+    "exercise_walk": "산책",
+    "exercise_stretch": "스트레칭/요가",
+    "social_date": "데이트",
+    "social_friends": "친구 모임",
+    "social_celebration": "생일/기념일",
+    "social_homeparty": "홈파티",
+    "sit_breakup": "이별 후",
+    "sit_comfort": "위로 필요",
+    "sit_mood_lift": "기분 전환",
+    "sit_nostalgia": "추억 회상",
+    "travel_prep": "여행 준비",
+    "travel_transit": "공항/기차",
+    "travel_on_trip": "여행 중",
+    "special_cafe": "카페",
+    "special_club": "클럽",
+    "special_festival": "페스티벌",
+    "special_gaming": "게임",
+    "special_dawn_mood": "감성/새벽 감성",
+}
+
+# neo4j/common/classified_catalog._ALIAS 동기화: 카테고리 CSV 열 이름 → { 한글 별칭: 그래프 name 으로 쓰이는 영문 키 }
+KAG_SCENARIO_ALIAS_KO_TO_KEY: dict[str, dict[str, str]] = {
+    "weather": {
+        "맑음": "sunny",
+        "비": "rain",
+        "눈": "snow",
+        "흐림": "cloudy",
+    },
+    "season": {
+        "봄": "spring",
+        "여름": "summer",
+        "가을": "autumn",
+        "겨울": "winter",
+    },
+    "time": {
+        "아침": "morning",
+        "오후": "afternoon",
+        "저녁": "evening",
+        "밤": "night",
+        "새벽": "dawn",
+    },
+    "emotion": {
+        "외로움": "lonely",
+        "쓸쓸함": "lonely",
+        "우울함": "melancholy",
+        "신남": "hyped",
+        "설렘": "thrill",
+        "차분함": "calm",
+        "잔잔함": "calm",
+        "보통": "moderate",
+        "적당함": "moderate",
+        "활기참": "energy_hyped",
+    },
+    "commute": {
+        "출근": "to_work",
+        "퇴근": "from_work",
+        "대중교통": "public",
+        "운전": "drive",
+    },
+    "home": {
+        "집안일": "chores",
+        "청소": "chores",
+        "요리": "cooking",
+        "샤워": "shower",
+        "휴식": "rest",
+        "잠": "sleep",
+        "수면": "sleep",
+    },
+    "focus": {
+        "공부": "study",
+        "학습": "study",
+        "사무실": "office",
+        "업무": "office",
+        "마감": "deadline",
+        "데드라인": "deadline",
+    },
+    "exercise": {
+        "헬스": "gym",
+        "운동": "gym",
+        "산책": "walk",
+        "스트레칭": "stretch",
+        "요가": "stretch",
+    },
+    "emotion_situation": {
+        "이별": "breakup",
+        "위로": "comfort",
+        "기분전환": "mood_lift",
+        "추억": "nostalgia",
+        "회상": "nostalgia",
+    },
+    "special": {
+        "카페": "cafe",
+        "클럽": "club",
+        "페스티벌": "festival",
+        "게임": "gaming",
+        "새벽감성": "dawn_mood",
+        "여행": "travel",
+    },
+}
+
+
+def resolve_scenario_param(category: str, ko_or_en: str) -> str:
+    """한글 별칭이면 `KAG_SCENARIO_ALIAS_KO_TO_KEY`에서 영문 저장 토큰으로 치환, 아니면 공백 트림만 한 원문 반환."""
+
+    raw = (ko_or_en or "").strip()
+    if not raw:
+        return raw
+    cat = (category or "").strip()
+    table = KAG_SCENARIO_ALIAS_KO_TO_KEY.get(cat)
+    if table and raw in table:
+        return table[raw]
+    return raw
 
 
 ###########################################################
@@ -106,20 +250,14 @@ class KagMusicCatalogProperty(str, Enum):
     TRACK_POPULARITY = "track_popularity"
 
 
-class KagMoodProperty(str, Enum):
-    """Mood 노드 프로퍼티 키."""
-
-    MOOD = "mood"
-
-
 class KagGenreProperty(str, Enum):
     """Genre 노드 프로퍼티 키."""
 
     GENRE = "genre"
 
 
-class KagDimTagProperty(str, Enum):
-    """DimWeather 등 이름 기반 차원 노드의 표시 필드."""
+class KagLabelValueProperty(str, Enum):
+    """LabelWeather 등 분류 라벨 값 노드의 표시 필드."""
 
     NAME = "name"
 
@@ -182,9 +320,8 @@ def _build_cypher_templates() -> dict[str, str]:
     nl = KagNodeLabel
     rt = KagRelationType
     mc = KagMusicCatalogProperty
-    mm = KagMoodProperty
     rg = KagGenreProperty
-    dt = KagDimTagProperty
+    dt = KagLabelValueProperty
     cb = KagCypherBinding
     rc = KagQueryResultColumn
     sit = KAG_CYPHER_SITUATION_REL_PATTERN
@@ -240,22 +377,22 @@ ORDER BY coalesce(m.{_ev(mc.TRACK_POPULARITY)}, 0) DESC
 LIMIT $limit
 """
 
-    q_search_011 = f"""
-MATCH (m:{_ev(nl.MUSIC_CATALOG)})
-WITH m, toInteger(left(toString(m.{_ev(mc.TRACK_ALBUM_RELEASE_DATE)}), 4)) AS {_ev(cb.RELEASE_YEAR)}
-WHERE
-  ($year IS NOT NULL AND {_ev(cb.RELEASE_YEAR)} = $year)
-  OR ($year IS NULL AND $start_year IS NOT NULL AND $end_year IS NOT NULL
-      AND {_ev(cb.RELEASE_YEAR)} >= $start_year AND {_ev(cb.RELEASE_YEAR)} <= $end_year)
-RETURN
-  m.{_ev(mc.TRACK_ID)} AS {_ev(rc.TRACK_ID)},
-  m.{_ev(mc.TRACK_NAME)} AS {_ev(rc.TRACK_NAME)},
-  m.{_ev(mc.TRACK_ARTIST)} AS {_ev(rc.TRACK_ARTIST)},
-  m.{_ev(mc.TRACK_ALBUM_RELEASE_DATE)} AS {_ev(rc.RELEASE_DATE)},
-  coalesce(m.{_ev(mc.TRACK_POPULARITY)}, 0) AS {_ev(rc.POPULARITY)}
-ORDER BY {_ev(rc.POPULARITY)} DESC
-LIMIT $limit
-"""
+    # q_search_011 = f"""
+    # MATCH (m:{_ev(nl.MUSIC_CATALOG)})
+    # WITH m, toInteger(left(toString(m.{_ev(mc.TRACK_ALBUM_RELEASE_DATE)}), 4)) AS {_ev(cb.RELEASE_YEAR)}
+    # WHERE
+    #   ($year IS NOT NULL AND {_ev(cb.RELEASE_YEAR)} = $year)
+    #   OR ($year IS NULL AND $start_year IS NOT NULL AND $end_year IS NOT NULL
+    #       AND {_ev(cb.RELEASE_YEAR)} >= $start_year AND {_ev(cb.RELEASE_YEAR)} <= $end_year)
+    # RETURN
+    #   m.{_ev(mc.TRACK_ID)} AS {_ev(rc.TRACK_ID)},
+    #   m.{_ev(mc.TRACK_NAME)} AS {_ev(rc.TRACK_NAME)},
+    #   m.{_ev(mc.TRACK_ARTIST)} AS {_ev(rc.TRACK_ARTIST)},
+    #   m.{_ev(mc.TRACK_ALBUM_RELEASE_DATE)} AS {_ev(rc.RELEASE_DATE)},
+    #   coalesce(m.{_ev(mc.TRACK_POPULARITY)}, 0) AS {_ev(rc.POPULARITY)}
+    # ORDER BY {_ev(rc.POPULARITY)} DESC
+    # LIMIT $limit
+    # """
 
     q_rec_001 = f"""
 MATCH (m:{_ev(nl.MUSIC_CATALOG)})
@@ -272,13 +409,13 @@ LIMIT $limit
 """
 
     q_rec_002 = f"""
-MATCH (m:{_ev(nl.MUSIC_CATALOG)})-[:{_ev(rt.HAS_MOOD)}]-(mood:{_ev(nl.MOOD)})
-WHERE toLower(mood.{_ev(mm.MOOD)}) CONTAINS toLower($mood)
+MATCH (m:{_ev(nl.MUSIC_CATALOG)})-[:{_ev(rt.HAS_LABEL_EMOTION)}]-(emo:{_ev(nl.LABEL_EMOTION)})
+WHERE toLower(emo.{_ev(dt.NAME)}) CONTAINS toLower($mood)
 RETURN DISTINCT
   m.{_ev(mc.TRACK_ID)} AS {_ev(rc.TRACK_ID)},
   m.{_ev(mc.TRACK_NAME)} AS {_ev(rc.TRACK_NAME)},
   m.{_ev(mc.TRACK_ARTIST)} AS {_ev(rc.TRACK_ARTIST)},
-  mood.{_ev(mm.MOOD)} AS {_ev(rc.MATCHED_MOOD)},
+  emo.{_ev(dt.NAME)} AS {_ev(rc.MATCHED_MOOD)},
   coalesce(m.{_ev(mc.TRACK_POPULARITY)}, 0) AS {_ev(rc.POPULARITY)},
   10 + coalesce(m.{_ev(mc.TRACK_POPULARITY)}, 0) AS {_ev(rc.RECOMMENDATION_SCORE)}
 ORDER BY {_ev(rc.RECOMMENDATION_SCORE)} DESC
@@ -300,7 +437,7 @@ LIMIT $limit
 """
 
     q_rec_004 = f"""
-MATCH (m:{_ev(nl.MUSIC_CATALOG)})-[:{_ev(rt.HAS_DIM_WEATHER)}]-(w:{_ev(nl.DIM_WEATHER)})
+MATCH (m:{_ev(nl.MUSIC_CATALOG)})-[:{_ev(rt.HAS_LABEL_WEATHER)}]-(w:{_ev(nl.LABEL_WEATHER)})
 WHERE toLower(w.{_ev(dt.NAME)}) CONTAINS toLower($weather)
 RETURN DISTINCT
   m.{_ev(mc.TRACK_ID)} AS {_ev(rc.TRACK_ID)},
@@ -333,12 +470,12 @@ LIMIT $limit
     q_rec_008 = f"""
 MATCH (m:{_ev(nl.MUSIC_CATALOG)})
 OPTIONAL MATCH (m)-[:{_ev(rt.HAS_GENRE)}]-(g:{_ev(nl.GENRE)})
-OPTIONAL MATCH (m)-[:{_ev(rt.HAS_MOOD)}]-(mood:{_ev(nl.MOOD)})
+OPTIONAL MATCH (m)-[:{_ev(rt.HAS_LABEL_EMOTION)}]-(emo:{_ev(nl.LABEL_EMOTION)})
 OPTIONAL MATCH (m)-[:{hysit}]-(s)
-OPTIONAL MATCH (m)-[:{_ev(rt.HAS_DIM_WEATHER)}]-(w:{_ev(nl.DIM_WEATHER)})
+OPTIONAL MATCH (m)-[:{_ev(rt.HAS_LABEL_WEATHER)}]-(w:{_ev(nl.LABEL_WEATHER)})
 WITH m,
   max(CASE WHEN $genre IS NOT NULL AND toLower(g.{_ev(rg.GENRE)}) = toLower($genre) THEN 1 ELSE 0 END) AS genre_match,
-  max(CASE WHEN $mood IS NOT NULL AND toLower(mood.{_ev(mm.MOOD)}) = toLower($mood) THEN 1 ELSE 0 END) AS mood_match,
+  max(CASE WHEN $mood IS NOT NULL AND toLower(emo.{_ev(dt.NAME)}) CONTAINS toLower($mood) THEN 1 ELSE 0 END) AS mood_match,
   max(CASE WHEN $situation IS NOT NULL AND toLower(s.{_ev(dt.NAME)}) CONTAINS toLower($situation) THEN 1 ELSE 0 END) AS situation_match,
   max(CASE WHEN $weather IS NOT NULL AND toLower(w.{_ev(dt.NAME)}) CONTAINS toLower($weather) THEN 1 ELSE 0 END) AS weather_match
 WITH m, genre_match + mood_match + situation_match + weather_match AS {_ev(rc.MATCHED_COUNT)}
@@ -426,19 +563,19 @@ RETURN DISTINCT
 LIMIT $limit
 """
 
-    q_search_008 = f"""
-MATCH p=(m:{_ev(nl.MUSIC_CATALOG)})-[*1..$max_depth]-(n)
-WHERE toLower(m.{_ev(mc.TRACK_NAME)}) CONTAINS toLower($keyword)
-  AND ($target_label IS NULL OR $target_label IN labels(n))
-RETURN
-  m.{_ev(mc.TRACK_ID)} AS {_ev(rc.TRACK_ID)},
-  m.{_ev(mc.TRACK_NAME)} AS {_ev(rc.TRACK_NAME)},
-  length(p) AS {_ev(rc.PATH_LENGTH)},
-  [node IN nodes(p) | {{labels: labels(node), props: properties(node)}}] AS {_ev(rc.PATH_NODES)},
-  [rel IN relationships(p) | type(rel)] AS {_ev(rc.PATH_REL_TYPES)}
-ORDER BY {_ev(rc.PATH_LENGTH)} ASC
-LIMIT $limit
-"""
+    # q_search_008 = f"""
+    # MATCH p=(m:{_ev(nl.MUSIC_CATALOG)})-[*1..$max_depth]-(n)
+    # WHERE toLower(m.{_ev(mc.TRACK_NAME)}) CONTAINS toLower($keyword)
+    #   AND ($target_label IS NULL OR $target_label IN labels(n))
+    # RETURN
+    #   m.{_ev(mc.TRACK_ID)} AS {_ev(rc.TRACK_ID)},
+    #   m.{_ev(mc.TRACK_NAME)} AS {_ev(rc.TRACK_NAME)},
+    #   length(p) AS {_ev(rc.PATH_LENGTH)},
+    #   [node IN nodes(p) | {{labels: labels(node), props: properties(node)}}] AS {_ev(rc.PATH_NODES)},
+    #   [rel IN relationships(p) | type(rel)] AS {_ev(rc.PATH_REL_TYPES)}
+    # ORDER BY {_ev(rc.PATH_LENGTH)} ASC
+    # LIMIT $limit
+    # """
 
     q_search_010 = f"""
 MATCH (m:{_ev(nl.MUSIC_CATALOG)})
@@ -458,12 +595,12 @@ LIMIT $limit
     q_search_012 = f"""
 MATCH (m:{_ev(nl.MUSIC_CATALOG)})
 OPTIONAL MATCH (m)-[:{_ev(rt.HAS_GENRE)}]-(g:{_ev(nl.GENRE)})
-OPTIONAL MATCH (m)-[:{_ev(rt.HAS_MOOD)}]-(mood:{_ev(nl.MOOD)})
+OPTIONAL MATCH (m)-[:{_ev(rt.HAS_LABEL_EMOTION)}]-(emo:{_ev(nl.LABEL_EMOTION)})
 OPTIONAL MATCH (m)-[:{hysit}]-(s)
-OPTIONAL MATCH (m)-[:{_ev(rt.HAS_DIM_WEATHER)}]-(w:{_ev(nl.DIM_WEATHER)})
+OPTIONAL MATCH (m)-[:{_ev(rt.HAS_LABEL_WEATHER)}]-(w:{_ev(nl.LABEL_WEATHER)})
 WITH m,
   max(CASE WHEN $genre IS NOT NULL AND toLower(g.{_ev(rg.GENRE)}) = toLower($genre) THEN 1 ELSE 0 END) AS genre_match,
-  max(CASE WHEN $mood IS NOT NULL AND toLower(mood.{_ev(mm.MOOD)}) = toLower($mood) THEN 1 ELSE 0 END) AS mood_match,
+  max(CASE WHEN $mood IS NOT NULL AND toLower(emo.{_ev(dt.NAME)}) CONTAINS toLower($mood) THEN 1 ELSE 0 END) AS mood_match,
   max(CASE WHEN $situation IS NOT NULL AND toLower(s.{_ev(dt.NAME)}) CONTAINS toLower($situation) THEN 1 ELSE 0 END) AS situation_match,
   max(CASE WHEN $weather IS NOT NULL AND toLower(w.{_ev(dt.NAME)}) CONTAINS toLower($weather) THEN 1 ELSE 0 END) AS weather_match
 WITH m, genre_match + mood_match + situation_match + weather_match AS {_ev(rc.MATCHED_COUNT)}
@@ -478,24 +615,24 @@ ORDER BY {_ev(rc.MATCHED_COUNT)} DESC, {_ev(rc.POPULARITY)} DESC
 LIMIT $limit
 """
 
-    q_search_013 = f"""
-MATCH (m:{_ev(nl.MUSIC_CATALOG)})-[r]-()
-RETURN
-  m.{_ev(mc.TRACK_ID)} AS {_ev(rc.TRACK_ID)},
-  m.{_ev(mc.TRACK_NAME)} AS {_ev(rc.TRACK_NAME)},
-  m.{_ev(mc.TRACK_ARTIST)} AS {_ev(rc.TRACK_ARTIST)},
-  count(r) AS {_ev(rc.RELATION_COUNT)},
-  coalesce(m.{_ev(mc.TRACK_POPULARITY)}, 0) AS {_ev(rc.POPULARITY)}
-ORDER BY {_ev(rc.RELATION_COUNT)} DESC, {_ev(rc.POPULARITY)} DESC
-LIMIT $limit
-"""
+    # q_search_013 = f"""
+    # MATCH (m:{_ev(nl.MUSIC_CATALOG)})-[r]-()
+    # RETURN
+    #   m.{_ev(mc.TRACK_ID)} AS {_ev(rc.TRACK_ID)},
+    #   m.{_ev(mc.TRACK_NAME)} AS {_ev(rc.TRACK_NAME)},
+    #   m.{_ev(mc.TRACK_ARTIST)} AS {_ev(rc.TRACK_ARTIST)},
+    #   count(r) AS {_ev(rc.RELATION_COUNT)},
+    #   coalesce(m.{_ev(mc.TRACK_POPULARITY)}, 0) AS {_ev(rc.POPULARITY)}
+    # ORDER BY {_ev(rc.RELATION_COUNT)} DESC, {_ev(rc.POPULARITY)} DESC
+    # LIMIT $limit
+    # """
 
-    q_search_014 = f"""
-MATCH (m:{_ev(nl.MUSIC_CATALOG)})-[r]-()
-WHERE toLower(m.{_ev(mc.TRACK_NAME)}) CONTAINS toLower($keyword)
-RETURN DISTINCT type(r) AS {_ev(rc.RELATION_TYPE)}
-LIMIT $limit
-"""
+    # q_search_014 = f"""
+    # MATCH (m:{_ev(nl.MUSIC_CATALOG)})-[r]-()
+    # WHERE toLower(m.{_ev(mc.TRACK_NAME)}) CONTAINS toLower($keyword)
+    # RETURN DISTINCT type(r) AS {_ev(rc.RELATION_TYPE)}
+    # LIMIT $limit
+    # """
 
     q_rec_005 = f"""
 MATCH (base:{_ev(nl.MUSIC_CATALOG)})-[]-(feature)<-[]-(rec:{_ev(nl.MUSIC_CATALOG)})
@@ -517,11 +654,11 @@ LIMIT $limit
     q_rec_007 = f"""
 MATCH (m:{_ev(nl.MUSIC_CATALOG)})
 WHERE ($genre IS NULL OR toLower(m.{_ev(mc.PLAYLIST_GENRE)}) = toLower($genre))
-OPTIONAL MATCH (m)-[:{_ev(rt.HAS_MOOD)}]-(mood:{_ev(nl.MOOD)})
+OPTIONAL MATCH (m)-[:{_ev(rt.HAS_LABEL_EMOTION)}]-(emo:{_ev(nl.LABEL_EMOTION)})
 OPTIONAL MATCH (m)-[:{hysit}]-(s)
-OPTIONAL MATCH (m)-[:{_ev(rt.HAS_DIM_WEATHER)}]-(w:{_ev(nl.DIM_WEATHER)})
+OPTIONAL MATCH (m)-[:{_ev(rt.HAS_LABEL_WEATHER)}]-(w:{_ev(nl.LABEL_WEATHER)})
 WITH m,
-  max(CASE WHEN $mood IS NOT NULL AND toLower(mood.{_ev(mm.MOOD)}) CONTAINS toLower($mood) THEN 1 ELSE 0 END) AS mood_match,
+  max(CASE WHEN $mood IS NOT NULL AND toLower(emo.{_ev(dt.NAME)}) CONTAINS toLower($mood) THEN 1 ELSE 0 END) AS mood_match,
   max(CASE WHEN $situation IS NOT NULL AND toLower(s.{_ev(dt.NAME)}) CONTAINS toLower($situation) THEN 1 ELSE 0 END) AS situation_match,
   max(CASE WHEN $weather IS NOT NULL AND toLower(w.{_ev(dt.NAME)}) CONTAINS toLower($weather) THEN 1 ELSE 0 END) AS weather_match
 WITH m, mood_match + situation_match + weather_match AS ctx_match
@@ -549,13 +686,13 @@ LIMIT $limit
         keys.Q_SEARCH_005: q_search_005,
         keys.Q_SEARCH_006: q_search_006,
         keys.Q_SEARCH_007: q_search_007,
-        keys.Q_SEARCH_008: q_search_008,
+        # keys.Q_SEARCH_008: q_search_008,
         keys.Q_SEARCH_009: q_search_009,
         keys.Q_SEARCH_010: q_search_010,
-        keys.Q_SEARCH_011: q_search_011,
+        # keys.Q_SEARCH_011: q_search_011,
         keys.Q_SEARCH_012: q_search_012,
-        keys.Q_SEARCH_013: q_search_013,
-        keys.Q_SEARCH_014: q_search_014,
+        # keys.Q_SEARCH_013: q_search_013,
+        # keys.Q_SEARCH_014: q_search_014,
         keys.Q_REC_001: q_rec_001,
         keys.Q_REC_002: q_rec_002,
         keys.Q_REC_003: q_rec_003,
@@ -581,13 +718,13 @@ class KagQueryTemplateConstants:
     Q_SEARCH_005 = "Q_SEARCH_005"
     Q_SEARCH_006 = "Q_SEARCH_006"
     Q_SEARCH_007 = "Q_SEARCH_007"
-    Q_SEARCH_008 = "Q_SEARCH_008"
+    # Q_SEARCH_008 = "Q_SEARCH_008"
     Q_SEARCH_009 = "Q_SEARCH_009"
     Q_SEARCH_010 = "Q_SEARCH_010"
-    Q_SEARCH_011 = "Q_SEARCH_011"
+    # Q_SEARCH_011 = "Q_SEARCH_011"
     Q_SEARCH_012 = "Q_SEARCH_012"
-    Q_SEARCH_013 = "Q_SEARCH_013"
-    Q_SEARCH_014 = "Q_SEARCH_014"
+    # Q_SEARCH_013 = "Q_SEARCH_013"
+    # Q_SEARCH_014 = "Q_SEARCH_014"
     Q_REC_001 = "Q_REC_001"
     Q_REC_002 = "Q_REC_002"
     Q_REC_003 = "Q_REC_003"
@@ -634,11 +771,11 @@ class KagQueryTemplateConstants:
             "defaults": {"limit": 20},
             "optional_nullable": [],
         },
-        Q_SEARCH_008: {
-            "required": ["keyword"],
-            "defaults": {"target_label": None, "max_depth": 3, "limit": 10},
-            "optional_nullable": ["target_label"],
-        },
+        # Q_SEARCH_008: {
+        #     "required": ["keyword"],
+        #     "defaults": {"target_label": None, "max_depth": 3, "limit": 10},
+        #     "optional_nullable": ["target_label"],
+        # },
         Q_SEARCH_009: {
             "required": ["artist"],
             "defaults": {"limit": 30},
@@ -649,26 +786,26 @@ class KagQueryTemplateConstants:
             "defaults": {"limit": 20},
             "optional_nullable": [],
         },
-        Q_SEARCH_011: {
-            "required": [],
-            "defaults": {"year": None, "start_year": None, "end_year": None, "limit": 20},
-            "optional_nullable": ["year", "start_year", "end_year"],
-        },
+        # Q_SEARCH_011: {
+        #     "required": [],
+        #     "defaults": {"year": None, "start_year": None, "end_year": None, "limit": 20},
+        #     "optional_nullable": ["year", "start_year", "end_year"],
+        # },
         Q_SEARCH_012: {
             "required": [],
             "defaults": {"genre": None, "mood": None, "situation": None, "weather": None, "limit": 20},
             "optional_nullable": ["genre", "mood", "situation", "weather"],
         },
-        Q_SEARCH_013: {
-            "required": [],
-            "defaults": {"limit": 20},
-            "optional_nullable": [],
-        },
-        Q_SEARCH_014: {
-            "required": ["keyword"],
-            "defaults": {"limit": 20},
-            "optional_nullable": [],
-        },
+        # Q_SEARCH_013: {
+        #     "required": [],
+        #     "defaults": {"limit": 20},
+        #     "optional_nullable": [],
+        # },
+        # Q_SEARCH_014: {
+        #     "required": ["keyword"],
+        #     "defaults": {"limit": 20},
+        #     "optional_nullable": [],
+        # },
         Q_REC_001: {
             "required": ["genre"],
             "defaults": {"limit": 10},

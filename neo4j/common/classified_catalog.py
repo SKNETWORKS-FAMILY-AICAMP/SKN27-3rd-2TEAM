@@ -1,889 +1,750 @@
 """
-music_catalog.csv 오디오 피처를 spotify_music_recommendation_guide.md 조건으로 분류해
-track_id + 차원별(dim_*) CSV를 생성한다.
+music_classifier.py
+====================
+음악 분류 조건을 정의하고, DataFrame에서 조건에 맞는 track_id를 추출한다.
+
+■ 사용법 (딱 두 줄)
+    from music_classifier import get_track_ids
+    ids = get_track_ids(df, category="weather", keyword="비")
+
+■ 지원 카테고리 / 키워드
+    weather          : 맑음, 비, 눈, 흐림
+    season           : 봄, 여름, 가을, 겨울
+    time             : 아침, 오후, 저녁, 밤, 새벽
+    emotion          : 외로움, 쓸쓸함, 우울함, 신남, 설렘, 차분함, 잔잔함, 보통, 적당함, 활기참
+    commute          : 출근, 퇴근, 대중교통, 운전
+    home             : 집안일, 청소, 요리, 샤워, 휴식, 잠, 수면
+    focus            : 공부, 학습, 사무실, 업무, 마감, 데드라인
+    exercise         : 헬스, 운동, 산책, 스트레칭, 요가
+    emotion_situation: 이별, 위로, 기분전환, 추억, 회상
+    special          : 카페, 클럽, 페스티벌, 게임, 새벽감성, 여행
 """
 
 from __future__ import annotations
 
-import sys
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 import pandas as pd
 
-from common.constant import (
-    MUSIC_CATALOG_CSV_FILENAME,
-    MUSIC_CATALOG_SCENARIOS_CSV_FILENAME,
-    SCENARIO_COL_TAG_COUNT,
-    SCENARIO_COL_TAGS_ALL,
-    SCENARIO_CSV_TAG_SEPARATOR,
-    SCENARIO_DIM_COLUMNS,
-    SCENARIO_KEY_COLUMN,
-)
-
-
-####################################################################
-# 데이터 경로·스칼라 (common.utils 의존 시 neo4j 드라이버 필요 — 단독 실행용 로컬 정의)
-####################################################################
-def get_filepath(file_name: str) -> Path:
-    """`neo4j/data/` 아래 파일에 대한 절대 경로(`Path`)를 반환한다."""
-    _DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-    return _DATA_DIR / file_name
-
-
-def scalar_or_none(value: object) -> object:
-    """NaN·None·빈 문자열이면 None, 그 외에는 원값을 그대로 반환한다(스칼라 셀 정규화)."""
-    if value is None or (isinstance(value, float) and pd.isna(value)):
-        return None
-    if isinstance(value, str) and not value.strip():
-        return None
-    return value
-
-
-def _f(row: pd.Series, name: str) -> float | None:
-    """한 행에서 컬럼값을 float으로 읽고, 없거나 변환 불가면 None."""
-    v = scalar_or_none(row.get(name))
-    if v is None:
-        return None
-    try:
-        return float(v)
-    except (TypeError, ValueError):
-        return None
-
-
-def _mode_bin(row: pd.Series) -> int | None:
-    """`mode`를 장조 1 / 단조 0으로 정규화한다(0.5 미만→0). 결측이면 None."""
-    m = _f(row, "mode")
-    if m is None:
-        return None
-    return 1 if m >= 0.5 else 0
-
-
-#################################################################################################
-# 규칙 술어 타입: DataFrame 한 행(pd.Series)을 받아 해당 시나리오 조건 만족 여부(bool)를 반환하는 호출 가능 객체.
-# ScenarioRule.predicate 필드에 아래 명명 함수를 지정한다. (DataFrame 자체를 정의하는 것은 아님)
-#################################################################################################
-RowPred = Callable[[pd.Series], bool]
-
-
-@dataclass(frozen=True)
-class ScenarioRule:
-    """시나리오 규칙 한 줄: 차원(group), 출력 tag_id, 행 단위 참/거짓 술어(predicate)."""
-
-    group: str
-    tag_id: str
-    predicate: RowPred
-
-
-# ---- 가이드 표 기반 규칙 술어 ----
-
-
-def _weather_sunny(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    e = _f(row, "energy")
-    mo = _mode_bin(row)
-    return v is not None and e is not None and mo == 1 and v >= 0.6 and e >= 0.5
-
-
-def _weather_rain(row: pd.Series) -> bool:
-    va = _f(row, "valence")
-    ac = _f(row, "acousticness")
-    t = _f(row, "tempo")
-    mo = _mode_bin(row)
-    return (
-        all(x is not None for x in (va, ac, t, mo))
-        and va <= 0.4
-        and ac >= 0.5
-        and mo == 0
-        and 60 <= t <= 90
-    )
-
-
-def _weather_snow(row: pd.Series) -> bool:
-    ac = _f(row, "acousticness")
-    v = _f(row, "valence")
-    t = _f(row, "tempo")
-    return (
-        ac is not None
-        and v is not None
-        and t is not None
-        and ac >= 0.6
-        and 0.3 <= v <= 0.6
-        and t <= 80
-    )
-
-
-def _weather_cloudy(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    e = _f(row, "energy")
-    mo = _mode_bin(row)
-    return (
-        v is not None
-        and e is not None
-        and mo == 0
-        and 0.3 <= v <= 0.5
-        and 0.3 <= e <= 0.5
-    )
-
-
-def _season_spring(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    e = _f(row, "energy")
-    ac = _f(row, "acousticness")
-    t = _f(row, "tempo")
-    return (
-        all(x is not None for x in (v, e, ac, t))
-        and v >= 0.6
-        and 0.4 <= e <= 0.7
-        and ac >= 0.4
-        and 90 <= t <= 120
-    )
-
-
-def _season_summer(row: pd.Series) -> bool:
-    e = _f(row, "energy")
-    d = _f(row, "danceability")
-    v = _f(row, "valence")
-    t = _f(row, "tempo")
-    return (
-        all(x is not None for x in (e, d, v, t))
-        and e >= 0.7
-        and d >= 0.6
-        and v >= 0.6
-        and t >= 120
-    )
-
-
-def _season_autumn(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    ac = _f(row, "acousticness")
-    mo = _mode_bin(row)
-    return (
-        v is not None
-        and ac is not None
-        and mo == 0
-        and 0.3 <= v <= 0.5
-        and ac >= 0.5
-    )
-
-
-def _season_winter(row: pd.Series) -> bool:
-    ac = _f(row, "acousticness")
-    v = _f(row, "valence")
-    e = _f(row, "energy")
-    return (
-        ac is not None
-        and v is not None
-        and e is not None
-        and ac >= 0.5
-        and v <= 0.4
-        and e <= 0.4
-    )
-
-
-def _emotion_lonely(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    ac = _f(row, "acousticness")
-    mo = _mode_bin(row)
-    return v is not None and ac is not None and mo == 0 and v <= 0.3 and ac >= 0.6
-
-
-def _emotion_melancholy(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    mo = _mode_bin(row)
-    e = _f(row, "energy")
-    t = _f(row, "tempo")
-    return (
-        all(x is not None for x in (v, mo, e, t))
-        and v <= 0.3
-        and mo == 0
-        and e <= 0.4
-        and t <= 80
-    )
-
-
-def _emotion_hyped(row: pd.Series) -> bool:
-    e = _f(row, "energy")
-    d = _f(row, "danceability")
-    v = _f(row, "valence")
-    t = _f(row, "tempo")
-    return (
-        all(x is not None for x in (e, d, v, t))
-        and e >= 0.8
-        and d >= 0.7
-        and v >= 0.7
-        and t >= 120
-    )
-
-
-def _emotion_thrill(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    e = _f(row, "energy")
-    mo = _mode_bin(row)
-    t = _f(row, "tempo")
-    return (
-        all(x is not None for x in (v, e, mo, t))
-        and v >= 0.6
-        and 0.5 <= e <= 0.7
-        and mo == 1
-        and 100 <= t <= 130
-    )
-
-
-def _time_morning(row: pd.Series) -> bool:
-    e = _f(row, "energy")
-    v = _f(row, "valence")
-    t = _f(row, "tempo")
-    mo = _mode_bin(row)
-    return (
-        all(x is not None for x in (e, v, t, mo))
-        and 0.5 <= e <= 0.7
-        and v >= 0.6
-        and 100 <= t <= 120
-        and mo == 1
-    )
-
-
-def _time_afternoon(row: pd.Series) -> bool:
-    e = _f(row, "energy")
-    v = _f(row, "valence")
-    return e is not None and v is not None and 0.5 <= e <= 0.8 and 0.5 <= v <= 0.8
-
-
-def _time_evening(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    ac = _f(row, "acousticness")
-    e = _f(row, "energy")
-    return (
-        v is not None
-        and ac is not None
-        and e is not None
-        and 0.3 <= v <= 0.6
-        and ac >= 0.4
-        and e <= 0.5
-    )
-
-
-def _time_night(row: pd.Series) -> bool:
-    ac = _f(row, "acousticness")
-    e = _f(row, "energy")
-    t = _f(row, "tempo")
-    return (
-        ac is not None
-        and e is not None
-        and t is not None
-        and ac >= 0.5
-        and e <= 0.4
-        and t <= 90
-    )
-
-
-def _time_dawn(row: pd.Series) -> bool:
-    i = _f(row, "instrumentalness")
-    e = _f(row, "energy")
-    l = _f(row, "loudness")
-    return (
-        i is not None
-        and e is not None
-        and l is not None
-        and i >= 0.5
-        and e <= 0.3
-        and l <= -10
-    )
-
-
-def _energy_level_calm(row: pd.Series) -> bool:
-    e = _f(row, "energy")
-    t = _f(row, "tempo")
-    ac = _f(row, "acousticness")
-    l = _f(row, "loudness")
-    return (
-        all(x is not None for x in (e, t, ac, l))
-        and e <= 0.4
-        and t <= 90
-        and ac >= 0.5
-        and l <= -8
-    )
-
-
-def _energy_level_moderate(row: pd.Series) -> bool:
-    e = _f(row, "energy")
-    t = _f(row, "tempo")
-    return e is not None and t is not None and 0.4 <= e <= 0.7 and 90 <= t <= 120
-
-
-def _energy_level_hyped(row: pd.Series) -> bool:
-    e = _f(row, "energy")
-    d = _f(row, "danceability")
-    t = _f(row, "tempo")
-    return e is not None and d is not None and t is not None and e >= 0.7 and d >= 0.7 and t >= 120
-
-
-def _commute_to_work(row: pd.Series) -> bool:
-    e = _f(row, "energy")
-    v = _f(row, "valence")
-    t = _f(row, "tempo")
-    mo = _mode_bin(row)
-    return (
-        all(x is not None for x in (e, v, t, mo))
-        and 0.5 <= e <= 0.7
-        and v >= 0.5
-        and 100 <= t <= 120
-        and mo == 1
-    )
-
-
-def _commute_from_work(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    e = _f(row, "energy")
-    ac = _f(row, "acousticness")
-    return (
-        v is not None
-        and e is not None
-        and ac is not None
-        and 0.3 <= v <= 0.6
-        and e <= 0.5
-        and ac >= 0.3
-    )
-
-
-def _commute_public(row: pd.Series) -> bool:
-    i = _f(row, "instrumentalness")
-    e = _f(row, "energy")
-    sp = _f(row, "speechiness")
-    return (
-        i is not None
-        and e is not None
-        and sp is not None
-        and i >= 0.4
-        and 0.3 <= e <= 0.6
-        and sp <= 0.1
-    )
-
-
-def _commute_drive(row: pd.Series) -> bool:
-    e = _f(row, "energy")
-    t = _f(row, "tempo")
-    d = _f(row, "danceability")
-    v = _f(row, "valence")
-    return (
-        all(x is not None for x in (e, t, d, v))
-        and 0.6 <= e <= 0.8
-        and 110 <= t <= 140
-        and d >= 0.6
-        and v >= 0.5
-    )
-
-
-def _home_chores(row: pd.Series) -> bool:
-    e = _f(row, "energy")
-    d = _f(row, "danceability")
-    v = _f(row, "valence")
-    return (
-        e is not None
-        and d is not None
-        and v is not None
-        and 0.5 <= e <= 0.7
-        and d >= 0.6
-        and v >= 0.5
-    )
-
-
-def _home_cooking(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    t = _f(row, "tempo")
-    d = _f(row, "danceability")
-    return (
-        v is not None
-        and t is not None
-        and d is not None
-        and v >= 0.5
-        and 100 <= t <= 130
-        and 0.5 <= d <= 0.7
-    )
-
-
-def _home_shower(row: pd.Series) -> bool:
-    e = _f(row, "energy")
-    v = _f(row, "valence")
-    return e is not None and v is not None and e >= 0.6 and v >= 0.6
-
-
-def _home_rest(row: pd.Series) -> bool:
-    ac = _f(row, "acousticness")
-    e = _f(row, "energy")
-    i = _f(row, "instrumentalness")
-    return (
-        ac is not None
-        and e is not None
-        and i is not None
-        and ac >= 0.5
-        and e <= 0.4
-        and i >= 0.3
-    )
-
-
-def _home_sleep(row: pd.Series) -> bool:
-    e = _f(row, "energy")
-    t = _f(row, "tempo")
-    ac = _f(row, "acousticness")
-    l = _f(row, "loudness")
-    return (
-        all(x is not None for x in (e, t, ac, l))
-        and e <= 0.3
-        and t <= 70
-        and ac >= 0.6
-        and l <= -10
-    )
-
-
-def _focus_study(row: pd.Series) -> bool:
-    i = _f(row, "instrumentalness")
-    sp = _f(row, "speechiness")
-    e = _f(row, "energy")
-    return (
-        i is not None
-        and sp is not None
-        and e is not None
-        and i >= 0.7
-        and sp <= 0.05
-        and 0.3 <= e <= 0.5
-    )
-
-
-def _focus_office(row: pd.Series) -> bool:
-    i = _f(row, "instrumentalness")
-    e = _f(row, "energy")
-    t = _f(row, "tempo")
-    return (
-        all(x is not None for x in (i, e, t))
-        and i >= 0.6
-        and 0.4 <= e <= 0.6
-        and 90 <= t <= 120
-    )
-
-
-def _focus_deadline(row: pd.Series) -> bool:
-    e = _f(row, "energy")
-    t = _f(row, "tempo")
-    i = _f(row, "instrumentalness")
-    return (
-        all(x is not None for x in (e, t, i))
-        and 0.6 <= e <= 0.8
-        and t >= 120
-        and i >= 0.5
-    )
-
-
-def _exercise_gym(row: pd.Series) -> bool:
-    e = _f(row, "energy")
-    t = _f(row, "tempo")
-    d = _f(row, "danceability")
-    l = _f(row, "loudness")
-    return (
-        all(x is not None for x in (e, t, d, l))
-        and e >= 0.8
-        and t >= 130
-        and d >= 0.7
-        and l >= -6
-    )
-
-
-def _exercise_walk(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    e = _f(row, "energy")
-    t = _f(row, "tempo")
-    return (
-        v is not None
-        and e is not None
-        and t is not None
-        and v >= 0.5
-        and 0.4 <= e <= 0.6
-        and 90 <= t <= 110
-    )
-
-
-def _exercise_stretch(row: pd.Series) -> bool:
-    e = _f(row, "energy")
-    ac = _f(row, "acousticness")
-    t = _f(row, "tempo")
-    return (
-        e is not None
-        and ac is not None
-        and t is not None
-        and e <= 0.4
-        and ac >= 0.5
-        and t <= 80
-    )
-
-
-def _social_date(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    ac = _f(row, "acousticness")
-    mo = _mode_bin(row)
-    e = _f(row, "energy")
-    return (
-        all(x is not None for x in (v, ac, mo, e))
-        and v >= 0.5
-        and ac >= 0.3
-        and mo == 1
-        and 0.4 <= e <= 0.6
-    )
-
-
-def _social_friends(row: pd.Series) -> bool:
-    d = _f(row, "danceability")
-    e = _f(row, "energy")
-    v = _f(row, "valence")
-    return (
-        d is not None
-        and e is not None
-        and v is not None
-        and d >= 0.6
-        and e >= 0.6
-        and v >= 0.6
-    )
-
-
-def _social_celebration(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    e = _f(row, "energy")
-    mo = _mode_bin(row)
-    return v is not None and e is not None and mo == 1 and v >= 0.7 and e >= 0.6
-
-
-def _social_homeparty(row: pd.Series) -> bool:
-    d = _f(row, "danceability")
-    e = _f(row, "energy")
-    v = _f(row, "valence")
-    t = _f(row, "tempo")
-    return (
-        all(x is not None for x in (d, e, v, t))
-        and d >= 0.7
-        and e >= 0.7
-        and v >= 0.6
-        and t >= 110
-    )
-
-
-def _sit_breakup(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    mo = _mode_bin(row)
-    ac = _f(row, "acousticness")
-    e = _f(row, "energy")
-    return (
-        all(x is not None for x in (v, mo, ac, e))
-        and v <= 0.3
-        and mo == 0
-        and ac >= 0.4
-        and e <= 0.4
-    )
-
-
-def _sit_comfort(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    ac = _f(row, "acousticness")
-    t = _f(row, "tempo")
-    return (
-        v is not None
-        and ac is not None
-        and t is not None
-        and 0.3 <= v <= 0.5
-        and ac >= 0.5
-        and t <= 90
-    )
-
-
-def _sit_mood_lift(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    e = _f(row, "energy")
-    mo = _mode_bin(row)
-    return v is not None and e is not None and mo == 1 and v >= 0.6 and e >= 0.6
-
-
-def _sit_nostalgia(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    ac = _f(row, "acousticness")
-    return v is not None and ac is not None and 0.4 <= v <= 0.7 and ac >= 0.4
-
-
-def _travel_prep(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    e = _f(row, "energy")
-    d = _f(row, "danceability")
-    return (
-        v is not None
-        and e is not None
-        and d is not None
-        and v >= 0.6
-        and e >= 0.6
-        and d >= 0.5
-    )
-
-
-def _travel_transit(row: pd.Series) -> bool:
-    i = _f(row, "instrumentalness")
-    e = _f(row, "energy")
-    return (
-        i is not None
-        and e is not None
-        and i >= 0.4
-        and 0.3 <= e <= 0.5
-    )
-
-
-def _travel_on_trip(row: pd.Series) -> bool:
-    e = _f(row, "energy")
-    v = _f(row, "valence")
-    t = _f(row, "tempo")
-    return (
-        e is not None
-        and v is not None
-        and t is not None
-        and 0.6 <= e <= 0.8
-        and v >= 0.6
-        and 110 <= t <= 130
-    )
-
-
-def _special_cafe(row: pd.Series) -> bool:
-    ac = _f(row, "acousticness")
-    e = _f(row, "energy")
-    i = _f(row, "instrumentalness")
-    t = _f(row, "tempo")
-    return (
-        all(x is not None for x in (ac, e, i, t))
-        and ac >= 0.5
-        and 0.2 <= e <= 0.5
-        and i >= 0.4
-        and 70 <= t <= 100
-    )
-
-
-def _special_club(row: pd.Series) -> bool:
-    d = _f(row, "danceability")
-    e = _f(row, "energy")
-    t = _f(row, "tempo")
-    l = _f(row, "loudness")
-    return (
-        all(x is not None for x in (d, e, t, l))
-        and d >= 0.8
-        and e >= 0.8
-        and t >= 125
-        and l >= -5
-    )
-
-
-def _special_festival(row: pd.Series) -> bool:
-    e = _f(row, "energy")
-    li = _f(row, "liveness")
-    d = _f(row, "danceability")
-    return (
-        e is not None
-        and li is not None
-        and d is not None
-        and e >= 0.8
-        and li >= 0.5
-        and d >= 0.7
-    )
-
-
-def _special_gaming(row: pd.Series) -> bool:
-    e = _f(row, "energy")
-    t = _f(row, "tempo")
-    i = _f(row, "instrumentalness")
-    return (
-        all(x is not None for x in (e, t, i))
-        and 0.6 <= e <= 0.9
-        and t >= 120
-        and i >= 0.5
-    )
-
-
-def _special_dawn_mood(row: pd.Series) -> bool:
-    v = _f(row, "valence")
-    ac = _f(row, "acousticness")
-    mo = _mode_bin(row)
-    e = _f(row, "energy")
-    return (
-        all(x is not None for x in (v, ac, mo, e))
-        and v <= 0.4
-        and ac >= 0.6
-        and mo == 0
-        and e <= 0.3
-    )
-
-
-def _rules() -> list[ScenarioRule]:
-    """가이드 문서 표를 반영한 모든 `ScenarioRule`을 담은 리스트를 구성해 반환한다."""
-    R: list[ScenarioRule] = []
-
-    # —— 날씨 ——
-    R.append(ScenarioRule("weather", "weather_sunny", _weather_sunny))
-    R.append(ScenarioRule("weather", "weather_rain", _weather_rain))
-    R.append(ScenarioRule("weather", "weather_snow", _weather_snow))
-    R.append(ScenarioRule("weather", "weather_cloudy", _weather_cloudy))
-
-    # —— 계절 ——
-    R.append(ScenarioRule("season", "season_spring", _season_spring))
-    R.append(ScenarioRule("season", "season_summer", _season_summer))
-    R.append(ScenarioRule("season", "season_autumn", _season_autumn))
-    R.append(ScenarioRule("season", "season_winter", _season_winter))
-
-    # —— 감정 ——
-    R.append(ScenarioRule("emotion", "emotion_lonely", _emotion_lonely))
-    R.append(ScenarioRule("emotion", "emotion_melancholy", _emotion_melancholy))
-    R.append(ScenarioRule("emotion", "emotion_hyped", _emotion_hyped))
-    R.append(ScenarioRule("emotion", "emotion_thrill", _emotion_thrill))
-
-    # —— 시간대 ——
-    R.append(ScenarioRule("time_of_day", "time_morning", _time_morning))
-    R.append(ScenarioRule("time_of_day", "time_afternoon", _time_afternoon))
-    R.append(ScenarioRule("time_of_day", "time_evening", _time_evening))
-    R.append(ScenarioRule("time_of_day", "time_night", _time_night))
-    R.append(ScenarioRule("time_of_day", "time_dawn", _time_dawn))
-
-    # —— 에너지 레벨 ——
-    R.append(ScenarioRule("energy_level", "energy_level_calm", _energy_level_calm))
-    R.append(ScenarioRule("energy_level", "energy_level_moderate", _energy_level_moderate))
-    R.append(ScenarioRule("energy_level", "energy_level_hyped", _energy_level_hyped))
-
-    # —— 이동 ——
-    R.append(ScenarioRule("ctx_commute", "commute_to_work", _commute_to_work))
-    R.append(ScenarioRule("ctx_commute", "commute_from_work", _commute_from_work))
-    R.append(ScenarioRule("ctx_commute", "commute_public", _commute_public))
-    R.append(ScenarioRule("ctx_commute", "commute_drive", _commute_drive))
-
-    # —— 집 ——
-    R.append(ScenarioRule("ctx_home", "home_chores", _home_chores))
-    R.append(ScenarioRule("ctx_home", "home_cooking", _home_cooking))
-    R.append(ScenarioRule("ctx_home", "home_shower", _home_shower))
-    R.append(ScenarioRule("ctx_home", "home_rest", _home_rest))
-    R.append(ScenarioRule("ctx_home", "home_sleep", _home_sleep))
-
-    # —— 집중 ——
-    R.append(ScenarioRule("ctx_focus", "focus_study", _focus_study))
-    R.append(ScenarioRule("ctx_focus", "focus_office", _focus_office))
-    R.append(ScenarioRule("ctx_focus", "focus_deadline", _focus_deadline))
-
-    # —— 운동 ——
-    R.append(ScenarioRule("ctx_exercise", "exercise_gym", _exercise_gym))
-    R.append(ScenarioRule("ctx_exercise", "exercise_walk", _exercise_walk))
-    R.append(ScenarioRule("ctx_exercise", "exercise_stretch", _exercise_stretch))
-
-    # —— 관계 / 이벤트 ——
-    R.append(ScenarioRule("ctx_social", "social_date", _social_date))
-    R.append(ScenarioRule("ctx_social", "social_friends", _social_friends))
-    R.append(ScenarioRule("ctx_social", "social_celebration", _social_celebration))
-    R.append(ScenarioRule("ctx_social", "social_homeparty", _social_homeparty))
-
-    # —— 감정 상황 ——
-    R.append(ScenarioRule("ctx_emotion_sit", "sit_breakup", _sit_breakup))
-    R.append(ScenarioRule("ctx_emotion_sit", "sit_comfort", _sit_comfort))
-    R.append(ScenarioRule("ctx_emotion_sit", "sit_mood_lift", _sit_mood_lift))
-    R.append(ScenarioRule("ctx_emotion_sit", "sit_nostalgia", _sit_nostalgia))
-
-    # —— 여행 ——
-    R.append(ScenarioRule("ctx_travel", "travel_prep", _travel_prep))
-    R.append(ScenarioRule("ctx_travel", "travel_transit", _travel_transit))
-    R.append(ScenarioRule("ctx_travel", "travel_on_trip", _travel_on_trip))
-
-    # —— 특수 ——
-    R.append(ScenarioRule("ctx_special", "special_cafe", _special_cafe))
-    R.append(ScenarioRule("ctx_special", "special_club", _special_club))
-    R.append(ScenarioRule("ctx_special", "special_festival", _special_festival))
-    R.append(ScenarioRule("ctx_special", "special_gaming", _special_gaming))
-    R.append(ScenarioRule("ctx_special", "special_dawn_mood", _special_dawn_mood))
-
-    return R
-
-
-SCENARIO_RULES: list[ScenarioRule] = _rules()
-
-
-def collect_tags_by_group(row: pd.Series) -> dict[str, list[str]]:
-    """한 트랙 행에 대해 `SCENARIO_RULES`를 평가해, 차원(group)별로 만족한 tag_id 목록을 모은다."""
-    out: dict[str, list[str]] = {}
-    for rule in SCENARIO_RULES:
-        if rule.predicate(row):
-            out.setdefault(rule.group, []).append(rule.tag_id)
-    return out
-
-
-def row_to_output_record(row: pd.Series, sep: str = SCENARIO_CSV_TAG_SEPARATOR) -> dict[str, str]:
-    """CSV 출력 한 행에 해당하는 dict: `track_id`, 각 `dim_*`, `scenario_tags_all`, `scenario_tag_count`."""
-    by_g = collect_tags_by_group(row)
-    tid = scalar_or_none(row.get(SCENARIO_KEY_COLUMN))
-    rec = {SCENARIO_KEY_COLUMN: str(tid).strip() if tid is not None else ""}
-    for col in SCENARIO_DIM_COLUMNS:
-        group = col.removeprefix("dim_")
-        tags = by_g.get(group, [])
-        rec[col] = sep.join(tags)
-    all_tags = [t for tags in by_g.values() for t in tags]
-    rec[SCENARIO_COL_TAGS_ALL] = sep.join(all_tags)
-    rec[SCENARIO_COL_TAG_COUNT] = str(len(all_tags))
-    return rec
-
-
-def validate_track_ids(df: pd.DataFrame) -> tuple[bool, list[str]]:
-    """`track_id` 결측·공백·중복(동일 키 2행 이상)을 검사한다. (통과 여부, 경고 문구들) 반환."""
-    msgs: list[str] = []
-    if SCENARIO_KEY_COLUMN not in df.columns:
-        msgs.append(f"입력에 {SCENARIO_KEY_COLUMN} 컬럼이 없습니다.")
-        return False, msgs
-
-    def norm(x: object) -> str | None:
-        if x is None or (isinstance(x, float) and pd.isna(x)):
-            return None
-        s = str(x).strip()
-        return s if s else None
-
-    raw = df[SCENARIO_KEY_COLUMN].map(norm)
-    nulls = raw.isna()
-    if nulls.any():
-        msgs.append(f"track_id 결측/공백 행: {int(nulls.sum())}건")
-    valid = raw.dropna()
-    dup_mask = valid.duplicated(keep=False)
-    if dup_mask.any():
-        msgs.append(f"track_id 중복 행(동일 키 2행 이상): {int(dup_mask.sum())}건")
-    return len(msgs) == 0, msgs
-
-
-def classify_catalog(
-    input_path: str | Path,
-    output_csv_path: str | Path,
-    sep: str = SCENARIO_CSV_TAG_SEPARATOR,
-) -> tuple[pd.DataFrame, bool, list[str], int]:
-    """음원 카탈로그 CSV를 읽어 시나리오 분류 결과 DataFrame을 만들고 CSV로 저장한다.
-
-    Returns:
-        (결과 DataFrame, track_id 검증 통과 여부, 검증 메시지 목록, 입력 행 수)
+# ══════════════════════════════════════════════════════════════════════════════
+# 1. 분류 조건 테이블
+#    구조: { category: { alias(한글) -> { 오디오 피처 조건 } } }
+#    각 조건 값은 (min, max) 튜플 또는 단일 float / int.
+#    min/max 중 하나만 쓰려면 None으로 채운다.
+#    특수 키: "_mode" → 0(단조) / 1(장조) / None(무관)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── 내부 헬퍼: alias → English key ──────────────────────────────────────────
+_ALIAS: dict[str, dict[str, str]] = {
+    "weather": {
+        "맑음": "sunny", "비": "rain", "눈": "snow", "흐림": "cloudy",
+    },
+    "season": {
+        "봄": "spring", "여름": "summer", "가을": "autumn", "겨울": "winter",
+    },
+    "time": {
+        "아침": "morning", "오후": "afternoon", "저녁": "evening", "밤": "night", "새벽": "dawn",
+    },
+    "emotion": {
+        "외로움": "lonely", "쓸쓸함": "lonely",
+        "우울함": "melancholy",
+        "신남": "hyped",
+        "설렘": "thrill",
+        "차분함": "calm", "잔잔함": "calm",
+        "보통": "moderate", "적당함": "moderate",
+        "활기참": "energy_hyped",
+    },
+    "commute": {
+        "출근": "to_work", "퇴근": "from_work", "대중교통": "public", "운전": "drive",
+    },
+    "home": {
+        "집안일": "chores", "청소": "chores",
+        "요리": "cooking",
+        "샤워": "shower",
+        "휴식": "rest",
+        "잠": "sleep", "수면": "sleep",
+    },
+    "focus": {
+        "공부": "study", "학습": "study",
+        "사무실": "office", "업무": "office",
+        "마감": "deadline", "데드라인": "deadline",
+    },
+    "exercise": {
+        "헬스": "gym", "운동": "gym",
+        "산책": "walk",
+        "스트레칭": "stretch", "요가": "stretch",
+    },
+    "emotion_situation": {
+        "이별": "breakup", "위로": "comfort",
+        "기분전환": "mood_lift",
+        "추억": "nostalgia", "회상": "nostalgia",
+    },
+    "special": {
+        "카페": "cafe", "클럽": "club", "페스티벌": "festival",
+        "게임": "gaming", "새벽감성": "dawn_mood", "여행": "travel",
+    },
+}
+
+# ── 분류 조건 테이블 ─────────────────────────────────────────────────────────
+# 각 항목: { 피처명: (min, max) }  ← None = 제한 없음
+# 특수 키: "_mode" → 0 or 1 or None
+# ─────────────────────────────────────────────────────────────────────────────
+CONDITIONS: dict[str, dict[str, dict[str, tuple]]] = {
+
+    # ── 날씨 ────────────────────────────────────────────────────────────────
+    "weather": {
+        "sunny": {
+            "valence":      (0.6,  None),
+            "energy":       (0.6,  None),
+            "danceability": (0.5,  None),
+        },
+        "rain": {
+            "valence":      (None, 0.4),
+            "acousticness": (0.6,  None),
+            "energy":       (None, 0.5),
+            "_mode":        (0,    0),
+        },
+        "snow": {
+            "acousticness": (0.6,  None),
+            "energy":       (None, 0.4),
+            "valence":      (0.2,  0.5),
+        },
+        "cloudy": {
+            "valence":      (0.3,  0.6),
+            "energy":       (0.3,  0.6),
+            "acousticness": (0.4,  None),
+        },
+    },
+
+    # ── 계절 ────────────────────────────────────────────────────────────────
+    "season": {
+        "spring": {
+            "valence":      (0.6,  None),
+            "energy":       (0.4,  0.7),
+            "acousticness": (0.4,  None),
+            "tempo":        (90,   120),
+        },
+        "summer": {
+            "energy":       (0.7,  None),
+            "danceability": (0.6,  None),
+            "valence":      (0.6,  None),
+            "tempo":        (120,  None),
+        },
+        "autumn": {
+            "valence":      (0.3,  0.5),
+            "acousticness": (0.5,  None),
+            "_mode":        (0,    0),
+        },
+        "winter": {
+            "acousticness": (0.5,  None),
+            "valence":      (None, 0.4),
+            "energy":       (None, 0.4),
+        },
+    },
+
+    # ── 시간대 ──────────────────────────────────────────────────────────────
+    "time": {
+        "morning": {
+            "energy":       (0.5,  0.7),
+            "valence":      (0.6,  None),
+            "tempo":        (100,  120),
+            "_mode":        (1,    1),
+        },
+        "afternoon": {
+            "energy":       (0.5,  0.8),
+            "valence":      (0.5,  0.8),
+        },
+        "evening": {
+            "valence":      (0.3,  0.6),
+            "acousticness": (0.4,  None),
+            "energy":       (None, 0.5),
+        },
+        "night": {
+            "acousticness": (0.5,  None),
+            "energy":       (None, 0.4),
+            "tempo":        (None, 90),
+        },
+        "dawn": {
+            "instrumentalness": (0.5,  None),
+            "energy":           (None, 0.3),
+            "loudness":         (None, -10),
+        },
+    },
+
+    # ── 감정 ────────────────────────────────────────────────────────────────
+    "emotion": {
+        "lonely": {
+            "valence":      (None, 0.3),
+            "acousticness": (0.6,  None),
+            "_mode":        (0,    0),
+        },
+        "melancholy": {
+            "valence":      (None, 0.3),
+            "energy":       (None, 0.4),
+            "tempo":        (None, 80),
+            "_mode":        (0,    0),
+        },
+        "hyped": {
+            "energy":       (0.8,  None),
+            "danceability": (0.7,  None),
+            "valence":      (0.7,  None),
+            "tempo":        (120,  None),
+        },
+        "thrill": {
+            "valence":      (0.6,  None),
+            "energy":       (0.5,  0.7),
+            "tempo":        (100,  130),
+            "_mode":        (1,    1),
+        },
+        "calm": {
+            "energy":       (None, 0.4),
+            "tempo":        (None, 90),
+            "acousticness": (0.5,  None),
+            "loudness":     (None, -8),
+        },
+        "moderate": {
+            "energy":       (0.4,  0.7),
+            "tempo":        (90,   120),
+        },
+        "energy_hyped": {
+            "energy":       (0.7,  None),
+            "danceability": (0.7,  None),
+            "tempo":        (120,  None),
+        },
+    },
+
+    # ── 이동 ────────────────────────────────────────────────────────────────
+    "commute": {
+        "to_work": {
+            "energy":       (0.5,  0.7),
+            "valence":      (0.5,  None),
+            "tempo":        (100,  120),
+            "_mode":        (1,    1),
+        },
+        "from_work": {
+            "valence":      (0.3,  0.6),
+            "energy":       (None, 0.5),
+            "acousticness": (0.3,  None),
+        },
+        "public": {
+            "instrumentalness": (0.4,  None),
+            "energy":           (0.3,  0.6),
+            "speechiness":      (None, 0.1),
+        },
+        "drive": {
+            "energy":       (0.6,  0.8),
+            "tempo":        (110,  140),
+            "danceability": (0.6,  None),
+            "valence":      (0.5,  None),
+        },
+    },
+
+    # ── 집 ──────────────────────────────────────────────────────────────────
+    "home": {
+        "chores": {
+            "energy":       (0.5,  0.7),
+            "danceability": (0.6,  None),
+            "valence":      (0.5,  None),
+        },
+        "cooking": {
+            "valence":      (0.5,  None),
+            "tempo":        (100,  130),
+            "danceability": (0.5,  0.7),
+        },
+        "shower": {
+            "energy":       (0.6,  None),
+            "valence":      (0.6,  None),
+        },
+        "rest": {
+            "acousticness":     (0.5,  None),
+            "energy":           (None, 0.4),
+            "instrumentalness": (0.3,  None),
+        },
+        "sleep": {
+            "energy":       (None, 0.3),
+            "tempo":        (None, 70),
+            "acousticness": (0.6,  None),
+            "loudness":     (None, -10),
+        },
+    },
+
+    # ── 집중 ────────────────────────────────────────────────────────────────
+    "focus": {
+        "study": {
+            "instrumentalness": (0.7,  None),
+            "speechiness":      (None, 0.05),
+            "energy":           (0.3,  0.5),
+        },
+        "office": {
+            "instrumentalness": (0.6,  None),
+            "energy":           (0.4,  0.6),
+            "tempo":            (90,   120),
+        },
+        "deadline": {
+            "energy":           (0.6,  0.8),
+            "tempo":            (120,  None),
+            "instrumentalness": (0.5,  None),
+        },
+    },
+
+    # ── 운동 ────────────────────────────────────────────────────────────────
+    "exercise": {
+        "gym": {
+            "energy":       (0.8,  None),
+            "tempo":        (130,  None),
+            "danceability": (0.7,  None),
+            "loudness":     (-6,   None),
+        },
+        "walk": {
+            "valence":      (0.5,  None),
+            "energy":       (0.4,  0.6),
+            "tempo":        (90,   110),
+        },
+        "stretch": {
+            "energy":       (None, 0.4),
+            "acousticness": (0.5,  None),
+            "tempo":        (None, 80),
+        },
+    },
+
+    # ── 감정 상황 ────────────────────────────────────────────────────────────
+    "emotion_situation": {
+        "breakup": {
+            "valence":      (None, 0.3),
+            "acousticness": (0.4,  None),
+            "energy":       (None, 0.4),
+            "_mode":        (0,    0),
+        },
+        "comfort": {
+            "valence":      (0.3,  0.5),
+            "acousticness": (0.5,  None),
+            "tempo":        (None, 90),
+        },
+        "mood_lift": {
+            "valence":      (0.6,  None),
+            "energy":       (0.6,  None),
+            "_mode":        (1,    1),
+        },
+        "nostalgia": {
+            "valence":      (0.4,  0.7),
+            "acousticness": (0.4,  None),
+        },
+    },
+
+    # ── 특수 상황 ────────────────────────────────────────────────────────────
+    "special": {
+        "cafe": {
+            "acousticness":     (0.5,  None),
+            "energy":           (0.2,  0.5),
+            "instrumentalness": (0.4,  None),
+            "tempo":            (70,   100),
+        },
+        "club": {
+            "danceability": (0.8,  None),
+            "energy":       (0.8,  None),
+            "tempo":        (125,  None),
+            "loudness":     (-5,   None),
+        },
+        "festival": {
+            "energy":       (0.8,  None),
+            "liveness":     (0.5,  None),
+            "danceability": (0.7,  None),
+        },
+        "gaming": {
+            "energy":           (0.6,  0.9),
+            "tempo":            (120,  None),
+            "instrumentalness": (0.5,  None),
+        },
+        "dawn_mood": {
+            "valence":      (None, 0.4),
+            "acousticness": (0.6,  None),
+            "energy":       (None, 0.3),
+            "_mode":        (0,    0),
+        },
+        "travel": {
+            "valence":      (0.6,  None),
+            "energy":       (0.6,  None),
+            "danceability": (0.5,  None),
+        },
+    },
+}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 2. track_id 추출 함수
+# ══════════════════════════════════════════════════════════════════════════════
+
+def get_track_ids(
+    df: pd.DataFrame,
+    category: str,
+    keyword: str,
+    top_n: int = 10,
+    sort_by: str = "track_popularity",
+) -> list[str]:
     """
-    df = pd.read_csv(input_path, dtype={SCENARIO_KEY_COLUMN: str}, low_memory=False)
-    ok, issues = validate_track_ids(df)
-    if not ok:
-        for m in issues:
-            print("경고:", m, file=sys.stderr)
+    DataFrame에서 분류 조건에 맞는 track_id 리스트를 반환한다.
 
-    rows = [row_to_output_record(row, sep=sep) for _, row in df.iterrows()]
-    out_df = pd.DataFrame(rows)
-    column_order = [
-        SCENARIO_KEY_COLUMN,
-        *SCENARIO_DIM_COLUMNS,
-        SCENARIO_COL_TAGS_ALL,
-        SCENARIO_COL_TAG_COUNT,
-    ]
-    out_df = out_df[column_order]
-    Path(output_csv_path).parent.mkdir(parents=True, exist_ok=True)
-    out_df.to_csv(output_csv_path, index=False)
-    return out_df, ok, issues, len(df)
+    Parameters
+    ----------
+    df       : 오디오 피처가 포함된 pandas DataFrame
+                (필수 컬럼: track_id, track_popularity, 각 피처)
+    category : 분류 카테고리 (예: "weather", "season", ...)
+    keyword  : 한글 키워드 (예: "비", "봄", "아침", ...)
+    top_n    : 반환할 최대 트랙 수 (기본 10)
+    sort_by  : 정렬 기준 컬럼 (기본 "track_popularity")
+
+    Returns
+    -------
+    list[str]  — track_id 문자열 목록
+
+    Raises
+    ------
+    ValueError : 지원하지 않는 category 또는 keyword
+    """
+    if df.empty:
+        return []
+
+    # ① alias → English key
+    alias_map = _ALIAS.get(category)
+    if alias_map is None:
+        raise ValueError(
+            f"지원하지 않는 카테고리: '{category}'\n"
+            f"사용 가능: {list(_ALIAS.keys())}"
+        )
+
+    key = alias_map.get(keyword.strip())
+    if key is None:
+        raise ValueError(
+            f"카테고리 '{category}'에서 지원하지 않는 키워드: '{keyword}'\n"
+            f"사용 가능: {list(alias_map.keys())}"
+        )
+
+    # ② 조건 딕셔너리 조회
+    cond_dict = CONDITIONS[category][key]
+
+    # ③ mode 컬럼 이진화
+    mode_bin = pd.to_numeric(df.get("mode", pd.Series(dtype=float)), errors="coerce").apply(
+        lambda v: 1 if v >= 0.5 else 0 if pd.notna(v) else None
+    )
+
+    # ④ 조건 마스크 누적 AND
+    mask = pd.Series(True, index=df.index)
+
+    for feat, (lo, hi) in cond_dict.items():
+        if feat == "_mode":
+            # lo == hi == 원하는 mode 값 (0 or 1)
+            mask &= mode_bin == lo
+        else:
+            col = pd.to_numeric(df.get(feat, pd.Series(dtype=float)), errors="coerce")
+            if lo is not None:
+                mask &= col >= lo
+            if hi is not None:
+                mask &= col <= hi
+
+    # ⑤ 필터링 → 정렬 → ID 추출
+    result = df[mask].copy()
+
+    if sort_by in result.columns:
+        result = result.sort_values(sort_by, ascending=False)
+
+    return result.head(top_n)["track_id"].dropna().astype(str).tolist()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 3. 복수 키워드 처리 (충돌 감지 + 점수 기반 합산)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── 카테고리 우선순위 (숫자가 낮을수록 우선) ─────────────────────────────────
+# 이 상수만 수정하면 우선순위 정책이 바뀜.
+CATEGORY_PRIORITY: dict[str, int] = {
+    "emotion":           1,
+    "emotion_situation": 2,
+    "time":              3,
+    "focus":             4,
+    "exercise":          5,
+    "home":              6,
+    "commute":           7,
+    "special":           8,
+    "weather":           9,
+    "season":            10,
+}
+
+
+def _get_cond_dict(category: str, keyword: str) -> dict:
+    """alias 변환 후 CONDITIONS 딕셔너리를 반환하는 내부 헬퍼."""
+    alias_map = _ALIAS.get(category, {})
+    key = alias_map.get(keyword.strip())
+    if key is None:
+        raise ValueError(
+            f"카테고리 '{category}'에서 지원하지 않는 키워드: '{keyword}'\n"
+            f"사용 가능: {list(alias_map.keys())}"
+        )
+    return CONDITIONS[category][key]
+
+
+def _has_conflict(cond_a: dict, cond_b: dict) -> bool:
+    """
+    두 조건 딕셔너리 사이에 같은 피처의 범위가 겹치지 않으면 True(충돌).
+
+    예) energy: (None, 0.3)  vs  energy: (0.8, None)
+        → 상한 0.3 < 하한 0.8  → 겹치는 구간 없음 → 충돌
+    """
+    shared_feats = set(cond_a) & set(cond_b) - {"_mode"}
+
+    for feat in shared_feats:
+        lo_a, hi_a = cond_a[feat]
+        lo_b, hi_b = cond_b[feat]
+
+        # 각 범위의 실질적인 하한/상한
+        lo_a = lo_a if lo_a is not None else float("-inf")
+        hi_a = hi_a if hi_a is not None else float("inf")
+        lo_b = lo_b if lo_b is not None else float("-inf")
+        hi_b = hi_b if hi_b is not None else float("inf")
+
+        # 겹치는 구간: max(lo) <= min(hi)  →  거짓이면 충돌
+        if max(lo_a, lo_b) > min(hi_a, hi_b):
+            return True
+
+    # _mode 충돌 검사 (둘 다 지정됐고 값이 다른 경우)
+    if "_mode" in cond_a and "_mode" in cond_b:
+        if cond_a["_mode"][0] != cond_b["_mode"][0]:
+            return True
+
+    return False
+
+
+def _build_score_mask(df: pd.DataFrame, cond_dict: dict) -> pd.Series:
+    """
+    단일 조건 딕셔너리를 DataFrame에 적용해 bool 마스크를 반환한다.
+    get_track_ids() 내부 로직과 동일하며, 점수 합산 시 재사용된다.
+    """
+    mode_bin = pd.to_numeric(
+        df.get("mode", pd.Series(dtype=float)), errors="coerce"
+    ).apply(lambda v: 1 if v >= 0.5 else 0 if pd.notna(v) else None)
+
+    mask = pd.Series(True, index=df.index)
+    for feat, (lo, hi) in cond_dict.items():
+        if feat == "_mode":
+            mask &= mode_bin == lo
+        else:
+            col = pd.to_numeric(df.get(feat, pd.Series(dtype=float)), errors="coerce")
+            if lo is not None:
+                mask &= col >= lo
+            if hi is not None:
+                mask &= col <= hi
+    return mask
+
+
+def get_track_ids_multi(
+    df: pd.DataFrame,
+    keywords: list[tuple[str, str]],
+    top_n: int = 10,
+    sort_by: str = "track_popularity",
+) -> dict:
+    """
+    복수 키워드를 받아 충돌 감지 → 점수 기반 합산으로 track_id를 반환한다.
+
+    Parameters
+    ----------
+    df       : 오디오 피처가 포함된 pandas DataFrame
+    keywords : [(category, keyword), ...] 형태의 리스트
+                예) [("time", "새벽"), ("exercise", "헬스")]
+    top_n    : 반환할 최대 트랙 수
+    sort_by  : 동점일 때 2차 정렬 기준 컬럼
+
+    Returns
+    -------
+    dict {
+        "track_ids"    : list[str]             — 추천 track_id 목록
+        "applied"      : list[(category, kw)]  — 실제 적용된 키워드
+        "dropped"      : list[(category, kw)]  — 충돌로 제외된 키워드
+        "conflict"     : bool                  — 충돌 발생 여부
+        "score_counts" : dict[str, int]        — track_id별 만족 조건 수
+    }
+
+    Raises
+    ------
+    ValueError : keywords가 비어있거나 지원하지 않는 카테고리/키워드
+    """
+    if not keywords:
+        raise ValueError("keywords가 비어있습니다.")
+
+    if df.empty:
+        return {"track_ids": [], "applied": [], "dropped": [], "conflict": False, "score_counts": {}}
+
+    # ── Step 1. 각 키워드의 조건 딕셔너리 로드 ─────────────────────────────
+    loaded: list[tuple[str, str, dict]] = []   # (category, keyword, cond_dict)
+    for category, keyword in keywords:
+        cond_dict = _get_cond_dict(category, keyword)
+        loaded.append((category, keyword, cond_dict))
+
+    # ── Step 2. 충돌 감지 → 우선순위 낮은 쪽 제거 ─────────────────────────
+    conflict_detected = False
+    dropped: list[tuple[str, str]] = []
+
+    # 우선순위 순으로 정렬 (낮은 번호 = 높은 우선순위)
+    loaded.sort(key=lambda x: CATEGORY_PRIORITY.get(x[0], 99))
+
+    # 앞에서부터 확정된 조건들과 신규 조건을 비교, 충돌 시 신규를 제거
+    confirmed: list[tuple[str, str, dict]] = []
+    for cat, kw, cond in loaded:
+        conflicted_with = next(
+            (c_cat for c_cat, c_kw, c_cond in confirmed if _has_conflict(cond, c_cond)),
+            None,
+        )
+        if conflicted_with:
+            conflict_detected = True
+            dropped.append((cat, kw))
+        else:
+            confirmed.append((cat, kw, cond))
+
+    applied = [(cat, kw) for cat, kw, _ in confirmed]
+
+    # ── Step 3. 점수 합산 ────────────────────────────────────────────────────
+    score = pd.Series(0, index=df.index, dtype=int)
+    for _, _, cond in confirmed:
+        score += _build_score_mask(df, cond).astype(int)
+
+    # 점수 0인 트랙 제외
+    scored_df = df[score > 0].copy()
+    scored_df["_score"] = score[score > 0]
+
+    # 고득점 → sort_by 컬럼 순으로 정렬
+    sort_cols = ["_score"]
+    if sort_by in scored_df.columns:
+        sort_cols.append(sort_by)
+    scored_df = scored_df.sort_values(sort_cols, ascending=False)
+
+    result_ids = scored_df.head(top_n)["track_id"].dropna().astype(str).tolist()
+
+    # track_id별 점수 요약
+    score_counts = (
+        scored_df.head(top_n)
+        .set_index("track_id")["_score"]
+        .astype(int)
+        .to_dict()
+    )
+
+    return {
+        "track_ids":    result_ids,
+        "applied":      applied,
+        "dropped":      dropped,
+        "conflict":     conflict_detected,
+        "score_counts": score_counts,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 4. 지원 카테고리 / 키워드 조회 헬퍼 (선택)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def list_categories() -> list[str]:
+    """지원하는 카테고리 목록을 반환한다."""
+    return list(_ALIAS.keys())
+
+
+def list_keywords(category: str) -> list[str]:
+    """해당 카테고리에서 사용 가능한 한글 키워드 목록을 반환한다."""
+    alias_map = _ALIAS.get(category)
+    if alias_map is None:
+        raise ValueError(f"지원하지 않는 카테고리: '{category}'")
+    return list(alias_map.keys())
+
+
+def get_condition(category: str, keyword: str) -> dict:
+    """
+    특정 카테고리/키워드의 분류 조건 딕셔너리를 그대로 반환한다.
+    조건을 확인하거나 외부에서 수정할 때 사용.
+    """
+    alias_map = _ALIAS.get(category)
+    if alias_map is None:
+        raise ValueError(f"지원하지 않는 카테고리: '{category}'")
+    key = alias_map.get(keyword.strip())
+    if key is None:
+        raise ValueError(f"카테고리 '{category}'에서 지원하지 않는 키워드: '{keyword}'")
+    return CONDITIONS[category][key]
+
+
+########################################################
+# 음악 데이터 분류를 컬럼으로 추가하는 함수 by 김경수
+########################################################
+def build_music_catalog_labels_df(
+    df: pd.DataFrame,
+    *,
+    tag_sep: str = ";",
+    track_id_col: str = "track_id",
+) -> pd.DataFrame:
+    """
+    `music_catalog` 피처가 담긴 DataFrame에서 트랙별로 카테고리 라벨 키를 집계한다.
+
+    - 행·키: 입력의 ``track_id_col`` 값을 **재매핑·재생성하지 않고 그대로** 출력한다.
+      Neo4j `MusicCatalog`와 맞추려면 입력은 **`music_catalog.csv`를 읽은 DataFrame**이어야 한다.
+    - 열: `CATEGORY_PRIORITY`에 등장하는 카테고리명을 우선순위(값이 작을수록 앞) 순으로 배치
+    - 셀: 해당 카테고리의 `CONDITIONS` 영문 키 중 조건을 만족하는 것만 모아 `tag_sep`로 이어붙임
+          (예: home 열 → ``chores`` 또는 ``chores;cooking``). 하나도 없으면 빈 문자열.
+    """
+    categories_ordered = sorted(CATEGORY_PRIORITY.keys(), key=lambda c: CATEGORY_PRIORITY[c])
+
+    if track_id_col not in df.columns:
+        raise ValueError(f"컬럼 '{track_id_col}'이(가) 없습니다. 카탈로그 CSV에 track_id가 있어야 합니다.")
+
+    if df.empty:
+        return pd.DataFrame(columns=["track_id", *categories_ordered])
+
+    work = df.reset_index(drop=True)
+    n = len(work)
+    out: dict[str, object] = {"track_id": work[track_id_col].dropna().astype(str).tolist()}
+
+    for cat in categories_ordered:
+        buckets: list[set[str]] = [set() for _ in range(n)]
+        for eng_key, cond_dict in CONDITIONS[cat].items():
+            mask = _build_score_mask(work, cond_dict)
+            for pos, ok in enumerate(mask.tolist()):
+                if ok:
+                    buckets[pos].add(eng_key)
+        out[cat] = [tag_sep.join(sorted(s)) if s else "" for s in buckets]
+
+    return pd.DataFrame(out)
+
+
+def _looks_like_catalog_track_id(s: str) -> bool:
+    """이 레포 `music_catalog.csv`의 내장 track_id(nl 접두)처럼 보이는지 간단 검사."""
+    t = str(s).strip()
+    return len(t) >= 12 and t.startswith("nl")
 
 
 if __name__ == "__main__":
-    in_path = get_filepath(MUSIC_CATALOG_CSV_FILENAME)
-    out_path = get_filepath(MUSIC_CATALOG_SCENARIOS_CSV_FILENAME)
+    ########################################################
+    # 실행 시 music_catalog.csv를 읽고, 같은 track_id로 라벨 CSV를 덮어쓴다.
+    # 다른 소스(JSON 등) Spotify ID 행만으로 라벨을 만들면 Neo4j와 불일치하므로 이 경로만 사용한다.
+    ########################################################
+    _DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+    _catalog_csv = _DATA_DIR / "music_catalog.csv"
+    _out_csv = _DATA_DIR / "music_catalog_scenarios.csv"
 
-    out_df, _tid_ok, _tid_msgs, _n_in = classify_catalog(in_path, out_path)
+    df_catalog = pd.read_csv(_catalog_csv)
+    sample_ids = df_catalog["track_id"].dropna().astype(str).head(200)
+    if len(sample_ids) > 0 and sum(1 for x in sample_ids if _looks_like_catalog_track_id(x)) < len(
+        sample_ids
+    ) * 0.5:
+        raise SystemExit(
+            "music_catalog.csv의 track_id 상당수가 카탈로그 내장 형식(nl…)이 아닙니다. "
+            "Neo4j에 적재한 MusicCatalog.track_id와 동일한 CSV인지 확인하세요."
+        )
 
-    print(f"Wrote {out_path}")
+    df_labels = build_music_catalog_labels_df(df_catalog)
+    df_labels.to_csv(_out_csv, index=False)
+
+    merged = pd.merge(
+        df_catalog[["track_id"]],
+        df_labels[["track_id"]],
+        on="track_id",
+        how="outer",
+        indicator=True,
+    )
+    if not merged["_merge"].eq("both").all():
+        bad = merged[merged["_merge"] != "both"]
+        raise SystemExit(f"카탈로그와 라벨 행 불일치: {len(bad)}행 — track_id 집합이 달라졌습니다.")
+    print(
+        f"Wrote {_out_csv} ({len(df_labels)} rows); track_id 컬럼은 music_catalog.csv와 1:1 동일합니다."
+    )
