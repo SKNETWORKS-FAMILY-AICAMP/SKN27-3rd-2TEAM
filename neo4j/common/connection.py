@@ -12,8 +12,8 @@ import os
 import psycopg
 # import streamlit as st
 from neo4j import GraphDatabase
-from graphdatascience import GraphDataScience
-from langchain_ollama import OllamaEmbeddings
+# from graphdatascience import GraphDataScience
+# from langchain_ollama import OllamaEmbeddings
 
 
 #####################################################################################
@@ -55,13 +55,13 @@ class Neo4j_Connection(metaclass=Singleton):
         uri = uri or os.getenv("NEO4J_URI")
         user = user or os.getenv("NEO4J_USER")
         password = password or os.getenv("NEO4J_PASSWORD")
-        if embedding_model is None:
-            embedding_model = os.getenv("NEO4J_EMBEDDING_MODEL") or "qwen3-embedding:0.6b"
+        # if embedding_model is None:
+        #     embedding_model = os.getenv("NEO4J_EMBEDDING_MODEL") or "qwen3-embedding:0.6b"
 
         # 드라이버 생성
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
-        self.embedding_model = OllamaEmbeddings(model=embedding_model)
-        self.gds = GraphDataScience(uri, auth=(user, password))
+        # self.embedding_model = OllamaEmbeddings(model=embedding_model)
+        # self.gds = GraphDataScience(uri, auth=(user, password))
         logger.info(f"Neo4j 연결 성공: {uri}")
         logger.info(f"임베딩 모델: {embedding_model}")
 
@@ -107,14 +107,14 @@ class Neo4j_Connection(metaclass=Singleton):
             uri=os.getenv("NEO4J_URI"),
             user=os.getenv("NEO4J_USER"),
             password=os.getenv("NEO4J_PASSWORD"),
-            embedding_model=os.getenv("NEO4J_EMBEDDING_MODEL")
+            # embedding_model=os.getenv("NEO4J_EMBEDDING_MODEL")
         )
 
         conn2 = Neo4j_Connection(
             uri=os.getenv("NEO4J_URI"),
             user=os.getenv("NEO4J_USER"),
             password=os.getenv("NEO4J_PASSWORD"),
-            embedding_model=os.getenv("NEO4J_EMBEDDING_MODEL")
+            # embedding_model=os.getenv("NEO4J_EMBEDDING_MODEL")
         )
 
         logger.info("첫 번째 연결: %s", conn1)
@@ -136,7 +136,7 @@ if __name__ == "__main__":
         uri=os.getenv("NEO4J_URI"),
         user=os.getenv("NEO4J_USER"),
         password=os.getenv("NEO4J_PASSWORD"),
-        embedding_model=os.getenv("NEO4J_EMBEDDING_MODEL")
+        # embedding_model=os.getenv("NEO4J_EMBEDDING_MODEL")
     )
 
     conn.test_singleton()

@@ -1,0 +1,2 @@
+# Docker/WSL/Linux entrypoint scripts break with CRLF shebangs (e.g. exit 126).
+*.sh text eol=lf
