@@ -1,7 +1,9 @@
 import logging
+import os
 import time
 
 from app.agents.base_agent import BaseAgent
+from app.rag.adapters.rag_real_adapter import RealRagAdapter
 from app.rag.adapters.mock_rag_adapter import MockRagAdapter
 from app.rag.adapters.rag_adapter import RagAdapter
 from app.schemas.rag_input_schema import RagInputSchema
@@ -15,7 +17,7 @@ class RagDispatchAgent(BaseAgent):
     """
 
     def __init__(self, rag_adapter: RagAdapter | None = None):
-        self._adapter = rag_adapter or MockRagAdapter()
+        self._adapter = rag_adapter or self._build_default_adapter()
 
     def run(
         self,
@@ -93,3 +95,10 @@ class RagDispatchAgent(BaseAgent):
             },
         )
         return rag_input.model_dump()
+
+    @staticmethod
+    def _build_default_adapter() -> RagAdapter:
+        mode = os.getenv("RIMAS_RAG_MODE", "mock").strip().lower()
+        if mode == "real":
+            return RealRagAdapter()
+        return MockRagAdapter()

@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -15,7 +17,7 @@ class RecommendationReasonSchema(BaseModel):
 
 
 class RagStateSchema(BaseModel):
-    status: str
+    status: Literal["success", "failed", "fallback"]
     query: str = ""
     normalized_query: str = ""
     recommended_content_evidence: list[RagEvidenceSchema] = Field(default_factory=list)
