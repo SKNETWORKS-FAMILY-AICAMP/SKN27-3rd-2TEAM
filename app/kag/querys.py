@@ -3,7 +3,7 @@ import logging
 from collections.abc import Callable
 
 from app.kag.connection import Neo4j_Connection
-from app.kag.constant import KagQueryTemplateConstants
+from app.kag.constant import KagQueryTemplateConstants, resolve_scenario_param
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -56,8 +56,8 @@ class KagQueryTools:
         merged = dict(defaults)
         merged.update(payload)
         merged = KagQueryTools._normalize_limit(merged)
-        if query_key == KagQueryTemplateConstants.Q_SEARCH_008:
-            merged["max_depth"] = _max_depth_from_row(merged, default=int((tmpl.get("defaults") or {}).get("max_depth") or 3))
+        # if query_key == KagQueryTemplateConstants.Q_SEARCH_008:
+        #     merged["max_depth"] = _max_depth_from_row(merged, default=int((tmpl.get("defaults") or {}).get("max_depth") or 3))
 
         for key in required:
             value = merged.get(key)
@@ -95,13 +95,13 @@ class KagQueryTools:
             "tool_q_search_005_music_stat_lookup": KagQueryTools.tool_q_search_005_music_stat_lookup,
             "tool_q_search_006_connected_node_music_lookup": KagQueryTools.tool_q_search_006_connected_node_music_lookup,
             "tool_q_search_007_music_common_feature_lookup": KagQueryTools.tool_q_search_007_music_common_feature_lookup,
-            "tool_q_search_008_music_path_lookup": KagQueryTools.tool_q_search_008_music_path_lookup,
+            # "tool_q_search_008_music_path_lookup": KagQueryTools.tool_q_search_008_music_path_lookup,
             "tool_q_search_009_artist_music_lookup": KagQueryTools.tool_q_search_009_artist_music_lookup,
             "tool_q_search_010_category_top_music_lookup": KagQueryTools.tool_q_search_010_category_top_music_lookup,
-            "tool_q_search_011_temporal_music_lookup": KagQueryTools.tool_q_search_011_temporal_music_lookup,
+            # "tool_q_search_011_temporal_music_lookup": KagQueryTools.tool_q_search_011_temporal_music_lookup,
             "tool_q_search_012_composite_condition_search": KagQueryTools.tool_q_search_012_composite_condition_search,
-            "tool_q_search_013_high_connection_music_lookup": KagQueryTools.tool_q_search_013_high_connection_music_lookup,
-            "tool_q_search_014_relation_type_lookup": KagQueryTools.tool_q_search_014_relation_type_lookup,
+            # "tool_q_search_013_high_connection_music_lookup": KagQueryTools.tool_q_search_013_high_connection_music_lookup,
+            # "tool_q_search_014_relation_type_lookup": KagQueryTools.tool_q_search_014_relation_type_lookup,
             "tool_q_rec_001_genre_based_recommendation": KagQueryTools.tool_q_rec_001_genre_based_recommendation,
             "tool_q_rec_002_mood_based_recommendation": KagQueryTools.tool_q_rec_002_mood_based_recommendation,
             "tool_q_rec_003_situation_based_recommendation": KagQueryTools.tool_q_rec_003_situation_based_recommendation,
@@ -227,7 +227,6 @@ class KagQueryTools:
         - 우울할 때 듣는 노래 있어?
         - 새벽에 어울리는 음악 알려줘
         - 집중할 때 듣기 좋은 음악 찾아줘
-        - 
         """
         return KagQueryTools.execute(
             KagQueryTemplateConstants.Q_SEARCH_006,
@@ -363,7 +362,12 @@ class KagQueryTools:
         weather: str | None = None,
         limit: int = 20,
     ) -> list[dict]:
-        """장르·무드·상황·날씨 등 복합 맥락 조건으로 곡을 검색한다.
+        """장르·감정(LabelEmotion)·상황(time/season 포함)·날씨(LabelWeather) 복합 조건으로 곡을 검색한다.
+
+        용도:
+        - 장르·무드·상황·날씨를 한 번에 조합해 필터링할 때 사용한다.
+        - mood/situation/weather는 그래프 `name`과 맞는 영문 토큰이거나 ``resolve_scenario_param``으로 한글 별칭을 치환한 값을 넘긴다.
+        - 호출 예: 비+잔잔한 pop → genre=pop, mood=calm, weather=rain / 운동+힙합 → genre=hip hop, situation=gym / 밤 → situation=night
 
         예상 질문:
         - 비 오는 날 듣기 좋은 잔잔한 pop 음악 찾아줘
@@ -426,11 +430,12 @@ class KagQueryTools:
 
     @staticmethod
     def tool_q_rec_002_mood_based_recommendation(conn: Neo4j_Connection, mood: str, limit: int = 10) -> list[dict]:
-        """분위기(mood) 태그를 기준으로 추천한다.
+        """감정(emotion) 시나리오 라벨(`LabelEmotion.name`)을 기준으로 추천한다.
 
         용도:
-        - 감정/분위기 중심 추천 요청을 처리한다.
-        - 차분함, 신남 등 정성적 무드 질의에 대응한다.
+        - 감정/분위기 중심 추천 요청을 처리한다. 차분함, 신남 등 정성적 무드 질의에 대응한다.
+        - `music_catalog_scenarios.csv`의 `emotion` 열이 연결한 태그와 매칭한다.
+        - 파라미터는 그래프 영문 토큰(예: calm, hyped)이거나 ``resolve_scenario_param("emotion", "잔잔함")`` 등으로 한글 별칭을 치환한 값을 넘긴다.
 
         예상 질문:
         - "잔잔한 분위기 노래 추천해줘"
@@ -444,25 +449,28 @@ class KagQueryTools:
         situation: str,
         limit: int = 10,
     ) -> list[dict]:
-        """상황/활동 컨텍스트를 기준으로 추천한다.
+        """상황·활동·시간·계절 시나리오 라벨을 기준으로 추천한다.
 
         용도:
-        - 운동, 출근, 집중, 여행 같은 사용 맥락 기반 추천을 처리한다.
-        - 상황 태그와 매핑된 곡을 우선 노출한다.
+        - 운동, 출근, 집중, 여행, 밤·계절 등 사용 맥락 기반 추천을 처리한다. 상황 태그와 매핑된 곡을 우선 노출한다.
+        - exercise/home/commute/focus/special 및 time·season 등 `HAS_LABEL_*`로 연결된 값 노드 `name`과 CONTAINS 매칭한다.
+        - 한글 발화는 ``resolve_scenario_param``으로 영문 토큰 치환(예: exercise 카테고리에서 운동→gym, time에서 밤→night, season에서 겨울→winter).
 
         예상 질문:
         - "운동할 때 들을 노래 추천"
         - "집중할 때 좋은 음악 찾아줘"
+        - "밤에 듣기 좋은 음악 찾아줘"
+        - "겨울에 어울리는 곡 추천해줘"
         """
         return KagQueryTools.execute(KagQueryTemplateConstants.Q_REC_003, {"situation": situation, "limit": limit}, conn)
 
     @staticmethod
     def tool_q_rec_004_weather_based_recommendation(conn: Neo4j_Connection, weather: str, limit: int = 10) -> list[dict]:
-        """날씨 컨텍스트를 기준으로 추천한다.
+        """날씨(`LabelWeather.name`)를 기준으로 추천한다.
 
         용도:
-        - 맑음/비/눈 등 날씨 기반 감성 추천 요청을 처리한다.
-        - 일상 컨텍스트 질의에서 빠른 후보군 생성을 담당한다.
+        - 맑음/비/눈 등 날씨 기반 감성 추천 요청을 처리한다. 일상 컨텍스트 질의에서 빠른 후보군 생성에 쓴다.
+        - 그래프 영문 토큰(`sunny`, `rain` 등)으로 매칭한다. 한글(맑음, 비)은 ``resolve_scenario_param("weather", "...")`` 로 치환해 전달한다.
 
         예상 질문:
         - "비 오는 날 듣기 좋은 노래 추천"
@@ -550,11 +558,12 @@ class KagQueryTools:
         weather: str | None = None,
         limit: int = 10,
     ) -> list[dict]:
-        """장르/무드/상황/날씨를 함께 고려한 하이브리드 추천을 수행한다.
+        """장르·LabelEmotion·상황(time/season 포함)·LabelWeather를 함께 고려한 하이브리드 추천.
 
         용도:
         - 복합 조건이 들어온 고난도 추천 질의를 처리한다.
         - 다중 컨텍스트 매칭 수와 인기도를 함께 점수화해 정렬한다.
+        - 파라미터는 그래프 영문 태그이거나 ``resolve_scenario_param``으로 한글 별칭을 치환한 값을 넘긴다.
 
         예상 질문:
         - "비 오는 날, 차분한 인디 추천해줘"
@@ -574,8 +583,8 @@ class KagQueryTools:
 
 
 if __name__ == "__main__":
-    # 스모크 테스트: 쿼리 문법/실행 가능 여부만 확인한다.
-    # (결과 개수/정확도 검증은 범위 밖)
+    # 스모크: 일부 파라미터는 resolve_scenario_param 으로 한글→영문 저장 토큰 치환 후 실행한다.
+    # (Neo4j 적재 및 시나리오 라벨이 있어야 결과 행이 나올 수 있다.)
     conn = Neo4j_Connection()
 
     smoke_cases = [
@@ -601,16 +610,20 @@ if __name__ == "__main__":
         ),
         (
             "Q_SEARCH_006",
-            lambda: KagQueryTools.tool_q_search_006_connected_node_music_lookup(conn, node_value="rain", limit=3),
+            lambda: KagQueryTools.tool_q_search_006_connected_node_music_lookup(
+                conn,
+                node_value=resolve_scenario_param("weather", "비"),
+                limit=3,
+            ),
         ),
         (
             "Q_SEARCH_007",
             lambda: KagQueryTools.tool_q_search_007_music_common_feature_lookup(conn, music1="love", music2="you", limit=3),
         ),
-        (
-            "Q_SEARCH_008",
-            lambda: KagQueryTools.tool_q_search_008_music_path_lookup(conn, keyword="love", max_depth=2, limit=3),
-        ),
+        # (
+        #     "Q_SEARCH_008",
+        #     lambda: KagQueryTools.tool_q_search_008_music_path_lookup(conn, keyword="love", max_depth=2, limit=3),
+        # ),
         (
             "Q_SEARCH_009",
             lambda: KagQueryTools.tool_q_search_009_artist_music_lookup(conn, artist="Taylor", limit=3),
@@ -619,37 +632,63 @@ if __name__ == "__main__":
             "Q_SEARCH_010",
             lambda: KagQueryTools.tool_q_search_010_category_top_music_lookup(conn, category_type="genre", category_value="pop", limit=3),
         ),
-        (
-            "Q_SEARCH_011",
-            lambda: KagQueryTools.tool_q_search_011_temporal_music_lookup(conn, year=2020, limit=3),
-        ),
+        # (
+        #     "Q_SEARCH_011",
+        #     lambda: KagQueryTools.tool_q_search_011_temporal_music_lookup(conn, year=2020, limit=3),
+        # ),
         (
             "Q_SEARCH_012",
-            lambda: KagQueryTools.tool_q_search_012_composite_condition_search(conn, genre="pop", mood="calm", limit=3),
+            lambda: KagQueryTools.tool_q_search_012_composite_condition_search(
+                conn,
+                genre="pop",
+                mood=resolve_scenario_param("emotion", "잔잔함"),
+                weather=resolve_scenario_param("weather", "비"),
+                limit=3,
+            ),
         ),
-        (
-            "Q_SEARCH_013",
-            lambda: KagQueryTools.tool_q_search_013_high_connection_music_lookup(conn, limit=3),
-        ),
-        (
-            "Q_SEARCH_014",
-            lambda: KagQueryTools.tool_q_search_014_relation_type_lookup(conn, keyword="love", limit=10),
-        ),
+        # (
+        #     "Q_SEARCH_013",
+        #     lambda: KagQueryTools.tool_q_search_013_high_connection_music_lookup(conn, limit=3),
+        # ),
+        # (
+        #     "Q_SEARCH_014",
+        #     lambda: KagQueryTools.tool_q_search_014_relation_type_lookup(conn, keyword="love", limit=10),
+        # ),
         (
             "Q_REC_001",
             lambda: KagQueryTools.tool_q_rec_001_genre_based_recommendation(conn, genre="rock", limit=3),
         ),
         (
             "Q_REC_002",
-            lambda: KagQueryTools.tool_q_rec_002_mood_based_recommendation(conn, mood="calm", limit=3),
+            lambda: KagQueryTools.tool_q_rec_002_mood_based_recommendation(
+                conn,
+                mood=resolve_scenario_param("emotion", "잔잔함"),
+                limit=3,
+            ),
         ),
         (
             "Q_REC_003",
-            lambda: KagQueryTools.tool_q_rec_003_situation_based_recommendation(conn, situation="exercise", limit=3),
+            lambda: KagQueryTools.tool_q_rec_003_situation_based_recommendation(
+                conn,
+                situation=resolve_scenario_param("exercise", "운동"),
+                limit=3,
+            ),
+        ),
+        (
+            "Q_REC_003_season_ko",
+            lambda: KagQueryTools.tool_q_rec_003_situation_based_recommendation(
+                conn,
+                situation=resolve_scenario_param("season", "겨울"),
+                limit=3,
+            ),
         ),
         (
             "Q_REC_004",
-            lambda: KagQueryTools.tool_q_rec_004_weather_based_recommendation(conn, weather="weather_sunny", limit=3),
+            lambda: KagQueryTools.tool_q_rec_004_weather_based_recommendation(
+                conn,
+                weather=resolve_scenario_param("weather", "맑음"),
+                limit=3,
+            ),
         ),
         (
             "Q_REC_005",
@@ -668,8 +707,8 @@ if __name__ == "__main__":
             lambda: KagQueryTools.tool_q_rec_008_hybrid_context_recommendation(
                 conn,
                 genre="pop",
-                mood="calm",
-                weather="weather_sunny",
+                mood=resolve_scenario_param("emotion", "잔잔함"),
+                weather=resolve_scenario_param("weather", "맑음"),
                 limit=3,
             ),
         ),
