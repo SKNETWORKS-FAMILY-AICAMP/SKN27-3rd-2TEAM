@@ -22,6 +22,8 @@ music_classifier.py
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -661,3 +663,53 @@ def get_condition(category: str, keyword: str) -> dict:
     if key is None:
         raise ValueError(f"카테고리 '{category}'에서 지원하지 않는 키워드: '{keyword}'")
     return CONDITIONS[category][key]
+
+
+########################################################
+# 음악 데이터 분류를 컬럼으로 추가하는 함수 by 김경수
+########################################################
+def build_music_catalog_scenarios_df(
+    df: pd.DataFrame,
+    *,
+    tag_sep: str = ";",
+) -> pd.DataFrame:
+    """
+    `music_catalog` 피처가 담긴 DataFrame에서 트랙별로 시나리오 키를 집계한다.
+
+    - 행: 입력과 동일한 순서의 `track_id`
+    - 열: `CATEGORY_PRIORITY`에 등장하는 카테고리명을 우선순위(값이 작을수록 앞) 순으로 배치
+    - 셀: 해당 카테고리의 `CONDITIONS` 영문 키 중 조건을 만족하는 것만 모아 `tag_sep`로 이어붙임
+          (예: home 열 → ``chores`` 또는 ``chores;cooking``). 하나도 없으면 빈 문자열.
+    """
+    categories_ordered = sorted(CATEGORY_PRIORITY.keys(), key=lambda c: CATEGORY_PRIORITY[c])
+
+    if df.empty:
+        return pd.DataFrame(columns=["track_id", *categories_ordered])
+
+    work = df.reset_index(drop=True)
+    n = len(work)
+    out: dict[str, object] = {"track_id": work["track_id"].dropna().astype(str).tolist()}
+
+    for cat in categories_ordered:
+        buckets: list[set[str]] = [set() for _ in range(n)]
+        for eng_key, cond_dict in CONDITIONS[cat].items():
+            mask = _build_score_mask(work, cond_dict)
+            for pos, ok in enumerate(mask.tolist()):
+                if ok:
+                    buckets[pos].add(eng_key)
+        out[cat] = [tag_sep.join(sorted(s)) if s else "" for s in buckets]
+
+    return pd.DataFrame(out)
+
+
+if __name__ == "__main__":
+    ########################################################
+    # 실행 시 음악 데이터 읽어서 분류로 추출 
+    ########################################################
+    _DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+    _catalog_csv = _DATA_DIR / "music_catalog.csv"
+    _out_csv = _DATA_DIR / "music_catalog_scenarios.csv"
+
+    df_catalog = pd.read_csv(_catalog_csv)
+    df_scenarios = build_music_catalog_scenarios_df(df_catalog)
+    df_scenarios.to_csv(_out_csv, index=False)
