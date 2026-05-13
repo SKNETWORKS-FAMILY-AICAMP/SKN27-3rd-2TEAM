@@ -11,7 +11,7 @@ class StubRecommendationService:
 
     def get_page_view_model(self, user_id, session_id):
         self.calls.append((user_id, session_id))
-        return {"personalized": [], "new_release": [], "discovery": []}
+        return {"personalized": [], "new_release": [], "discovery": []}, False
 
 
 class StubChatbotService:

@@ -70,10 +70,11 @@ def test_main_recommendation_service_returns_page_view_model(monkeypatch):
         latest_cache,
     )
 
-    view_model = MainRecommendationService(orchestrator=StubOrchestrator()).get_page_view_model(
+    view_model, session_degraded = MainRecommendationService(orchestrator=StubOrchestrator()).get_page_view_model(
         "user_001", "session_abc"
     )
 
+    assert isinstance(session_degraded, bool)
     assert view_model["page_type"] == "main_recommendation_page"
     assert view_model["status"] == "success"
     assert view_model["taste_badges"]

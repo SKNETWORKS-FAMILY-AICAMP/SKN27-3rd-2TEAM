@@ -18,7 +18,7 @@ def test_music_detail_api_returns_contract_shape():
 
 def test_music_detail_api_uses_injected_detail_service():
     class StubMusicDetailService:
-        def get_detail(self, content_id):
+        def get_detail(self, content_id, recent_rag_state=None):
             return {
                 "content_id": content_id,
                 "title": "Midnight Loop",
