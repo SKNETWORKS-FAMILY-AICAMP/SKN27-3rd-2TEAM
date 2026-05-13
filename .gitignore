@@ -50,3 +50,9 @@ dist/
 !data/load/.gitkeep
 seed/*
 !seed/.gitkeep
+
+app/rag/elasticsearch/*
+
+spotify_60k_sampled.json
+spotify_songs.json
+
