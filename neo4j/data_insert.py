@@ -42,25 +42,26 @@ def main():
     # import_column(path="music_catalog.csv", column_name="playlist_subgenre", query_params=Query.subgenres)
     # import_column(path="music_catalog.csv", column_name="track_album_release_date", query_params=Query.year)
 
-    ######################## 검색 시나리오에 따른 분류 노드 / 엣지 추가 ##############################
-    # 모든 시나리오를 enum으로 취급해서 하나의 노드로 연결
-    # import_music_catalog_scenarios()
-
-
-    ############################### 엣지 연결 ############################################
-    # 데이터 전체를 주회해야 하므로 import_data 를 통해 실행하게 됨 
-    # 다만 각 쿼리 내부에 연결 여부를 매핑하는 함수가 들어있어야 한다. 조건에 맞으면 연결 / 아니면 pass 
-    # import_data(path="music_catalog.csv", query_params=Query.edge_has_genre)
-    # import_data(path="music_catalog.csv", query_params=Query.edge_has_subgenre)
-    # import_data(path="music_catalog.csv", query_params=Query.edge_performed_by)
-
-
 
     ############################### 서브노드 간 엣지 연결 ############################################
     # 장르랑 서브 장르 연결을 위한 csv 데이터 생성 
     # remove_duplicate_genre_subgenre(path=get_filepath("music_catalog.csv"))
     # import_data(path="genre_subgenre.csv", query_params=Query.edge_has_genre_subgenre)
 
+
+    ############################### 엣지 연결 ############################################
+    # 데이터 전체를 주회해야 하므로 import_data 를 통해 실행하게 됨 
+    # 다만 각 쿼리 내부에 연결 여부를 매핑하는 함수가 들어있어야 한다. 조건에 맞으면 연결 / 아니면 pass 
+    import_data(path="music_catalog.csv", query_params=Query.edge_has_genre)
+    import_data(path="music_catalog.csv", query_params=Query.edge_has_subgenre)
+    import_data(path="music_catalog.csv", query_params=Query.edge_performed_by)
+
+
+    ######################## 검색 시나리오 dim_* 분류 (music_catalog_scenarios.csv) ##############################
+    # 열마다 별도 노드 라벨(DimWeather, DimSeason, …)로 tag_id 값을 적재하고,
+    # MusicCatalog에는 HAS_DIM_WEATHER 등 차원별 관계로 연결한다.
+    # 선행: music_catalog.csv로 MusicCatalog 트랙 노드가 이미 있어야 track_id 매칭된다.
+    # import_music_catalog_scenarios()
 
 
 

@@ -114,8 +114,8 @@ def split_scenario_csv_cell(value, sep: str) -> list[str]:
 
 def import_music_catalog_scenarios(batch_size: int = 1000) -> None:
     """
-    music_catalog_scenarios.csv의 각 dim_* 컬럼에서 유일한 tag_id마다 ScenarioTag 노드를 만들고,
-    동일 파일의 track_id에 대응하는 MusicCatalog 노드와 HAS_SCENARIO_TAG 관계로 연결한다.
+    music_catalog_scenarios.csv의 각 dim_* 열마다 해당 Neo4j 노드 타입(DimWeather 등)으로 값(tag_id) 노드를 만들고,
+    같은 열의 값과 track_id에 대해 HAS_DIM_WEATHER 등 차원별 관계로 MusicCatalog와 연결한다.
     MusicCatalog 적재가 선행되어 있어야 매칭된다.
     """
     from common.querys import Query
@@ -138,9 +138,41 @@ def import_music_catalog_scenarios(batch_size: int = 1000) -> None:
                 tag_pairs.add((col, tag))
                 link_rows.append({"track_id": track_id, "dimension": col, "tag_id": tag})
 
-    tag_rows = [{"dimension": d, "tag_id": t} for d, t in sorted(tag_pairs)]
-    execute_query(tag_rows, Query.scenario_dim_tags_merge, batch_size=batch_size)
-    execute_query(link_rows, Query.scenario_dim_tags_link, batch_size=batch_size)
+    driver = Neo4j_Connection()
+
+    for dim in SCENARIO_DIM_COLUMNS:
+        dim_tags = sorted({t for d, t in tag_pairs if d == dim})
+        tag_param_rows = [{"tag_id": t} for t in dim_tags]
+        total_tags = len(tag_param_rows)
+        for start in range(0, total_tags, batch_size):
+            batch = tag_param_rows[start : start + batch_size]
+            query, parameters = Query.scenario_dim_values_merge(dim, batch)
+            driver.execute_query(query=query, parameters=parameters)
+            logger.info(
+                "시나리오 차원 %r 값 노드 %s / %s 적재",
+                dim,
+                start + len(batch),
+                total_tags,
+            )
+
+        dim_links = [
+            {"track_id": r["track_id"], "tag_id": r["tag_id"]}
+            for r in link_rows
+            if r["dimension"] == dim
+        ]
+        total_links = len(dim_links)
+        for start in range(0, total_links, batch_size):
+            batch = dim_links[start : start + batch_size]
+            query, parameters = Query.scenario_dim_link(dim, batch)
+            driver.execute_query(query=query, parameters=parameters)
+            logger.info(
+                "시나리오 차원 %r 관계 %s / %s 적재",
+                dim,
+                start + len(batch),
+                total_links,
+            )
+
+    logger.info("music_catalog_scenarios 시나리오 dim_* 적재 완료")
 
 
 ############################################################

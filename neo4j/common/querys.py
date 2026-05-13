@@ -14,6 +14,7 @@ from common.constant import (
     KagTempoLabel,
     KagNodeLabel,
     KagRelationType,
+    SCENARIO_DIM_TO_LABEL_AND_REL,
 )
 
 
@@ -271,38 +272,38 @@ class Query:
 ############################################ 시나리오 분류 (music_catalog_scenarios.csv) ############################################
 
     @staticmethod
-    def scenario_dim_tags_merge(rows: list[dict]) -> tuple[str, dict]:
+    def scenario_dim_values_merge(dimension: str, rows: list[dict]) -> tuple[str, dict]:
         """
-        dim_* 컬럼에서 등장하는 (컬럼명, tag_id) 쌍별로 ScenarioTag 노드를 MERGE한다.
-        rows: { "dimension": "dim_weather", "tag_id": "weather_sunny" } 형태.
+        지정한 dim_* 컬럼에 대응하는 노드 라벨로, 유일한 tag_id 값마다 노드를 MERGE한다.
+        rows: { "tag_id": "weather_sunny" } 형태. dimension은 SCENARIO_DIM_TO_LABEL_AND_REL 키.
         """
 
-        label = KagNodeLabel.SCENARIO_TAG.value
+        node_label, _ = SCENARIO_DIM_TO_LABEL_AND_REL[dimension]
+        label = node_label.value
         query = f"""
         UNWIND $rows AS row
-        MERGE (st:{label} {{
-            dimension: row.dimension,
-            tag_id: row.tag_id
-        }})
+        MERGE (v:{label} {{name: row.tag_id}})
+        SET v.tag_id = row.tag_id
         """
         parameters = {"rows": rows}
         return query, parameters
 
     @staticmethod
-    def scenario_dim_tags_link(rows: list[dict]) -> tuple[str, dict]:
+    def scenario_dim_link(dimension: str, rows: list[dict]) -> tuple[str, dict]:
         """
-        MusicCatalog(track_id)와 ScenarioTag(dimension, tag_id)를 HAS_SCENARIO_TAG로 연결한다.
-        rows: { "track_id", "dimension", "tag_id" } 형태. 해당 MusicCatalog 노드가 없으면 해당 행은 매칭되지 않는다.
+        MusicCatalog(track_id)와 해당 차원의 값 노드를 차원별 HAS_DIM_* 관계로 연결한다.
+        rows: { "track_id", "tag_id" } 형태.
         """
 
-        rel = KagRelationType.HAS_SCENARIO_TAG.value
+        node_label, rel_type = SCENARIO_DIM_TO_LABEL_AND_REL[dimension]
+        label = node_label.value
+        rel = rel_type.value
         mcl = KagNodeLabel.MUSIC_CATALOG.value
-        stl = KagNodeLabel.SCENARIO_TAG.value
         query = f"""
         UNWIND $rows AS row
         MATCH (mc:{mcl} {{track_id: row.track_id}})
-        MATCH (st:{stl} {{dimension: row.dimension, tag_id: row.tag_id}})
-        MERGE (mc)-[:{rel}]->(st)
+        MATCH (v:{label} {{name: row.tag_id}})
+        MERGE (mc)-[:{rel}]->(v)
         """
         parameters = {"rows": rows}
         return query, parameters

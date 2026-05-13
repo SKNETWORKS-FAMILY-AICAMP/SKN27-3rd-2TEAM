@@ -1,5 +1,11 @@
-import { memo, useState, useEffect } from "react";
+import { memo, useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import {
+  mascotIdle,
+  mascotRecommending,
+  mascotTalking,
+  mascotThinking,
+} from "../../styles/motion";
 
 export type MascotState = "idle" | "thinking" | "talking" | "recommending" | "fallback";
 
@@ -8,18 +14,24 @@ interface Props {
 }
 
 const BASE = "/mascot/";
+const SINGLE_IMAGE = `${BASE}mascot.png`;
 
 function useMascotImages() {
-  const [hasImages, setHasImages] = useState(false);
+  const [imageMode, setImageMode] = useState<"single" | "layered" | "fallback">("fallback");
 
   useEffect(() => {
-    const img = new Image();
-    img.onload = () => setHasImages(true);
-    img.onerror = () => setHasImages(false);
-    img.src = `${BASE}body.png`;
+    const single = new Image();
+    single.onload = () => setImageMode("single");
+    single.onerror = () => {
+      const body = new Image();
+      body.onload = () => setImageMode("layered");
+      body.onerror = () => setImageMode("fallback");
+      body.src = `${BASE}body.png`;
+    };
+    single.src = SINGLE_IMAGE;
   }, []);
 
-  return hasImages;
+  return imageMode;
 }
 
 function useBlinkTimer() {
@@ -27,12 +39,13 @@ function useBlinkTimer() {
 
   useEffect(() => {
     let handle: ReturnType<typeof setTimeout>;
+    let blinkHandle: ReturnType<typeof setTimeout>;
 
     const schedule = () => {
       const delay = 4000 + Math.random() * 3000;
       handle = setTimeout(() => {
         setIsBlinking(true);
-        setTimeout(() => {
+        blinkHandle = setTimeout(() => {
           setIsBlinking(false);
           schedule();
         }, 180);
@@ -40,48 +53,43 @@ function useBlinkTimer() {
     };
 
     schedule();
-    return () => clearTimeout(handle);
+    return () => {
+      clearTimeout(handle);
+      clearTimeout(blinkHandle);
+    };
   }, []);
 
   return isBlinking;
 }
 
-const FLOAT_ANIMATE = {
-  idle:        { y: [0, -12, 0] },
-  thinking:    { rotate: [-3, 3, -3] },
-  talking:     { y: [0, -6, 0] },
-  recommending:{ y: [0, -8, 0], scale: [1, 1.03, 1] },
-  fallback:    { y: [0, -4, 0] },
-};
-
-const FLOAT_TRANSITION: Record<MascotState, { duration: number; repeat: number; ease: "easeInOut" }> = {
-  idle:         { duration: 4,   repeat: Infinity, ease: "easeInOut" },
-  thinking:     { duration: 2,   repeat: Infinity, ease: "easeInOut" },
-  talking:      { duration: 1.5, repeat: Infinity, ease: "easeInOut" },
-  recommending: { duration: 2,   repeat: Infinity, ease: "easeInOut" },
-  fallback:     { duration: 5,   repeat: Infinity, ease: "easeInOut" },
+const MOTION_PRESET = {
+  idle: mascotIdle,
+  thinking: mascotThinking,
+  talking: mascotTalking,
+  recommending: mascotRecommending,
+  fallback: mascotIdle,
 };
 
 const GLOW_OPACITY: Record<MascotState, number[]> = {
-  idle: [0.3, 0.6, 0.3],
-  thinking: [0.2, 0.4, 0.2],
-  talking: [0.4, 0.7, 0.4],
-  recommending: [0.55, 1, 0.55],
-  fallback: [0.15, 0.3, 0.15],
+  idle: [0.3, 0.55, 0.3],
+  thinking: [0.25, 0.42, 0.25],
+  talking: [0.34, 0.58, 0.34],
+  recommending: [0.42, 0.7, 0.42],
+  fallback: [0.18, 0.3, 0.18],
 };
 
 const GLOW_DURATION: Record<MascotState, number> = {
-  idle: 3,
-  thinking: 2,
-  talking: 1.5,
-  recommending: 2,
+  idle: 3.4,
+  thinking: 3,
+  talking: 2.6,
+  recommending: 3.4,
   fallback: 4,
 };
 
 export const MascotCharacter = memo(function MascotCharacter({ state = "idle" }: Props) {
-  const hasImages = useMascotImages();
+  const imageMode = useMascotImages();
   const isBlinking = useBlinkTimer();
-
+  const preset = MOTION_PRESET[state];
   const eyeSrc = isBlinking ? `${BASE}eyes_closed.png` : `${BASE}eyes_open.png`;
 
   return (
@@ -92,9 +100,11 @@ export const MascotCharacter = memo(function MascotCharacter({ state = "idle" }:
         transition={{ duration: GLOW_DURATION[state], repeat: Infinity, ease: "easeInOut" }}
       />
 
-      <motion.div className="mascot-float" animate={FLOAT_ANIMATE[state]} transition={FLOAT_TRANSITION[state]}>
+      <motion.div className="mascot-float" animate={preset.animate} transition={preset.transition}>
         <div className="mascot-body">
-          {hasImages ? (
+          {imageMode === "single" ? (
+            <img src={SINGLE_IMAGE} alt="RIMAS mascot" className="mascot-image" />
+          ) : imageMode === "layered" ? (
             <>
               <img src={`${BASE}body.png`} alt="" className="mascot-layer" />
               <img src={`${BASE}head.png`} alt="" className="mascot-layer" />
@@ -105,13 +115,13 @@ export const MascotCharacter = memo(function MascotCharacter({ state = "idle" }:
               )}
               {state === "recommending" && (
                 <>
-                  <img src={`${BASE}music_note_01.png`} alt="" className="mascot-layer" style={{ animation: "note-float 2s ease-out infinite" }} />
-                  <img src={`${BASE}music_note_02.png`} alt="" className="mascot-layer" style={{ animation: "note-float 2s ease-out infinite 0.8s" }} />
+                  <img src={`${BASE}music_note_01.png`} alt="" className="mascot-layer" />
+                  <img src={`${BASE}music_note_02.png`} alt="" className="mascot-layer" />
                 </>
               )}
             </>
           ) : (
-            <div className="mascot-placeholder">🎧</div>
+            <div className="mascot-placeholder">RIMAS</div>
           )}
         </div>
       </motion.div>

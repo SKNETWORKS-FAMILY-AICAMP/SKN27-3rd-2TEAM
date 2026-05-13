@@ -1,22 +1,20 @@
 /**
- * 챗봇 페이지
+ * 챗봇 페이지.
  *
- * 성능 규칙:
- *   - 마운트 시 히스토리 1회 로드 (React Query)
- *   - 메시지 전송은 useMutation (중복 전송은 isPending으로 차단)
- *   - chatStore.appendTurn으로 낙관적 업데이트 → 재렌더 최소화
- *   - 입력값은 지역 useState (store에 두지 않음 — 타이핑마다 전역 재렌더 방지)
+ * API 호출, 세션 히스토리 로드, response_state 처리 흐름은 기존 계약을 유지한다.
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { fetchSessionHistory, sendChatMessage } from "../api/chatbot";
-import { useChatStore } from "../stores/chatStore";
-import { useSessionStore } from "../stores/sessionStore";
-import { generateRequestId } from "../utils/requestId";
+import { DreamBackground } from "../components/background/DreamBackground";
 import { ChatHistory } from "../components/chatbot/ChatHistory";
 import { ChatInput } from "../components/chatbot/ChatInput";
 import { ChatbotHeader } from "../components/chatbot/ChatbotHeader";
 import { RelatedRecommendationCards } from "../components/chatbot/RelatedRecommendationCards";
+import { GlassPanel } from "../components/ui/GlassPanel";
+import { useChatStore } from "../stores/chatStore";
+import { useSessionStore } from "../stores/sessionStore";
+import { generateRequestId } from "../utils/requestId";
 
 export function ChatbotPage() {
   const { userId, sessionId } = useSessionStore();
@@ -24,11 +22,10 @@ export function ChatbotPage() {
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // 마운트 시 히스토리 1회 로드
   const { data: historyData } = useQuery({
     queryKey: ["session-history", sessionId],
     queryFn: () => fetchSessionHistory(sessionId, userId),
-    staleTime: Infinity,  // 세션 수명 동안 재조회 없음
+    staleTime: Infinity,
     retry: false,
   });
 
@@ -38,7 +35,6 @@ export function ChatbotPage() {
     }
   }, [historyData, setHistory]);
 
-  // 자동 스크롤
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [history]);
@@ -51,7 +47,7 @@ export function ChatbotPage() {
       const rs = data.response_state;
       appendTurn(variables.userInput, rs.chatbot_response, rs.display_recommendations);
       if (data.session_degraded) {
-        console.warn("[ChatbotPage] session_degraded: Redis 세션이 일시적으로 불안정합니다.");
+        console.warn("[ChatbotPage] session_degraded: Redis session is temporarily unstable.");
       }
       setLoading(false);
     },
@@ -65,31 +61,34 @@ export function ChatbotPage() {
     const trimmed = input.trim();
     if (!trimmed || mutation.isPending) return;
     setInput("");
-    // 전송마다 새 requestId 생성 — 같은 메시지를 두 번 누른 경우 백엔드가 409로 차단
     mutation.mutate({ userInput: trimmed, requestId: generateRequestId() });
   }, [input, mutation]);
 
   const lastTurn = history[history.length - 1];
 
   return (
-    <div className="chatbot-page">
-      <ChatbotHeader userId={userId} />
+    <DreamBackground variant="chatbot">
+      <div className="chatbot-page">
+        <GlassPanel className="chatbot-shell" intensity="strong">
+          <ChatbotHeader userId={userId} />
 
-      <div className="chat-body">
-        <ChatHistory history={history} />
-        <div ref={bottomRef} />
+          <div className="chat-body">
+            <ChatHistory history={history} />
+            <div ref={bottomRef} />
+          </div>
+
+          {lastTurn?.display_recommendations?.length > 0 && (
+            <RelatedRecommendationCards cards={lastTurn.display_recommendations} />
+          )}
+
+          <ChatInput
+            value={input}
+            onChange={setInput}
+            onSend={handleSend}
+            disabled={isLoading}
+          />
+        </GlassPanel>
       </div>
-
-      {lastTurn?.display_recommendations?.length > 0 && (
-        <RelatedRecommendationCards cards={lastTurn.display_recommendations} />
-      )}
-
-      <ChatInput
-        value={input}
-        onChange={setInput}
-        onSend={handleSend}
-        disabled={isLoading}
-      />
-    </div>
+    </DreamBackground>
   );
 }
