@@ -20,6 +20,17 @@ def _limit_from_row(row: dict | None, default: int = 10) -> int:
     return max(1, min(n, 500))
 
 
+def _max_depth_from_row(row: dict | None, default: int = 3) -> int:
+    if not row:
+        return default
+    raw = row.get("max_depth", default)
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return max(1, min(n, 10))
+
+
 ####################################################################
 # 실행할 쿼리 목록 정의 (조각 조립 방식)
 ####################################################################
@@ -45,6 +56,8 @@ class KagQueryTools:
         merged = dict(defaults)
         merged.update(payload)
         merged = KagQueryTools._normalize_limit(merged)
+        if query_key == KagQueryTemplateConstants.Q_SEARCH_008:
+            merged["max_depth"] = _max_depth_from_row(merged, default=int((tmpl.get("defaults") or {}).get("max_depth") or 3))
 
         for key in required:
             value = merged.get(key)
@@ -76,14 +89,26 @@ class KagQueryTools:
         """
         return {
             "tool_q_search_001_music_basic_info_lookup": KagQueryTools.tool_q_search_001_music_basic_info_lookup,
+            "tool_q_search_002_music_relation_info_lookup": KagQueryTools.tool_q_search_002_music_relation_info_lookup,
             "tool_q_search_003_music_condition_search": KagQueryTools.tool_q_search_003_music_condition_search,
+            "tool_q_search_004_similar_music_lookup": KagQueryTools.tool_q_search_004_similar_music_lookup,
+            "tool_q_search_005_music_stat_lookup": KagQueryTools.tool_q_search_005_music_stat_lookup,
+            "tool_q_search_006_connected_node_music_lookup": KagQueryTools.tool_q_search_006_connected_node_music_lookup,
+            "tool_q_search_007_music_common_feature_lookup": KagQueryTools.tool_q_search_007_music_common_feature_lookup,
+            "tool_q_search_008_music_path_lookup": KagQueryTools.tool_q_search_008_music_path_lookup,
             "tool_q_search_009_artist_music_lookup": KagQueryTools.tool_q_search_009_artist_music_lookup,
+            "tool_q_search_010_category_top_music_lookup": KagQueryTools.tool_q_search_010_category_top_music_lookup,
             "tool_q_search_011_temporal_music_lookup": KagQueryTools.tool_q_search_011_temporal_music_lookup,
+            "tool_q_search_012_composite_condition_search": KagQueryTools.tool_q_search_012_composite_condition_search,
+            "tool_q_search_013_high_connection_music_lookup": KagQueryTools.tool_q_search_013_high_connection_music_lookup,
+            "tool_q_search_014_relation_type_lookup": KagQueryTools.tool_q_search_014_relation_type_lookup,
             "tool_q_rec_001_genre_based_recommendation": KagQueryTools.tool_q_rec_001_genre_based_recommendation,
             "tool_q_rec_002_mood_based_recommendation": KagQueryTools.tool_q_rec_002_mood_based_recommendation,
             "tool_q_rec_003_situation_based_recommendation": KagQueryTools.tool_q_rec_003_situation_based_recommendation,
             "tool_q_rec_004_weather_based_recommendation": KagQueryTools.tool_q_rec_004_weather_based_recommendation,
+            "tool_q_rec_005_similar_song_recommendation": KagQueryTools.tool_q_rec_005_similar_song_recommendation,
             "tool_q_rec_006_popularity_based_recommendation": KagQueryTools.tool_q_rec_006_popularity_based_recommendation,
+            "tool_q_rec_007_diversity_recommendation": KagQueryTools.tool_q_rec_007_diversity_recommendation,
             "tool_q_rec_008_hybrid_context_recommendation": KagQueryTools.tool_q_rec_008_hybrid_context_recommendation,
         }
 
@@ -101,6 +126,33 @@ class KagQueryTools:
         - "shape of you 곡 정보 알려줘"
         """
         return KagQueryTools.execute(KagQueryTemplateConstants.Q_SEARCH_001, {"keyword": keyword, "limit": limit}, conn)
+
+    @staticmethod
+    def tool_q_search_002_music_relation_info_lookup(
+        conn: Neo4j_Connection,
+        keyword: str,
+        relation_filter: str | None = None,
+        node_label_filter: str | None = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        """특정 곡(제목 키워드)에 연결된 관계·상대 노드를 조회한다.
+
+        예상 질문:
+        - Ditto랑 연결된 정보 보여줘
+        - 이 노래는 어떤 날씨랑 연결돼?
+        - Hype Boy랑 연결된 감정이 있어?
+        - Attention은 어떤 상황에 어울려?
+        """
+        return KagQueryTools.execute(
+            KagQueryTemplateConstants.Q_SEARCH_002,
+            {
+                "keyword": keyword,
+                "relation_filter": relation_filter,
+                "node_label_filter": node_label_filter,
+                "limit": limit,
+            },
+            conn,
+        )
 
     @staticmethod
     def tool_q_search_003_music_condition_search(
@@ -134,6 +186,110 @@ class KagQueryTools:
         )
 
     @staticmethod
+    def tool_q_search_004_similar_music_lookup(conn: Neo4j_Connection, keyword: str, limit: int = 20) -> list[dict]:
+        """기준 곡과 공유 특성 노드가 많은 다른 곡을 조회한다.
+
+        예상 질문:
+        - Ditto랑 비슷한 노래 찾아줘
+        - Hype Boy랑 비슷한 곡 보여줘
+        - 이 노래랑 분위기 비슷한 음악 있어?
+        - Attention 같은 느낌의 노래 찾아줘
+        - Shape of You랑 연결 요소가 비슷한 곡 보여줘
+        """
+        return KagQueryTools.execute(KagQueryTemplateConstants.Q_SEARCH_004, {"keyword": keyword, "limit": limit}, conn)
+
+    @staticmethod
+    def tool_q_search_005_music_stat_lookup(conn: Neo4j_Connection, stat_type: str, limit: int = 10) -> list[dict]:
+        """장르·아티스트·연도별 곡 수 집계 상위 그룹을 조회한다. stat_type: genre | artist | year.
+
+        예상 질문:
+        - 곡 수가 가장 많은 장르가 뭐야?
+        - 가장 많이 등장하는 장르 보여줘
+        - 데이터에 어떤 장르가 많아?
+        - 아티스트별 곡 수 보여줘
+        - 장르별 음악 개수 알려줘
+        """
+        return KagQueryTools.execute(KagQueryTemplateConstants.Q_SEARCH_005, {"stat_type": stat_type, "limit": limit}, conn)
+
+    @staticmethod
+    def tool_q_search_006_connected_node_music_lookup(
+        conn: Neo4j_Connection,
+        node_value: str,
+        node_label_filter: str | None = None,
+        relation_filter: str | None = None,
+        limit: int = 20,
+    ) -> list[dict]:
+        """연결 차원 노드 속성 값으로 역방향 곡 검색을 수행한다.
+
+        예상 질문:
+        - 비 오는 날과 연결된 음악 보여줘
+        - 운동할 때 듣기 좋은 음악 찾아줘
+        - sad랑 연결된 노래 있어?
+        - 밤에 어울리는 음악 보여줘
+        - 집중할 때 연결된 곡 찾아줘
+        """
+        return KagQueryTools.execute(
+            KagQueryTemplateConstants.Q_SEARCH_006,
+            {
+                "node_value": node_value,
+                "node_label_filter": node_label_filter,
+                "relation_filter": relation_filter,
+                "limit": limit,
+            },
+            conn,
+        )
+
+    @staticmethod
+    def tool_q_search_007_music_common_feature_lookup(
+        conn: Neo4j_Connection,
+        music1: str,
+        music2: str,
+        limit: int = 20,
+    ) -> list[dict]:
+        """두 곡이 공유하는 중간 특성 노드를 조회한다.
+
+        예상 질문:
+        - Ditto랑 Hype Boy 공통점 뭐야?
+        - Attention이랑 OMG가 공유하는 정보 있어?
+        - 두 곡의 공통 장르 알려줘
+        - Shape of You랑 비슷하게 연결된 요소가 뭐야?
+        - 이 두 노래가 같이 묶이는 이유가 있어?
+        """
+        return KagQueryTools.execute(
+            KagQueryTemplateConstants.Q_SEARCH_007,
+            {"music1": music1, "music2": music2, "limit": limit},
+            conn,
+        )
+
+    @staticmethod
+    def tool_q_search_008_music_path_lookup(
+        conn: Neo4j_Connection,
+        keyword: str,
+        target_label: str | None = None,
+        max_depth: int = 3,
+        limit: int = 10,
+    ) -> list[dict]:
+        """기준 곡에서 출발하는 그래프 경로를 길이 상한 내에서 조회한다.
+
+        예상 질문:
+        - Ditto에서 연결 경로 보여줘
+        - 이 노래가 어떤 노드를 통해 추천되는지 보여줘
+        - Hype Boy의 그래프 연결 구조 보여줘
+        - 이 곡에서 감정 노드까지 가는 경로 보여줘
+        - Attention이 어떤 장르와 상황으로 연결되는지 보여줘
+        """
+        return KagQueryTools.execute(
+            KagQueryTemplateConstants.Q_SEARCH_008,
+            {
+                "keyword": keyword,
+                "target_label": target_label,
+                "max_depth": max_depth,
+                "limit": limit,
+            },
+            conn,
+        )
+
+    @staticmethod
     def tool_q_search_009_artist_music_lookup(conn: Neo4j_Connection, artist: str, limit: int = 30) -> list[dict]:
         """아티스트 중심으로 대표/인기 곡을 조회한다.
 
@@ -146,6 +302,28 @@ class KagQueryTools:
         - "아이유 곡 목록 보여줘"
         """
         return KagQueryTools.execute(KagQueryTemplateConstants.Q_SEARCH_009, {"artist": artist, "limit": limit}, conn)
+
+    @staticmethod
+    def tool_q_search_010_category_top_music_lookup(
+        conn: Neo4j_Connection,
+        category_type: str,
+        category_value: str,
+        limit: int = 20,
+    ) -> list[dict]:
+        """카테고리(장르·서브장르·아티스트) 내 인기 순 곡을 조회한다.
+
+        예상 질문:
+        - pop에서 인기 많은 노래 보여줘
+        - rock 장르 인기곡 알려줘
+        - 힙합 중 유명한 곡 찾아줘
+        - Taylor Swift 노래 중 인기곡 보여줘
+        - subgenre 기준으로 인기곡 찾아줘
+        """
+        return KagQueryTools.execute(
+            KagQueryTemplateConstants.Q_SEARCH_010,
+            {"category_type": category_type, "category_value": category_value, "limit": limit},
+            conn,
+        )
 
     @staticmethod
     def tool_q_search_011_temporal_music_lookup(
@@ -175,6 +353,62 @@ class KagQueryTools:
             },
             conn,
         )
+
+    @staticmethod
+    def tool_q_search_012_composite_condition_search(
+        conn: Neo4j_Connection,
+        genre: str | None = None,
+        mood: str | None = None,
+        situation: str | None = None,
+        weather: str | None = None,
+        limit: int = 20,
+    ) -> list[dict]:
+        """장르·무드·상황·날씨 등 복합 맥락 조건으로 곡을 검색한다.
+
+        예상 질문:
+        - 비 오는 날 듣기 좋은 잔잔한 pop 음악 찾아줘
+        - 운동할 때 듣는 신나는 힙합 보여줘
+        - 밤에 듣기 좋은 감성적인 노래 찾아줘
+        - 기분 좋을 때 들을 dance 음악 있어?
+        - 집중할 때 어울리는 조용한 음악 찾아줘
+        """
+        return KagQueryTools.execute(
+            KagQueryTemplateConstants.Q_SEARCH_012,
+            {
+                "genre": genre,
+                "mood": mood,
+                "situation": situation,
+                "weather": weather,
+                "limit": limit,
+            },
+            conn,
+        )
+
+    @staticmethod
+    def tool_q_search_013_high_connection_music_lookup(conn: Neo4j_Connection, limit: int = 20) -> list[dict]:
+        """관계 수가 많은 곡(그래프 허브에 가까운 트랙)을 조회한다.
+
+        예상 질문:
+        - 가장 많이 연결된 음악 보여줘
+        - 그래프에서 중심에 가까운 노래가 뭐야?
+        - 연결 정보가 많은 곡 알려줘
+        - 추천 근거가 많은 음악 찾아줘
+        - 노드 연결이 많은 음악 순위 보여줘
+        """
+        return KagQueryTools.execute(KagQueryTemplateConstants.Q_SEARCH_013, {"limit": limit}, conn)
+
+    @staticmethod
+    def tool_q_search_014_relation_type_lookup(conn: Neo4j_Connection, keyword: str, limit: int = 20) -> list[dict]:
+        """기준 곡에 연결된 관계 타입 목록을 조회한다.
+
+        예상 질문:
+        - Ditto는 어떤 관계들이 있어?
+        - 이 노래랑 연결된 엣지 타입 보여줘
+        - Hype Boy의 관계 종류 알려줘
+        - 이 곡은 어떤 정보랑 연결될 수 있어?
+        - Attention의 연결 타입 목록 보여줘
+        """
+        return KagQueryTools.execute(KagQueryTemplateConstants.Q_SEARCH_014, {"keyword": keyword, "limit": limit}, conn)
 
     @staticmethod
     def tool_q_rec_001_genre_based_recommendation(conn: Neo4j_Connection, genre: str, limit: int = 10) -> list[dict]:
@@ -237,6 +471,19 @@ class KagQueryTools:
         return KagQueryTools.execute(KagQueryTemplateConstants.Q_REC_004, {"weather": weather, "limit": limit}, conn)
 
     @staticmethod
+    def tool_q_rec_005_similar_song_recommendation(conn: Neo4j_Connection, keyword: str, limit: int = 10) -> list[dict]:
+        """공유 특성 수를 점수화한 유사 곡 추천을 수행한다.
+
+        예상 질문:
+        - Ditto 같은 노래 추천해줘
+        - Hype Boy랑 비슷한 노래 추천해줘
+        - 이 곡이 마음에 드는데 비슷한 곡 있어?
+        - Shape of You 느낌으로 추천해줘
+        - Attention 비슷한 음악 들려줘
+        """
+        return KagQueryTools.execute(KagQueryTemplateConstants.Q_REC_005, {"keyword": keyword, "limit": limit}, conn)
+
+    @staticmethod
     def tool_q_rec_006_popularity_based_recommendation(
         conn: Neo4j_Connection,
         genre: str | None = None,
@@ -260,6 +507,36 @@ class KagQueryTools:
                 "genre": genre,
                 "subgenre": subgenre,
                 "artist": artist,
+                "limit": limit,
+            },
+            conn,
+        )
+
+    @staticmethod
+    def tool_q_rec_007_diversity_recommendation(
+        conn: Neo4j_Connection,
+        genre: str | None = None,
+        mood: str | None = None,
+        situation: str | None = None,
+        weather: str | None = None,
+        limit: int = 10,
+    ) -> list[dict]:
+        """아티스트당 대표곡 1곡씩 모아 다양성 있는 추천 목록을 만든다.
+
+        예상 질문:
+        - 다양하게 노래 추천해줘
+        - 아티스트 안 겹치게 추천해줘
+        - pop 노래 여러 가수로 추천해줘
+        - 비슷한 노래 말고 다양하게 보여줘
+        - 장르 안에서 다양하게 골라줘
+        """
+        return KagQueryTools.execute(
+            KagQueryTemplateConstants.Q_REC_007,
+            {
+                "genre": genre,
+                "mood": mood,
+                "situation": situation,
+                "weather": weather,
                 "limit": limit,
             },
             conn,
@@ -308,16 +585,56 @@ if __name__ == "__main__":
             lambda: KagQueryTools.tool_q_search_001_music_basic_info_lookup(conn, keyword="love", limit=3),
         ),
         (
+            "Q_SEARCH_002",
+            lambda: KagQueryTools.tool_q_search_002_music_relation_info_lookup(conn, keyword="love", limit=3),
+        ),
+        (
             "Q_SEARCH_003",
             lambda: KagQueryTools.tool_q_search_003_music_condition_search(conn, genre="hip hop", limit=3),
+        ),
+        (
+            "Q_SEARCH_004",
+            lambda: KagQueryTools.tool_q_search_004_similar_music_lookup(conn, keyword="love", limit=3),
+        ),
+        (
+            "Q_SEARCH_005",
+            lambda: KagQueryTools.tool_q_search_005_music_stat_lookup(conn, stat_type="genre", limit=5),
+        ),
+        (
+            "Q_SEARCH_006",
+            lambda: KagQueryTools.tool_q_search_006_connected_node_music_lookup(conn, node_value="rain", limit=3),
+        ),
+        (
+            "Q_SEARCH_007",
+            lambda: KagQueryTools.tool_q_search_007_music_common_feature_lookup(conn, music1="love", music2="you", limit=3),
+        ),
+        (
+            "Q_SEARCH_008",
+            lambda: KagQueryTools.tool_q_search_008_music_path_lookup(conn, keyword="love", max_depth=2, limit=3),
         ),
         (
             "Q_SEARCH_009",
             lambda: KagQueryTools.tool_q_search_009_artist_music_lookup(conn, artist="Taylor", limit=3),
         ),
         (
+            "Q_SEARCH_010",
+            lambda: KagQueryTools.tool_q_search_010_category_top_music_lookup(conn, category_type="genre", category_value="pop", limit=3),
+        ),
+        (
             "Q_SEARCH_011",
             lambda: KagQueryTools.tool_q_search_011_temporal_music_lookup(conn, year=2020, limit=3),
+        ),
+        (
+            "Q_SEARCH_012",
+            lambda: KagQueryTools.tool_q_search_012_composite_condition_search(conn, genre="pop", mood="calm", limit=3),
+        ),
+        (
+            "Q_SEARCH_013",
+            lambda: KagQueryTools.tool_q_search_013_high_connection_music_lookup(conn, limit=3),
+        ),
+        (
+            "Q_SEARCH_014",
+            lambda: KagQueryTools.tool_q_search_014_relation_type_lookup(conn, keyword="love", limit=10),
         ),
         (
             "Q_REC_001",
@@ -336,8 +653,16 @@ if __name__ == "__main__":
             lambda: KagQueryTools.tool_q_rec_004_weather_based_recommendation(conn, weather="weather_sunny", limit=3),
         ),
         (
+            "Q_REC_005",
+            lambda: KagQueryTools.tool_q_rec_005_similar_song_recommendation(conn, keyword="love", limit=3),
+        ),
+        (
             "Q_REC_006",
             lambda: KagQueryTools.tool_q_rec_006_popularity_based_recommendation(conn, genre="pop", limit=3),
+        ),
+        (
+            "Q_REC_007",
+            lambda: KagQueryTools.tool_q_rec_007_diversity_recommendation(conn, genre="pop", limit=3),
         ),
         (
             "Q_REC_008",
