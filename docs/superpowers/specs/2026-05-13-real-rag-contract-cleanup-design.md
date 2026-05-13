@@ -205,6 +205,8 @@ Real RAG는 조용히 Mock으로 전환하지 않는다.
 - `RagDispatchAgent`의 Real import 경로는 설계서와 일치해야 한다.
 - `RagInputSchema.retrieval_constraints.require_content_id_match`는 Real RAG에서 강제 적용되어야 한다.
 - `RagStateSchema.status` 허용값은 `success`, `failed`, `fallback`을 포함해야 한다.
+  - 이는 신규 요구사항이 아니라 기존 통합 설계서 11.9의 "Real RAG 실패는 `fallback` 또는 `failed` 상태로 명시적으로 반환한다"는 요구를 스키마에 반영하는 작업이다.
+  - 기존 예시 JSON에 `success`만 보이더라도 Real RAG 실패/저하 경로를 표현하려면 `failed`와 `fallback`이 계약에 포함되어야 한다.
 - Main Recommendation service 반환 계약은 하나로 고정한다.
   - 권장 계약: service는 `(view_model, session_degraded)`를 반환한다.
   - route와 tests는 이 계약에 맞춰 정리한다.
@@ -235,6 +237,8 @@ Real RAG는 조용히 Mock으로 전환하지 않는다.
 
 삭제 또는 정리 후보는 다음 순서로 처리한다.
 
+파일 정리는 자동 생성물을 제외하면 즉시 삭제 작업이 아니다. Real RAG 연결 완료 후 import 영향, 테스트 영향, 설계 문서 기준을 확인하고 사용자 승인을 받은 뒤 처리한다.
+
 1. 자동 생성물
    - `__pycache__/`
    - `.pytest_cache/`
@@ -242,6 +246,8 @@ Real RAG는 조용히 Mock으로 전환하지 않는다.
 
 2. 설계서상 런타임 제외 파일
    - `neo4j/docker-compose.yml`
+   - 기존 통합 설계서에서 루트 `docker-compose.yml`을 런타임 기준으로 삼고 이 파일을 제외한다고 명시했으므로 삭제 후보로 분류한다.
+   - 실제 삭제는 사용자 승인 후 진행한다.
 
 3. Real RAG 연결 후 import 영향 확인 대상
    - `app/rag/adapters/real_rag_adapter.py`
@@ -256,6 +262,8 @@ Real RAG는 조용히 Mock으로 전환하지 않는다.
    - `app/rag/musicCatalogRepository/sql_repostiory.py`
    - `app/rag/musicCatalogRepository/loader2.py`
    - `app/rag/musicCatalogRepository/csv-row.py`
+   - `retrieval.py`, `embedding.py`, `indexing.py`는 기존 통합 설계서에서 Real RAG 연결 후보 구현으로 분류되어 있으므로, 새 `elasticsearch_retriever.py` 경계가 실제로 대체한 뒤에만 legacy 후보로 본다.
+   - `*_repostiory.py` 오타 파일명은 import 영향 범위 확인 후 한 번에 정리한다.
 
 원천 데이터로 볼 수 있는 CSV/JSON 파일은 삭제하지 않는다.
 
