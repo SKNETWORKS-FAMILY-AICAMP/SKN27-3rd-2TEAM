@@ -9,9 +9,9 @@ from pathlib import Path
 from common.connection import Neo4j_Connection
 from common.constant import (
     MUSIC_CATALOG_SCENARIOS_CSV_FILENAME,
-    SCENARIO_CSV_TAG_SEPARATOR,
-    SCENARIO_DIM_COLUMNS,
-    SCENARIO_KEY_COLUMN,
+    LABEL_CATEGORY_COLUMNS,
+    LABEL_CSV_KEY_COLUMN,
+    LABEL_CSV_TAG_SEPARATOR,
 )
 from typing import Optional
 
@@ -102,8 +102,8 @@ def import_column(path: str = None,column_name: str = None,query_params=None,bat
     logger.info(f"컬럼 {column_name!r} "f"유니크 {total_count}개 적재 완료")
 
 
-def split_scenario_csv_cell(value, sep: str) -> list[str]:
-    """dim_* 셀에 들어 있는 세미콜론 구분 tag_id 목록을 리스트로 정규화한다."""
+def split_label_csv_cell(value, sep: str) -> list[str]:
+    """라벨 CSV 셀의 세미콜론 구분 토큰 목록을 리스트로 정규화한다."""
     if value is None or pd.isna(value):
         return []
     s = str(value).strip()
@@ -112,67 +112,68 @@ def split_scenario_csv_cell(value, sep: str) -> list[str]:
     return [p.strip() for p in str(s).split(sep) if p.strip()]
 
 
-def import_music_catalog_scenarios(batch_size: int = 1000) -> None:
+def import_music_catalog_labels(batch_size: int = 1000) -> None:
     """
-    music_catalog_scenarios.csv의 각 dim_* 열마다 해당 Neo4j 노드 타입(DimWeather 등)으로 값(tag_id) 노드를 만들고,
-    같은 열의 값과 track_id에 대해 HAS_DIM_WEATHER 등 차원별 관계로 MusicCatalog와 연결한다.
-    MusicCatalog 적재가 선행되어 있어야 매칭된다.
+    music_catalog_scenarios.csv의 각 카테고리 라벨 열(LABEL_CATEGORY_COLUMNS)마다
+    해당 Neo4j 값 노드(Label*)를 MERGE하고 MusicCatalog(track_id)와 HAS_LABEL_* 로 연결한다.
+    선행으로 music_catalog 적재가 있어야 track_id 매칭된다.
     """
     from common.querys import Query
 
     df = pd.read_csv(get_filepath(MUSIC_CATALOG_SCENARIOS_CSV_FILENAME))
+    df = df[:5] # 테스트 용으로 5열 까지만 
     tag_pairs: set[tuple[str, str]] = set()
     link_rows: list[dict] = []
 
     for rec in df.to_dict("records"):
-        tid_raw = rec.get(SCENARIO_KEY_COLUMN)
+        tid_raw = rec.get(LABEL_CSV_KEY_COLUMN)
         if tid_raw is None or (isinstance(tid_raw, float) and pd.isna(tid_raw)):
             continue
         track_id = str(tid_raw).strip()
         if not track_id:
             continue
-        for col in SCENARIO_DIM_COLUMNS:
+        for col in LABEL_CATEGORY_COLUMNS:
             if col not in rec:
                 continue
-            for tag in split_scenario_csv_cell(rec.get(col), SCENARIO_CSV_TAG_SEPARATOR):
+            for tag in split_label_csv_cell(rec.get(col), LABEL_CSV_TAG_SEPARATOR):
                 tag_pairs.add((col, tag))
-                link_rows.append({"track_id": track_id, "dimension": col, "tag_id": tag})
+                link_rows.append({"track_id": track_id, "column": col, "tag_id": tag})
 
     driver = Neo4j_Connection()
 
-    for dim in SCENARIO_DIM_COLUMNS:
-        dim_tags = sorted({t for d, t in tag_pairs if d == dim})
-        tag_param_rows = [{"tag_id": t} for t in dim_tags]
+    for column in LABEL_CATEGORY_COLUMNS:
+        col_tags = sorted({t for c, t in tag_pairs if c == column})
+        tag_param_rows = [{"tag_id": t} for t in col_tags]
         total_tags = len(tag_param_rows)
         for start in range(0, total_tags, batch_size):
             batch = tag_param_rows[start : start + batch_size]
-            query, parameters = Query.scenario_dim_values_merge(dim, batch)
+            query, parameters = Query.label_category_values_merge(column, batch)
             driver.execute_query(query=query, parameters=parameters)
             logger.info(
-                "시나리오 차원 %r 값 노드 %s / %s 적재",
-                dim,
+                "카테고리 라벨 열 %r 값 노드 %s / %s 적재",
+                column,
                 start + len(batch),
                 total_tags,
             )
 
-        dim_links = [
+        col_links = [
             {"track_id": r["track_id"], "tag_id": r["tag_id"]}
             for r in link_rows
-            if r["dimension"] == dim
+            if r["column"] == column
         ]
-        total_links = len(dim_links)
+        total_links = len(col_links)
         for start in range(0, total_links, batch_size):
-            batch = dim_links[start : start + batch_size]
-            query, parameters = Query.scenario_dim_link(dim, batch)
+            batch = col_links[start : start + batch_size]
+            query, parameters = Query.label_category_link(column, batch)
             driver.execute_query(query=query, parameters=parameters)
             logger.info(
-                "시나리오 차원 %r 관계 %s / %s 적재",
-                dim,
+                "카테고리 라벨 열 %r 관계 %s / %s 적재",
+                column,
                 start + len(batch),
                 total_links,
             )
 
-    logger.info("music_catalog_scenarios 시나리오 dim_* 적재 완료")
+    logger.info("music_catalog_scenarios 라벨 열 적재 완료")
 
 
 ############################################################

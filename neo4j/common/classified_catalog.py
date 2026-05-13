@@ -668,13 +668,13 @@ def get_condition(category: str, keyword: str) -> dict:
 ########################################################
 # 음악 데이터 분류를 컬럼으로 추가하는 함수 by 김경수
 ########################################################
-def build_music_catalog_scenarios_df(
+def build_music_catalog_labels_df(
     df: pd.DataFrame,
     *,
     tag_sep: str = ";",
 ) -> pd.DataFrame:
     """
-    `music_catalog` 피처가 담긴 DataFrame에서 트랙별로 시나리오 키를 집계한다.
+    `music_catalog` 피처가 담긴 DataFrame에서 트랙별로 카테고리 라벨 키를 집계한다.
 
     - 행: 입력과 동일한 순서의 `track_id`
     - 열: `CATEGORY_PRIORITY`에 등장하는 카테고리명을 우선순위(값이 작을수록 앞) 순으로 배치
@@ -711,5 +711,5 @@ if __name__ == "__main__":
     _out_csv = _DATA_DIR / "music_catalog_scenarios.csv"
 
     df_catalog = pd.read_csv(_catalog_csv)
-    df_scenarios = build_music_catalog_scenarios_df(df_catalog)
-    df_scenarios.to_csv(_out_csv, index=False)
+    df_labels = build_music_catalog_labels_df(df_catalog)
+    df_labels.to_csv(_out_csv, index=False)

@@ -14,7 +14,7 @@ from common.constant import (
     KagTempoLabel,
     KagNodeLabel,
     KagRelationType,
-    SCENARIO_DIM_TO_LABEL_AND_REL,
+    LABEL_CATEGORY_TO_NODE_AND_REL,
 )
 
 
@@ -269,16 +269,16 @@ class Query:
         return query, parameters
 
 
-############################################ 시나리오 분류 (music_catalog_scenarios.csv) ############################################
+############################################ 카테고리 라벨 (music_catalog_scenarios.csv) ############################################
 
     @staticmethod
-    def scenario_dim_values_merge(dimension: str, rows: list[dict]) -> tuple[str, dict]:
+    def label_category_values_merge(category_column: str, rows: list[dict]) -> tuple[str, dict]:
         """
-        지정한 dim_* 컬럼에 대응하는 노드 라벨로, 유일한 tag_id 값마다 노드를 MERGE한다.
-        rows: { "tag_id": "weather_sunny" } 형태. dimension은 SCENARIO_DIM_TO_LABEL_AND_REL 키.
+        classified_catalog 카테고리 열에 대응하는 Neo4j 노드 타입으로, 유일한 tag_id마다 노드를 MERGE한다.
+        rows: { "tag_id": "…" }. category_column은 LABEL_CATEGORY_TO_NODE_AND_REL 키.
         """
 
-        node_label, _ = SCENARIO_DIM_TO_LABEL_AND_REL[dimension]
+        node_label, _ = LABEL_CATEGORY_TO_NODE_AND_REL[category_column]
         label = node_label.value
         query = f"""
         UNWIND $rows AS row
@@ -289,13 +289,13 @@ class Query:
         return query, parameters
 
     @staticmethod
-    def scenario_dim_link(dimension: str, rows: list[dict]) -> tuple[str, dict]:
+    def label_category_link(category_column: str, rows: list[dict]) -> tuple[str, dict]:
         """
-        MusicCatalog(track_id)와 해당 차원의 값 노드를 차원별 HAS_DIM_* 관계로 연결한다.
-        rows: { "track_id", "tag_id" } 형태.
+        MusicCatalog(track_id)와 해당 열의 분류 라벨 값 노드를 HAS_LABEL_* 관계로 연결한다.
+        rows: { "track_id", "tag_id" }.
         """
 
-        node_label, rel_type = SCENARIO_DIM_TO_LABEL_AND_REL[dimension]
+        node_label, rel_type = LABEL_CATEGORY_TO_NODE_AND_REL[category_column]
         label = node_label.value
         rel = rel_type.value
         mcl = KagNodeLabel.MUSIC_CATALOG.value

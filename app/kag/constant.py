@@ -21,19 +21,16 @@ class KagNodeLabel(str, Enum):
     MOOD = "Mood"
     TEMPO = "Tempo"
     RELEASE_YEAR = "ReleaseYear"
-    DIM_WEATHER = "DimWeather"
-    DIM_SEASON = "DimSeason"
-    DIM_EMOTION = "DimEmotion"
-    DIM_TIME_OF_DAY = "DimTimeOfDay"
-    DIM_ENERGY_LEVEL = "DimEnergyLevel"
-    DIM_CTX_COMMUTE = "DimCtxCommute"
-    DIM_CTX_HOME = "DimCtxHome"
-    DIM_CTX_FOCUS = "DimCtxFocus"
-    DIM_CTX_EXERCISE = "DimCtxExercise"
-    DIM_CTX_SOCIAL = "DimCtxSocial"
-    DIM_CTX_EMOTION_SIT = "DimCtxEmotionSit"
-    DIM_CTX_TRAVEL = "DimCtxTravel"
-    DIM_CTX_SPECIAL = "DimCtxSpecial"
+    LABEL_EMOTION = "LabelEmotion"
+    LABEL_EMOTION_SITUATION = "LabelEmotionSituation"
+    LABEL_TIME = "LabelTime"
+    LABEL_FOCUS = "LabelFocus"
+    LABEL_EXERCISE = "LabelExercise"
+    LABEL_HOME = "LabelHome"
+    LABEL_COMMUTE = "LabelCommute"
+    LABEL_SPECIAL = "LabelSpecial"
+    LABEL_WEATHER = "LabelWeather"
+    LABEL_SEASON = "LabelSeason"
 
 
 ###########################################################
@@ -48,42 +45,37 @@ class KagRelationType(str, Enum):
     HAS_MOOD = "HAS_MOOD"
     HAS_TEMPO = "HAS_TEMPO"
     RELEASED_IN = "RELEASED_IN"
-    HAS_DIM_WEATHER = "HAS_DIM_WEATHER"
-    HAS_DIM_SEASON = "HAS_DIM_SEASON"
-    HAS_DIM_EMOTION = "HAS_DIM_EMOTION"
-    HAS_DIM_TIME_OF_DAY = "HAS_DIM_TIME_OF_DAY"
-    HAS_DIM_ENERGY_LEVEL = "HAS_DIM_ENERGY_LEVEL"
-    HAS_DIM_CTX_COMMUTE = "HAS_DIM_CTX_COMMUTE"
-    HAS_DIM_CTX_HOME = "HAS_DIM_CTX_HOME"
-    HAS_DIM_CTX_FOCUS = "HAS_DIM_CTX_FOCUS"
-    HAS_DIM_CTX_EXERCISE = "HAS_DIM_CTX_EXERCISE"
-    HAS_DIM_CTX_SOCIAL = "HAS_DIM_CTX_SOCIAL"
-    HAS_DIM_CTX_EMOTION_SIT = "HAS_DIM_CTX_EMOTION_SIT"
-    HAS_DIM_CTX_TRAVEL = "HAS_DIM_CTX_TRAVEL"
-    HAS_DIM_CTX_SPECIAL = "HAS_DIM_CTX_SPECIAL"
+    HAS_LABEL_EMOTION = "HAS_LABEL_EMOTION"
+    HAS_LABEL_EMOTION_SIT = "HAS_LABEL_EMOTION_SIT"
+    HAS_LABEL_TIME = "HAS_LABEL_TIME"
+    HAS_LABEL_FOCUS = "HAS_LABEL_FOCUS"
+    HAS_LABEL_EXERCISE = "HAS_LABEL_EXERCISE"
+    HAS_LABEL_HOME = "HAS_LABEL_HOME"
+    HAS_LABEL_COMMUTE = "HAS_LABEL_COMMUTE"
+    HAS_LABEL_SPECIAL = "HAS_LABEL_SPECIAL"
+    HAS_LABEL_WEATHER = "HAS_LABEL_WEATHER"
+    HAS_LABEL_SEASON = "HAS_LABEL_SEASON"
 
 
 def _cypher_rel_type_union(relations: tuple[KagRelationType, ...]) -> str:
     return "|".join(r.value for r in relations)
 
 
-# Q_REC_003 · 상황 매칭에 쓰는 컨텍스트 관계 묶음
+# Q_REC_003 · 상황 매칭: classified_catalog 카테고리 중 활동/장소 성격의 관계 묶음
 KAG_QUERY_SITUATION_CONTEXT_REL_TYPES: tuple[KagRelationType, ...] = (
-    KagRelationType.HAS_DIM_CTX_EXERCISE,
-    KagRelationType.HAS_DIM_CTX_COMMUTE,
-    KagRelationType.HAS_DIM_CTX_HOME,
-    KagRelationType.HAS_DIM_CTX_SOCIAL,
-    KagRelationType.HAS_DIM_CTX_FOCUS,
-    KagRelationType.HAS_DIM_CTX_TRAVEL,
-    KagRelationType.HAS_DIM_CTX_SPECIAL,
+    KagRelationType.HAS_LABEL_EXERCISE,
+    KagRelationType.HAS_LABEL_COMMUTE,
+    KagRelationType.HAS_LABEL_HOME,
+    KagRelationType.HAS_LABEL_FOCUS,
+    KagRelationType.HAS_LABEL_SPECIAL,
 )
 
 KAG_CYPHER_SITUATION_REL_PATTERN: str = _cypher_rel_type_union(KAG_QUERY_SITUATION_CONTEXT_REL_TYPES)
 
-# Q_REC_008 하이브리드 — 감정 상황 차원 포함
+# Q_REC_008 하이브리드 — 감정 상황 열(emotion_situation) 포함
 KAG_QUERY_HYBRID_SITUATION_REL_TYPES: tuple[KagRelationType, ...] = (
     *KAG_QUERY_SITUATION_CONTEXT_REL_TYPES,
-    KagRelationType.HAS_DIM_CTX_EMOTION_SIT,
+    KagRelationType.HAS_LABEL_EMOTION_SIT,
 )
 
 KAG_CYPHER_HYBRID_SITUATION_REL_PATTERN: str = _cypher_rel_type_union(KAG_QUERY_HYBRID_SITUATION_REL_TYPES)
@@ -118,8 +110,8 @@ class KagGenreProperty(str, Enum):
     GENRE = "genre"
 
 
-class KagDimTagProperty(str, Enum):
-    """DimWeather 등 이름 기반 차원 노드의 표시 필드."""
+class KagLabelValueProperty(str, Enum):
+    """LabelWeather 등 분류 라벨 값 노드의 표시 필드."""
 
     NAME = "name"
 
@@ -184,7 +176,7 @@ def _build_cypher_templates() -> dict[str, str]:
     mc = KagMusicCatalogProperty
     mm = KagMoodProperty
     rg = KagGenreProperty
-    dt = KagDimTagProperty
+    dt = KagLabelValueProperty
     cb = KagCypherBinding
     rc = KagQueryResultColumn
     sit = KAG_CYPHER_SITUATION_REL_PATTERN
@@ -300,7 +292,7 @@ LIMIT $limit
 """
 
     q_rec_004 = f"""
-MATCH (m:{_ev(nl.MUSIC_CATALOG)})-[:{_ev(rt.HAS_DIM_WEATHER)}]-(w:{_ev(nl.DIM_WEATHER)})
+MATCH (m:{_ev(nl.MUSIC_CATALOG)})-[:{_ev(rt.HAS_LABEL_WEATHER)}]-(w:{_ev(nl.LABEL_WEATHER)})
 WHERE toLower(w.{_ev(dt.NAME)}) CONTAINS toLower($weather)
 RETURN DISTINCT
   m.{_ev(mc.TRACK_ID)} AS {_ev(rc.TRACK_ID)},
@@ -335,7 +327,7 @@ MATCH (m:{_ev(nl.MUSIC_CATALOG)})
 OPTIONAL MATCH (m)-[:{_ev(rt.HAS_GENRE)}]-(g:{_ev(nl.GENRE)})
 OPTIONAL MATCH (m)-[:{_ev(rt.HAS_MOOD)}]-(mood:{_ev(nl.MOOD)})
 OPTIONAL MATCH (m)-[:{hysit}]-(s)
-OPTIONAL MATCH (m)-[:{_ev(rt.HAS_DIM_WEATHER)}]-(w:{_ev(nl.DIM_WEATHER)})
+OPTIONAL MATCH (m)-[:{_ev(rt.HAS_LABEL_WEATHER)}]-(w:{_ev(nl.LABEL_WEATHER)})
 WITH m,
   max(CASE WHEN $genre IS NOT NULL AND toLower(g.{_ev(rg.GENRE)}) = toLower($genre) THEN 1 ELSE 0 END) AS genre_match,
   max(CASE WHEN $mood IS NOT NULL AND toLower(mood.{_ev(mm.MOOD)}) = toLower($mood) THEN 1 ELSE 0 END) AS mood_match,
@@ -460,7 +452,7 @@ MATCH (m:{_ev(nl.MUSIC_CATALOG)})
 OPTIONAL MATCH (m)-[:{_ev(rt.HAS_GENRE)}]-(g:{_ev(nl.GENRE)})
 OPTIONAL MATCH (m)-[:{_ev(rt.HAS_MOOD)}]-(mood:{_ev(nl.MOOD)})
 OPTIONAL MATCH (m)-[:{hysit}]-(s)
-OPTIONAL MATCH (m)-[:{_ev(rt.HAS_DIM_WEATHER)}]-(w:{_ev(nl.DIM_WEATHER)})
+OPTIONAL MATCH (m)-[:{_ev(rt.HAS_LABEL_WEATHER)}]-(w:{_ev(nl.LABEL_WEATHER)})
 WITH m,
   max(CASE WHEN $genre IS NOT NULL AND toLower(g.{_ev(rg.GENRE)}) = toLower($genre) THEN 1 ELSE 0 END) AS genre_match,
   max(CASE WHEN $mood IS NOT NULL AND toLower(mood.{_ev(mm.MOOD)}) = toLower($mood) THEN 1 ELSE 0 END) AS mood_match,
@@ -519,7 +511,7 @@ MATCH (m:{_ev(nl.MUSIC_CATALOG)})
 WHERE ($genre IS NULL OR toLower(m.{_ev(mc.PLAYLIST_GENRE)}) = toLower($genre))
 OPTIONAL MATCH (m)-[:{_ev(rt.HAS_MOOD)}]-(mood:{_ev(nl.MOOD)})
 OPTIONAL MATCH (m)-[:{hysit}]-(s)
-OPTIONAL MATCH (m)-[:{_ev(rt.HAS_DIM_WEATHER)}]-(w:{_ev(nl.DIM_WEATHER)})
+OPTIONAL MATCH (m)-[:{_ev(rt.HAS_LABEL_WEATHER)}]-(w:{_ev(nl.LABEL_WEATHER)})
 WITH m,
   max(CASE WHEN $mood IS NOT NULL AND toLower(mood.{_ev(mm.MOOD)}) CONTAINS toLower($mood) THEN 1 ELSE 0 END) AS mood_match,
   max(CASE WHEN $situation IS NOT NULL AND toLower(s.{_ev(dt.NAME)}) CONTAINS toLower($situation) THEN 1 ELSE 0 END) AS situation_match,
