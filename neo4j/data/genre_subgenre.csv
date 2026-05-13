@@ -1,25 +1,1045 @@
 genres,subgenres
-rock,album rock
-r&b,new jack swing
-rock,classic rock
-rock,hard rock
-r&b,hip pop
-latin,tropical
-r&b,urban contemporary
-rap,gangster rap
-pop,indie poptimism
-edm,big room
-latin,latin pop
+post-hardcore,rock
+dubstep,trap
+punk rock,pop punk
+worship,christian
+reggae,alternative rock
+pop punk,emo
+rock,electropop
+progressive rock,progressive metal
+electropop,dance
+classic rock,psychedelic rock
+metal,death metal
+soul,dream pop
+alternative,hip hop
+hip-hop,christian
+indie rock,grunge
+electronic,alternative rock
+grime,hip-hop
+soul,psychedelic
+punk rock,new wave
+electronic,indie pop
+pop,j-pop
+heavy metal,melodic death metal
+psychedelic,psychedelic rock
+electro,dream pop
+emo,hardcore
+psychedelic rock,alternative rock
+metalcore,melodic death metal
+progressive rock,emo
+nu metal,metalcore
+psychedelic rock,progressive rock
+electro,pop
+classical,folk
+metal,psychedelic rock
+punk rock,indie rock
+pop,black metal
+hard rock,psychedelic rock
+jazz,disco
+pop,indie pop
+alternative,psychedelic rock
+pop,rock
+shoegaze,emo
+dance,indie pop
+emo,pop rock
+power metal,metal
+indie rock,alternative rock
+pop rock,dub
+progressive rock,psychedelic rock
+alternative rock,garage rock
+folk,rock
+folk,indie pop
+melodic death metal,doom metal
+indie pop,
+doom metal,progressive metal
+soundtrack,alternative rock
+pop,house
+metal,industrial
+metal,christian
+black metal,ambient
+shoegaze,psychedelic rock
+country,blues
+hip hop,lo-fi
+hard rock,metalcore
+rock,trance
+rock,garage rock
+metal,thrash metal
+dubstep,
+doom metal,death metal
+melodic death metal,progressive metal
+heavy metal,
+hip hop,rap
+country,
+rock,metalcore
+lo-fi,
+alternative rock,nu metal
+punk,pop
+soundtrack,pop
+indie rock,psychedelic
+punk,psychedelic
+electronic,indie
+melodic death metal,death metal
+black metal,metal
+grunge,rock
+dub,reggae
+new wave,classical
+rock,soundtrack
+progressive metal,nu metal
+progressive rock,folk
+pop punk,indie rock
+electronic,electropop
+funk,dub
+emo,screamo
+alternative,new wave
+house,soul
+new wave,
+pop,indie
+rap,hip-hop
+progressive rock,new wave
+folk,indie
 pop,electropop
-rap,hip hop
-edm,progressive electro house
-pop,post-teen pop
-rap,southern hip hop
-latin,latin hip hop
-r&b,neo soul
-edm,pop edm
-edm,electro house
-pop,dance pop
+experimental,indie
+electro,soul
+rock,synthpop
+electronic,drum and bass
+drum and bass,hip hop
+j-pop,
+rock,funk
+metal,melodic death metal
+indie,
+rock,country
+hardcore,metalcore
+chillout,jazz
+hardcore,thrash metal
+hip hop,chillwave
+indie pop,alternative
+classical,jazz
+rock,worship
+death metal,
+nu metal,
+punk,reggae
+death metal,metal
+dance,hip hop
+soul,gospel
+indie pop,electronic
+techno,
+trap,
+electropop,indie pop
+blues,pop
+gospel,psychedelic rock
+country,alternative
+lo-fi,alternative
+britpop,
+dubstep,electronic
+new wave,punk
+hip hop,comedy
+new wave,punk rock
+alternative,dub
+electronic,techno
+indie rock,emo
+rock,blues
+electronic,trance
+hard rock,
+hip hop,nu metal
+screamo,emo
+christian,pop rock
+electronic,industrial
+rock,classical
+industrial,progressive metal
+alternative rock,indie rock
+rock,
+emo,progressive rock
+pop,garage rock
+rock,metal
+indie rock,psychedelic rock
+dance,techno
+rnb,pop
+math rock,emo
+new wave,electronic
+indie,alternative
+electronic,soundtrack
+post-punk,pop rock
+death metal,hardcore
+punk rock,grunge
+experimental,industrial
+reggae,funk
+post-punk,electronic
+pop rock,alternative rock
+house,indie rock
+pop,latin
+electronic,trap
+indie,electronic
+k-pop,pop rock
+progressive metal,power metal
+indie pop,rock
+pop rock,indie pop
+jazz,latin
+rock,rnb
+folk,latin
+folk,comedy
+electronic,synthpop
+screamo,metalcore
+metal,post-hardcore
+trap,alternative
+electronic,funk
+punk,pop punk
 latin,reggaeton
-rock,permanent wave
+hardcore,
+psychedelic rock,new wave
+hardcore,metal
+synthpop,post-punk
+dance,trap
+blues,soul
+indie rock,folk
+heavy metal,rock
+punk,folk
+techno,electronic
+rnb,hip-hop
+trap,electronic
+experimental,trap
+pop,funk
+rock,punk
+pop,country
+country,rock
+hip hop,k-pop
+rock,punk rock
+chillout,electro
+hard rock,heavy metal
+trance,drum and bass
+ambient,industrial
+cloud rap,trap
+alternative rock,pop rock
+punk,new wave
+rock,hardcore
+post-hardcore,
+experimental,country
+indie rock,synthpop
+rock,alternative
+rock,heavy metal
+soul,jazz
+electronic,ambient
+thrash metal,death metal
+new wave,rock
+reggae,
+punk,indie rock
+pop rock,hard rock
+rnb,soul
+classical,alternative rock
+rock,electronic
+hip hop,indie rock
+industrial,folk
+alternative rock,post-punk
+electronic,classical
+pop,ambient
+hardcore,punk
+indie pop,lo-fi
+blues,gospel
+indie,rock
+hardcore,punk rock
+gospel,
+electronic,
+drum and bass,
+pop,blues
+j-pop,rock
+indie pop,electropop
+electronic,metal
+metalcore,hard rock
+pop rock,electropop
+trance,techno
+jazz,blues
+pop,classical
+dream pop,
+folk,blues
+classic rock,rock
+nu metal,rock
+acoustic,pop rock
+experimental,blues
+heavy metal,post-hardcore
+reggae,rnb
+hardcore,heavy metal
+pop punk,alternative rock
+cloud rap,ambient
+pop,
+metalcore,post-hardcore
+shoegaze,grunge
+dance,
+blues,folk
+post-hardcore,punk
+rap,jazz
+psychedelic,alternative rock
+metal,j-pop
+experimental,
+folk,metal
+psychedelic,indie pop
+classical,experimental
+britpop,rock
+blues,new wave
+dub,dancehall
+synthpop,electro
+lo-fi,dream pop
+cloud rap,
+screamo,
+metal,black metal
+post-hardcore,alternative
+jazz,indie rock
+hard rock,rock
+alternative,indie pop
+electronic,dubstep
+pop,rnb
+electropop,trap
+drum and bass,dubstep
+disco,house
+blues,indie rock
+hip hop,pop rock
+shoegaze,alternative rock
+techno,electro
+shoegaze,black metal
+power metal,progressive metal
+emo,pop punk
+shoegaze,indie pop
+j-pop,electropop
+ambient,
+indie pop,garage rock
+electronic,alternative
+nu metal,post-hardcore
+pop punk,hard rock
+funk,hip hop
+swing,jazz
+folk,punk
+synthpop,pop
+emo rap,hip hop
+metal,hard rock
+synthpop,experimental
+pop,pop rock
+trap,rap
+alternative rock,progressive rock
+jazz,pop rock
+doom metal,black metal
+pop,electronic
+hard rock,post-hardcore
+folk,pop rock
+disco,electropop
+dance,electronic
+alternative,indie
+emo,indie rock
+alternative,post-hardcore
+emo rap,emo
+funk,psychedelic rock
+progressive rock,hard rock
+progressive metal,alternative rock
+latin,
+progressive rock,indie
+progressive metal,progressive rock
+progressive rock,post-hardcore
+punk rock,metalcore
+alternative rock,dream pop
+black metal,death metal
+grunge,punk
+electropop,
+trance,
+country,soul
+rock,lo-fi
+pop rock,country
+alternative rock,pop
+shoegaze,indie
+jazz,post-punk
+trance,dance
+garage rock,post-punk
+rock,rap
+alternative rock,experimental
+soul,pop
+alternative rock,math rock
+new wave,soul
+rnb,jazz
+classical,thrash metal
+house,pop
+ambient,electronic
+electronic,rock
+drum and bass,rock
+punk rock,country
+hardcore,post-hardcore
+punk rock,alt-country
+rock,math rock
+dream pop,indie pop
+pop,disco
+psychedelic rock,indie pop
+hip hop,electro
+country,gospel
+electronic,house
+grime,hip hop
+drum and bass,house
+acoustic,pop
+hardcore,rap
+dance,rock
+rock,doom metal
+hard rock,garage rock
+pop rock,
+indie rock,indie pop
+chillwave,hip hop
+indie rock,rock
+pop rock,metal
+indie rock,britpop
+dance,house
+rock,hip-hop
+soundtrack,rock
+metal,metalcore
+soul,reggae
+alternative rock,hip hop
+indie pop,indie rock
+hip hop,grime
+latin,electronic
+post-hardcore,dream pop
+christian,folk
+heavy metal,metal
+metalcore,
+pop punk,new wave
+electropop,electronic
+metalcore,metal
+alternative rock,emo
+pop,electro
+progressive metal,death metal
+hard rock,nu metal
+soul,hip hop
+electronic,shoegaze
+hip hop,pop
+punk rock,
+psychedelic rock,hard rock
+electronic,lo-fi
+ambient,rock
+rock,soul
+dream pop,shoegaze
+dream pop,indie
+disco,funk
+dream pop,post-hardcore
+country,indie rock
+psychedelic rock,indie
+alternative rock,psychedelic rock
+worship,
+hip hop,experimental
+electronic,rap
+metal,funk
+gospel,rap
+funk,
+heavy metal,power metal
+hip hop,acoustic
+ambient,house
+folk,progressive rock
+synthpop,new wave
+experimental,post-hardcore
+hip-hop,
+progressive metal,psychedelic rock
+dance,electropop
+soul,psychedelic rock
+indie rock,shoegaze
+pop,rap
+indie rock,indie
+indie rock,post-hardcore
+punk,indie
+pop,dream pop
+new wave,indie rock
+trap,pop punk
+acoustic,soul
+indie rock,lo-fi
+screamo,indie
+screamo,post-hardcore
+heavy metal,punk
+comedy,pop
+indie rock,electropop
+rap,hip hop
+post-punk,indie rock
+house,trip-hop
+synthpop,indie rock
+hip hop,hip-hop
+folk,dream pop
+metalcore,punk
+indie pop,pop rock
+alternative rock,pop punk
+indie,indie rock
+jazz,pop
+classic rock,metal
+folk,pop
+hip hop,reggae
+punk rock,punk
+pop rock,electronic
+pop punk,
+progressive metal,thrash metal
+melodic death metal,metalcore
+alternative rock,folk
+dancehall,reggae
+melodic death metal,thrash metal
+electro,techno
+punk,hip hop
+jazz,experimental
+psychedelic,
+jazz,acoustic
+disco,
+country,pop rock
+dream pop,chillwave
+alternative rock,new wave
+punk rock,heavy metal
+heavy metal,electronic
+soul,folk
+metal,
+hip hop,soul
+garage rock,hard rock
+shoegaze,ambient
+hard rock,metal
+alternative,
+hip hop,emo
+dancehall,soul
+emo,alternative rock
+pop,hip-hop
+progressive rock,
+psychedelic rock,garage rock
+blues,hard rock
+progressive rock,metal
+jazz,hip-hop
+soul,synthpop
+new wave,pop rock
+electronic,comedy
+electronic,latin
+industrial,drum and bass
+soul,alt-country
+electropop,electro
+classical,heavy metal
+shoegaze,
+jazz,reggae
+funk,electronic
+acoustic,folk
+pop rock,j-pop
+rock,indie rock
+hard rock,power metal
+j-pop,pop rock
+pop punk,punk
+indie rock,garage rock
+indie pop,disco
+grime,
+pop punk,punk rock
+hip-hop,electronic
+punk,industrial
+house,worship
+dance,latin
+pop,soul
+new wave,post-punk
+punk,metalcore
+grime,dance
+pop rock,rock
+punk,thrash metal
+jazz,soul
+folk,soul
+chillwave,
+post-hardcore,pop punk
 rap,trap
+metal,punk rock
+alternative,punk
+hip hop,pop punk
+emo rap,cloud rap
+metal,hardcore
+doom metal,
+psychedelic rock,country
+metal,alternative
+metal,heavy metal
+soul,dub
+alternative rock,dance
+psychedelic,electronic
+garage rock,psychedelic rock
+jazz,trip-hop
+punk rock,rock
+pop,classic rock
+hard rock,pop rock
+melodic death metal,
+progressive rock,heavy metal
+melodic death metal,metal
+grime,dubstep
+blues,psychedelic rock
+folk,classic rock
+pop,christian
+rock,jazz
+pop,gospel
+rnb,hip hop
+rock,pop rock
+funk,rock
+jazz,gospel
+shoegaze,alternative
+folk,christian
+house,dance
+ambient,nu metal
+deathcore,metalcore
+electro,
+progressive rock,electronic
+dub,
+trip-hop,dub
+pop rock,post-hardcore
+reggae,indie rock
+trip-hop,
+pop,folk
+pop,k-pop
+jazz,folk
+industrial,synthpop
+rock,post-punk
+indie pop,dream pop
+psychedelic rock,
+soundtrack,ambient
+electronic,indie rock
+indie rock,blues
+metalcore,deathcore
+indie pop,pop
+jazz,new wave
+rap,dance
+pop punk,rock
+soundtrack,classical
+hip hop,dub
+indie rock,
+pop,indie rock
+punk,
+disco,rock
+electropop,soul
+soundtrack,
+new wave,alternative rock
+power metal,hard rock
+folk,indie rock
+blues,country
+new wave,progressive rock
+country,pop
+experimental,indie rock
+lo-fi,pop
+progressive metal,deathcore
+alternative,rock
+post-punk,alternative rock
+hip hop,dance
+synthpop,alternative rock
+indie,alternative rock
+progressive rock,rock
+math rock,
+alternative rock,grunge
+synthpop,indie pop
+new wave,pop
+hip-hop,rap
+industrial,
+trip-hop,alternative
+hip hop,emo rap
+classic rock,progressive rock
+nu metal,deathcore
+post-hardcore,post-punk
+gospel,jazz
+drum and bass,jazz
+electronic,jazz
+heavy metal,doom metal
+electro,electronic
+indie,dream pop
+metalcore,doom metal
+grunge,indie rock
+dubstep,hip-hop
+electronic,pop rock
+metal,electro
+hip hop,dancehall
+j-pop,pop
+ambient,indie rock
+indie,pop
+emo,trap
+drum and bass,electronic
+indie rock,punk
+deathcore,
+reggaeton,
+indie rock,punk rock
+punk,punk rock
+pop,jazz
+post-punk,experimental
+rock,electro
+post-punk,acoustic
+indie,experimental
+blues,
+post-hardcore,screamo
+indie rock,alternative
+alternative rock,indie pop
+punk,alternative
+punk rock,garage rock
+metal,deathcore
+electropop,k-pop
+hard rock,progressive rock
+alternative rock,britpop
+electronic,post-punk
+dubstep,soul
+rock,alternative rock
+lo-fi,hip hop
+rap,cloud rap
+indie rock,electronic
+rock,progressive rock
+synthpop,indie
+new wave,reggae
+heavy metal,nu metal
+soul,indie pop
+soundtrack,electronic
+pop,post-punk
+metalcore,nu metal
+soul,rock
+shoegaze,post-hardcore
+experimental,post-punk
+rock,dream pop
+rnb,
+thrash metal,
+thrash metal,metal
+power metal,thrash metal
+ambient,jazz
+rock,pop
+hard rock,experimental
+ambient,pop rock
+rock,psychedelic
+death metal,progressive metal
+trip-hop,rock
+classical,latin
+indie,hip hop
+alternative rock,hard rock
+blues,punk rock
+emo,
+country,classic rock
+rock,experimental
+chillwave,lo-fi
+electronic,chillout
+rock,acoustic
+experimental,screamo
+indie,soul
+metal,doom metal
+alternative rock,indie
+psychedelic rock,rock
+indie pop,folk
+metalcore,christian
+progressive metal,hard rock
+reggae,electro
+post-hardcore,alternative rock
+emo rap,trap
+trap,hip hop
+indie pop,new wave
+post-punk,psychedelic rock
+christian,thrash metal
+punk,rock
+latin,jazz
+house,indie
+country,folk
+worship,gospel
+soul,electropop
+hip hop,indie pop
+electronic,electro
+thrash metal,punk rock
+rock,reggae
+hardcore,math rock
+disco,soul
+pop rock,indie rock
+post-punk,industrial
+electropop,pop rock
+trance,electronic
+hard rock,soul
+thrash metal,heavy metal
+metal,nu metal
+emo,punk
+acoustic,indie
+rock,hip hop
+dance,electro
+country,alt-country
+electronic,progressive rock
+swing,rock
+christian,country
+electronic,grime
+reggae,pop
+pop,alternative rock
+rock,emo
+ambient,chillout
+death metal,thrash metal
+j-pop,k-pop
+indie,folk
+electronic,dream pop
+christian,worship
+folk,alternative rock
+chillout,
+power metal,
+post-punk,new wave
+jazz,indie pop
+electronic,pop
+pop,grime
+classical,
+hard rock,classic rock
+classic rock,folk
+rock,psychedelic rock
+garage rock,rock
+disco,gospel
+k-pop,trap
+alternative rock,industrial
+punk,post-hardcore
+emo rap,
+dream pop,pop
+punk,lo-fi
+blues,rock
+alternative rock,metalcore
+electronic,experimental
+rock,classic rock
+rock,techno
+gospel,acoustic
+pop rock,jazz
+dance,pop
+hip hop,electropop
+indie rock,dream pop
+rock,industrial
+rock,christian
+progressive metal,metalcore
+math rock,post-hardcore
+experimental,psychedelic
+pop,experimental
+grunge,alternative rock
+heavy metal,jazz
+black metal,
+death metal,melodic death metal
+christian,
+folk,acoustic
+ambient,progressive rock
+pop rock,new wave
+electronic,hip-hop
+house,latin
+pop rock,post-punk
+rock,folk
+post-hardcore,emo
+classical,dubstep
+dancehall,hip hop
+alternative rock,synthpop
+alternative rock,funk
+industrial,electropop
+alternative rock,country
+ambient,dream pop
+soul,trap
+reggae,soul
+punk rock,electronic
+garage rock,indie
+rock,new wave
+post-punk,
+funk,jazz
+synthpop,
+power metal,heavy metal
+pop,reggae
+electronic,hip hop
+soul,funk
+alternative,indie rock
+emo,rock
+dance,reggae
+rock,alt-country
+gospel,soul
+k-pop,
+electronic,soul
+progressive rock,indie rock
+folk,reggae
+punk rock,post-punk
+ambient,experimental
+metal,power metal
+cloud rap,hip-hop
+punk,garage rock
+pop,drum and bass
+pop,hip hop
+electropop,alternative rock
+psychedelic rock,soul
+jazz,hip hop
+alternative rock,ambient
+shoegaze,indie rock
+folk,hip hop
+post-hardcore,metalcore
+metalcore,screamo
+dance,soul
+alternative rock,blues
+experimental,soul
+black metal,heavy metal
+indie rock,soul
+pop punk,pop rock
+latin,pop
+alternative rock,
+rap,funk
+house,ambient
+alternative rock,metal
+hip hop,soundtrack
+disco,jazz
+electropop,pop
+ambient,progressive metal
+synthpop,punk
+trance,pop
+post-punk,punk rock
+gospel,christian
+metal,jazz
+progressive metal,
+trap,emo rap
+hip hop,trap
+soul,
+emo,indie
+progressive metal,metal
+emo,post-hardcore
+pop,techno
+alternative,pop rock
+emo,lo-fi
+funk,disco
+progressive rock,jazz
+house,
+dancehall,trap
+synthpop,alternative
+hip hop,synthpop
+hip hop,funk
+hip hop,country
+dream pop,pop punk
+grunge,emo
+gospel,folk
+electronic,folk
+indie pop,alternative rock
+blues,garage rock
+synthpop,electronic
+pop rock,progressive rock
+acoustic,
+electronic,new wave
+soul,rnb
+grunge,psychedelic rock
+dubstep,alternative rock
+melodic death metal,power metal
+alternative rock,punk
+indie rock,pop punk
+alternative rock,punk rock
+swing,country
+pop,trap
+screamo,pop punk
+rap,
+heavy metal,black metal
+pop,new wave
+jazz,trap
+punk,blues
+shoegaze,post-punk
+pop,synthpop
+lo-fi,indie pop
+pop rock,pop
+alternative rock,alternative
+alternative rock,heavy metal
+soul,punk rock
+lo-fi,rock
+dream pop,indie rock
+funk,electro
+jazz,funk
+black metal,rock
+electropop,hip hop
+jazz,country
+folk,country
+christian,rock
+folk,alt-country
+trap,cloud rap
+punk,metal
+alternative rock,electronic
+progressive metal,heavy metal
+soul,alternative
+hip hop,
+blues,funk
+reggae,dub
+new wave,indie pop
+dancehall,
+ambient,folk
+swing,blues
+post-punk,indie pop
+classical,progressive rock
+indie pop,indie
+post-punk,rock
+electronic,dub
+j-pop,indie pop
+indie,indie pop
+house,electronic
+hip-hop,grime
+electro,jazz
+heavy metal,hard rock
+swing,
+funk,pop
+psychedelic,electro
+hip hop,rnb
+math rock,indie rock
+electropop,techno
+industrial,metal
+progressive rock,grunge
+pop rock,reggae
+electronic,dance
+comedy,
+classical,pop
+folk,classical
+lo-fi,indie
+trip-hop,electronic
+jazz,
+trap,rock
+deathcore,metal
+folk,
+reggae,dancehall
+garage rock,
+heavy metal,progressive metal
+psychedelic rock,pop rock
+pop,dance
+country,electropop
+metalcore,progressive metal
+punk,hardcore
+metal,alternative rock
+hard rock,alternative rock
+folk,dance
+dubstep,drum and bass
+techno,house
+alternative,alternative rock
+rock,j-pop
+alternative rock,rock
+heavy metal,hip hop
+hip hop,alternative
+metalcore,death metal
+indie rock,pop rock
+soundtrack,jazz
+soul,disco
+punk,pop rock
+pop,swing
+synthpop,shoegaze
+punk,electronic
+jazz,rnb
+rock,indie pop
+disco,pop
+j-pop,indie
+post-punk,lo-fi
+electropop,synthpop
+jazz,swing
+pop rock,psychedelic rock
+classic rock,hard rock
+indie,shoegaze
+nu metal,hard rock
+classical,hip-hop
+indie,post-hardcore
+hip hop,electronic
+synthpop,electropop
+hip-hop,reggae
+alternative,pop
+indie,electropop
+pop rock,classic rock
+indie rock,post-punk
+punk,post-punk
+hip hop,cloud rap
+alt-country,
+metal,experimental
+garage rock,punk rock
+funk,soul
+alternative,experimental
+hip-hop,hip hop
+alternative,acoustic
+acoustic,rock
+pop,alternative
+grime,rap
+progressive rock,experimental
+pop rock,pop punk
+hip-hop,soul
+folk,alternative
+soul,electro
+alternative rock,shoegaze
+alternative rock,post-hardcore
+pop rock,folk
+heavy metal,thrash metal
+shoegaze,experimental
+garage rock,pop rock
+alternative rock,lo-fi
+rock,hard rock
+house,electro
+chillwave,dream pop
+blues,jazz
+industrial,post-punk
+alternative rock,rap
+rock,shoegaze
+rock,indie
+rock,post-hardcore
+grunge,punk rock
+post-hardcore,indie pop

@@ -1,139 +1,244 @@
-"""KAG용 primary_goal·카테고리·라우팅. `primary_goal`은 스키마 IntentType 문자열과 1:1 동일하다."""
+"""KAG Query 템플릿/파라미터 템플릿 상수 모음."""
 
-from __future__ import annotations
+from typing import ClassVar
 
-from typing import ClassVar, get_args
+class KagQueryTemplateConstants:
+    """KAG Query 템플릿/파라미터 템플릿 상수.
 
-from app.schemas.intent_state_schema import IntentType
+    외부 Agent가 호출하는 Tool 함수는 이 레지스트리의 query_key를 기준으로
+    Cypher 템플릿과 파라미터 기본값/허용범위를 조회해 실행한다.
+    """
 
-####################################################################
-# IntentType ↔ primary_goal (동일 집합, 1:1)
-####################################################################
-_INTENT_VALUES = frozenset(get_args(IntentType))
-_INTENT_TYPE_TO_PRIMARY_GOAL: dict[str, str] = {t: t for t in _INTENT_VALUES}
+    # query_key
+    Q_SEARCH_001 = "Q_SEARCH_001"
+    Q_SEARCH_003 = "Q_SEARCH_003"
+    Q_SEARCH_009 = "Q_SEARCH_009"
+    Q_SEARCH_011 = "Q_SEARCH_011"
+    Q_REC_001 = "Q_REC_001"
+    Q_REC_002 = "Q_REC_002"
+    Q_REC_003 = "Q_REC_003"
+    Q_REC_004 = "Q_REC_004"
+    Q_REC_006 = "Q_REC_006"
+    Q_REC_008 = "Q_REC_008"
 
-if frozenset(_INTENT_TYPE_TO_PRIMARY_GOAL.keys()) != _INTENT_VALUES:
-    raise RuntimeError("IntentType 정의와 1:1 매핑 생성 불일치")
-if not all(k == v for k, v in _INTENT_TYPE_TO_PRIMARY_GOAL.items()):
-    raise RuntimeError("primary_goal은 intent_type과 동일 문자열이어야 합니다.")
-
-DEFAULT_PRIMARY_GOAL = "personalized_recommendation"
-
-
-def _assert_primary_goal_maps_intent_types(cat: dict[str, str], routes: dict[str, str]) -> None:
-    if frozenset(cat.keys()) != _INTENT_VALUES or frozenset(routes.keys()) != _INTENT_VALUES:
-        raise RuntimeError(
-            "PRIMARY_GOAL_TO_*는 IntentType 전원과 키가 일치해야 합니다. "
-            f"intent={sorted(_INTENT_VALUES)} category_keys={sorted(cat)} route_keys={sorted(routes)}"
-        )
-
-
-class KagGraphConstants:
-    """그래프/계약 문자열·intent(primary_goal)별 카테고리·라우트 매핑."""
-
-    RECOMMENDATION_CATEGORY_NEW_RELEASE = "new_release"
-    RECOMMENDATION_CATEGORY_DISCOVERY_CANDIDATE = "discovery_candidate"
-    RECOMMENDATION_CATEGORY_PERSONALIZED_MATCH = "personalized_match"
-    RECOMMENDATION_CATEGORY_INFORMATION_RELATED = "information_related"
-
-    ROUTE_NEW_RELEASE = "new_release"
-    ROUTE_SAFE_DISCOVERY = "safe_discovery"
-    ROUTE_PERSONALIZED = "personalized"
-
-    TARGET_SECTION_NEW_RELEASE = "new_release_section"
-    TARGET_SECTION_DISCOVERY = "discovery_section"
-    TARGET_SECTION_PERSONALIZED = "personalized_section"
-
-    # intent_type == primary_goal 이므로 키는 IntentType 멤버와 동일
-    INTENT_TYPE_TO_PRIMARY_GOAL: ClassVar[dict[str, str]] = dict(_INTENT_TYPE_TO_PRIMARY_GOAL)
-
-    PRIMARY_GOAL_TO_RECOMMENDATION_CATEGORY: ClassVar[dict[str, str]] = {
-        "personalized_recommendation": RECOMMENDATION_CATEGORY_PERSONALIZED_MATCH,
-        "new_release_recommendation": RECOMMENDATION_CATEGORY_NEW_RELEASE,
-        "discovery_recommendation": RECOMMENDATION_CATEGORY_DISCOVERY_CANDIDATE,
-        "music_information": RECOMMENDATION_CATEGORY_INFORMATION_RELATED,
-        "recommendation_reason": RECOMMENDATION_CATEGORY_PERSONALIZED_MATCH,
-        "general_chat": RECOMMENDATION_CATEGORY_PERSONALIZED_MATCH,
+    CYPHER_TEMPLATES: ClassVar[dict[str, str]] = {
+        Q_SEARCH_001: """
+MATCH (m:MusicCatalog)
+WHERE toLower(m.track_name) CONTAINS toLower($keyword)
+RETURN
+  m.track_id AS track_id,
+  m.track_name AS track_name,
+  m.track_artist AS track_artist,
+  m.track_album_name AS album_name,
+  m.track_album_release_date AS release_date,
+  m.playlist_genre AS genre,
+  m.playlist_subgenre AS subgenre,
+  m.duration_ms AS duration_ms,
+  m.track_popularity AS popularity
+ORDER BY coalesce(m.track_popularity, 0) DESC
+LIMIT $limit
+""",
+        Q_SEARCH_003: """
+MATCH (m:MusicCatalog)
+WHERE
+  ($genre IS NULL OR toLower(m.playlist_genre) = toLower($genre))
+  AND ($subgenre IS NULL OR toLower(m.playlist_subgenre) = toLower($subgenre))
+  AND ($artist IS NULL OR toLower(m.track_artist) CONTAINS toLower($artist))
+  AND ($release_year IS NULL OR toString(m.track_album_release_date) STARTS WITH toString($release_year))
+RETURN
+  m.track_id AS track_id,
+  m.track_name AS track_name,
+  m.track_artist AS track_artist,
+  m.track_album_name AS album_name,
+  m.track_album_release_date AS release_date,
+  m.playlist_genre AS genre,
+  m.playlist_subgenre AS subgenre,
+  m.track_popularity AS popularity
+ORDER BY coalesce(m.track_popularity, 0) DESC
+LIMIT $limit
+""",
+        Q_SEARCH_009: """
+MATCH (m:MusicCatalog)
+WHERE toLower(m.track_artist) CONTAINS toLower($artist)
+RETURN
+  m.track_id AS track_id,
+  m.track_name AS track_name,
+  m.track_artist AS track_artist,
+  m.track_album_name AS album_name,
+  m.track_popularity AS popularity
+ORDER BY coalesce(m.track_popularity, 0) DESC
+LIMIT $limit
+""",
+        Q_SEARCH_011: """
+MATCH (m:MusicCatalog)
+WITH m, toInteger(left(toString(m.track_album_release_date), 4)) AS release_year
+WHERE
+  ($year IS NOT NULL AND release_year = $year)
+  OR ($year IS NULL AND $start_year IS NOT NULL AND $end_year IS NOT NULL
+      AND release_year >= $start_year AND release_year <= $end_year)
+RETURN
+  m.track_id AS track_id,
+  m.track_name AS track_name,
+  m.track_artist AS track_artist,
+  m.track_album_release_date AS release_date,
+  coalesce(m.track_popularity, 0) AS popularity
+ORDER BY popularity DESC
+LIMIT $limit
+""",
+        Q_REC_001: """
+MATCH (m:MusicCatalog)
+WHERE toLower(m.playlist_genre) = toLower($genre)
+RETURN
+  m.track_id AS track_id,
+  m.track_name AS track_name,
+  m.track_artist AS track_artist,
+  m.playlist_genre AS genre,
+  coalesce(m.track_popularity, 0) AS popularity,
+  coalesce(m.track_popularity, 0) AS recommendation_score
+ORDER BY recommendation_score DESC
+LIMIT $limit
+""",
+        Q_REC_002: """
+MATCH (m:MusicCatalog)-[:HAS_MOOD]-(mood:Mood)
+WHERE toLower(mood.mood) CONTAINS toLower($mood)
+RETURN DISTINCT
+  m.track_id AS track_id,
+  m.track_name AS track_name,
+  m.track_artist AS track_artist,
+  mood.mood AS matched_mood,
+  coalesce(m.track_popularity, 0) AS popularity,
+  10 + coalesce(m.track_popularity, 0) AS recommendation_score
+ORDER BY recommendation_score DESC
+LIMIT $limit
+""",
+        Q_REC_003: """
+MATCH (m:MusicCatalog)-[:HAS_DIM_CTX_EXERCISE|HAS_DIM_CTX_COMMUTE|HAS_DIM_CTX_HOME|HAS_DIM_CTX_SOCIAL|HAS_DIM_CTX_FOCUS|HAS_DIM_CTX_TRAVEL|HAS_DIM_CTX_SPECIAL]-(s)
+WHERE toLower(s.name) CONTAINS toLower($situation)
+RETURN DISTINCT
+  m.track_id AS track_id,
+  m.track_name AS track_name,
+  m.track_artist AS track_artist,
+  s.name AS matched_situation,
+  coalesce(m.track_popularity, 0) AS popularity,
+  10 + coalesce(m.track_popularity, 0) AS recommendation_score
+ORDER BY recommendation_score DESC
+LIMIT $limit
+""",
+        Q_REC_004: """
+MATCH (m:MusicCatalog)-[:HAS_DIM_WEATHER]-(w:DimWeather)
+WHERE toLower(w.name) CONTAINS toLower($weather)
+RETURN DISTINCT
+  m.track_id AS track_id,
+  m.track_name AS track_name,
+  m.track_artist AS track_artist,
+  w.name AS matched_weather,
+  coalesce(m.track_popularity, 0) AS popularity,
+  10 + coalesce(m.track_popularity, 0) AS recommendation_score
+ORDER BY recommendation_score DESC
+LIMIT $limit
+""",
+        Q_REC_006: """
+MATCH (m:MusicCatalog)
+WHERE
+  ($genre IS NULL OR toLower(m.playlist_genre) = toLower($genre))
+  AND ($subgenre IS NULL OR toLower(m.playlist_subgenre) = toLower($subgenre))
+  AND ($artist IS NULL OR toLower(m.track_artist) CONTAINS toLower($artist))
+RETURN
+  m.track_id AS track_id,
+  m.track_name AS track_name,
+  m.track_artist AS track_artist,
+  m.playlist_genre AS genre,
+  coalesce(m.track_popularity, 0) AS popularity,
+  coalesce(m.track_popularity, 0) AS recommendation_score
+ORDER BY recommendation_score DESC
+LIMIT $limit
+""",
+        Q_REC_008: """
+MATCH (m:MusicCatalog)
+OPTIONAL MATCH (m)-[:HAS_GENRE]-(g:Genre)
+OPTIONAL MATCH (m)-[:HAS_MOOD]-(mood:Mood)
+OPTIONAL MATCH (m)-[:HAS_DIM_CTX_EXERCISE|HAS_DIM_CTX_COMMUTE|HAS_DIM_CTX_HOME|HAS_DIM_CTX_SOCIAL|HAS_DIM_CTX_FOCUS|HAS_DIM_CTX_TRAVEL|HAS_DIM_CTX_SPECIAL|HAS_DIM_CTX_EMOTION_SIT]-(s)
+OPTIONAL MATCH (m)-[:HAS_DIM_WEATHER]-(w:DimWeather)
+WITH m,
+  max(CASE WHEN $genre IS NOT NULL AND toLower(g.genre) = toLower($genre) THEN 1 ELSE 0 END) AS genre_match,
+  max(CASE WHEN $mood IS NOT NULL AND toLower(mood.mood) = toLower($mood) THEN 1 ELSE 0 END) AS mood_match,
+  max(CASE WHEN $situation IS NOT NULL AND toLower(s.name) CONTAINS toLower($situation) THEN 1 ELSE 0 END) AS situation_match,
+  max(CASE WHEN $weather IS NOT NULL AND toLower(w.name) CONTAINS toLower($weather) THEN 1 ELSE 0 END) AS weather_match
+WITH m, genre_match + mood_match + situation_match + weather_match AS matched_count
+WHERE matched_count > 0
+RETURN
+  m.track_id AS track_id,
+  m.track_name AS track_name,
+  m.track_artist AS track_artist,
+  matched_count,
+  coalesce(m.track_popularity, 0) AS popularity,
+  matched_count * 10 + coalesce(m.track_popularity, 0) AS recommendation_score
+ORDER BY recommendation_score DESC
+LIMIT $limit
+""",
     }
 
-    PRIMARY_GOAL_TO_ROUTE: ClassVar[dict[str, str]] = {
-        "personalized_recommendation": ROUTE_PERSONALIZED,
-        "new_release_recommendation": ROUTE_NEW_RELEASE,
-        "discovery_recommendation": ROUTE_SAFE_DISCOVERY,
-        "music_information": ROUTE_SAFE_DISCOVERY,
-        "recommendation_reason": ROUTE_PERSONALIZED,
-        "general_chat": ROUTE_PERSONALIZED,
+    PARAMETER_TEMPLATES: ClassVar[dict[str, dict]] = {
+        Q_SEARCH_001: {
+            "required": ["keyword"],
+            "defaults": {"limit": 10},
+            "optional_nullable": [],
+        },
+        Q_SEARCH_003: {
+            "required": [],
+            "defaults": {"genre": None, "subgenre": None, "artist": None, "release_year": None, "limit": 20},
+            "optional_nullable": ["genre", "subgenre", "artist", "release_year"],
+        },
+        Q_SEARCH_009: {
+            "required": ["artist"],
+            "defaults": {"limit": 30},
+            "optional_nullable": [],
+        },
+        Q_SEARCH_011: {
+            "required": [],
+            "defaults": {"year": None, "start_year": None, "end_year": None, "limit": 20},
+            "optional_nullable": ["year", "start_year", "end_year"],
+        },
+        Q_REC_001: {
+            "required": ["genre"],
+            "defaults": {"limit": 10},
+            "optional_nullable": [],
+        },
+        Q_REC_002: {
+            "required": ["mood"],
+            "defaults": {"limit": 10},
+            "optional_nullable": [],
+        },
+        Q_REC_003: {
+            "required": ["situation"],
+            "defaults": {"limit": 10},
+            "optional_nullable": [],
+        },
+        Q_REC_004: {
+            "required": ["weather"],
+            "defaults": {"limit": 10},
+            "optional_nullable": [],
+        },
+        Q_REC_006: {
+            "required": [],
+            "defaults": {"genre": None, "subgenre": None, "artist": None, "limit": 10},
+            "optional_nullable": ["genre", "subgenre", "artist"],
+        },
+        Q_REC_008: {
+            "required": [],
+            "defaults": {"genre": None, "mood": None, "situation": None, "weather": None, "limit": 10},
+            "optional_nullable": ["genre", "mood", "situation", "weather"],
+        },
     }
 
-    CATEGORY_TO_TARGET_SECTION: ClassVar[dict[str, str]] = {
-        RECOMMENDATION_CATEGORY_NEW_RELEASE: TARGET_SECTION_NEW_RELEASE,
-        RECOMMENDATION_CATEGORY_DISCOVERY_CANDIDATE: TARGET_SECTION_DISCOVERY,
-        RECOMMENDATION_CATEGORY_PERSONALIZED_MATCH: TARGET_SECTION_PERSONALIZED,
-        RECOMMENDATION_CATEGORY_INFORMATION_RELATED: TARGET_SECTION_PERSONALIZED,
-    }
+    @classmethod
+    def cypher_for(cls, query_key: str) -> str:
+        if query_key not in cls.CYPHER_TEMPLATES:
+            raise KeyError(f"unknown query_key: {query_key}")
+        return cls.CYPHER_TEMPLATES[query_key].strip()
 
     @classmethod
-    def primary_goal_from_intent_type(cls, intent_type: str | None) -> str:
-        if not intent_type:
-            return DEFAULT_PRIMARY_GOAL
-        if intent_type in _INTENT_VALUES:
-            return intent_type
-        return DEFAULT_PRIMARY_GOAL
-
-    @classmethod
-    def recommendation_category_for_primary_goal(cls, primary_goal: str) -> str:
-        return cls.PRIMARY_GOAL_TO_RECOMMENDATION_CATEGORY.get(
-            primary_goal,
-            cls.RECOMMENDATION_CATEGORY_PERSONALIZED_MATCH,
-        )
-
-    @classmethod
-    def route_for_primary_goal(cls, primary_goal: str) -> str:
-        return cls.PRIMARY_GOAL_TO_ROUTE.get(primary_goal, cls.ROUTE_PERSONALIZED)
-
-    @classmethod
-    def target_section_for_category(cls, category: str) -> str:
-        return cls.CATEGORY_TO_TARGET_SECTION.get(category, cls.TARGET_SECTION_PERSONALIZED)
-
-
-_assert_primary_goal_maps_intent_types(
-    KagGraphConstants.PRIMARY_GOAL_TO_RECOMMENDATION_CATEGORY,
-    KagGraphConstants.PRIMARY_GOAL_TO_ROUTE,
-)
-
-
-class KagSessionInput:
-    """`session_context`에 실린 외부 입력만 사용한다. 기대 형식은 `kag_input.json`의 `kag_input_json` 과 동일."""
-
-    KAG_INPUT_JSON_KEY = "kag_input_json"
-
-    def __init__(self, session_context: dict | None) -> None:
-        raw = (session_context or {}).get(self.KAG_INPUT_JSON_KEY)
-        self._kag_input: dict = raw if isinstance(raw, dict) else {}
-        self._primary_goal_cached: str | None = None
-
-    def kag_input_json(self) -> dict:
-        """외부에서 받은 KagInputSchema.model_dump()와 동등한 내용(dict 얕은 복사)."""
-        return dict(self._kag_input)
-
-    def intent_type(self) -> str | None:
-        raw = self._kag_input.get("intent_type")
-        if isinstance(raw, str) and raw.strip():
-            return raw.strip()
-        return None
-
-    def primary_goal(self) -> str:
-        if self._primary_goal_cached is None:
-            self._primary_goal_cached = KagGraphConstants.primary_goal_from_intent_type(
-                self.intent_type(),
-            )
-        return self._primary_goal_cached
-
-    def recommendation_category(self) -> str:
-        return KagGraphConstants.recommendation_category_for_primary_goal(self.primary_goal())
-
-    def route(self) -> str:
-        return KagGraphConstants.route_for_primary_goal(self.primary_goal())
-
-    def target_section(self) -> str:
-        return KagGraphConstants.target_section_for_category(self.recommendation_category())
+    def parameter_template_for(cls, query_key: str) -> dict:
+        if query_key not in cls.PARAMETER_TEMPLATES:
+            raise KeyError(f"unknown parameter template query_key: {query_key}")
+        return dict(cls.PARAMETER_TEMPLATES[query_key])
