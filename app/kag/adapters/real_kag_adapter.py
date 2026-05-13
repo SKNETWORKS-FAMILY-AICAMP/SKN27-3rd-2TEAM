@@ -1,5 +1,4 @@
 from app.kag.adapters.kag_adapter import KagAdapter
-from app.kag.constant import KagSessionInput
 
 
 class RealKagAdapter(KagAdapter):

@@ -356,6 +356,7 @@ if __name__ == "__main__":
         try:
             rows = runner()
             logger.info("[SMOKE PASS] %s rows=%s", label, len(rows))
+            logger.info(rows)
         except Exception as exc:  # noqa: BLE001
             logger.exception("[SMOKE FAIL] %s (%s: %s)", label, type(exc).__name__, exc)
     logger.info("KAG Query Tool smoke 완료")
