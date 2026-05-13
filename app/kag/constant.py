@@ -16,7 +16,7 @@ class KagNodeLabel(str, Enum):
 
     MUSIC_CATALOG = "MusicCatalog"
     GENRE = "Genre"
-    PLAYLIST_SUBGENRE = "PlaylistSubGenre"
+    SUBGENRE = "SubGenre"
     ARTIST = "Artist"
     MOOD = "Mood"
     TEMPO = "Tempo"
@@ -43,7 +43,7 @@ class KagRelationType(str, Enum):
     """Neo4j 관계 타입 (스키마와 동일하게 유지)."""
 
     HAS_GENRE = "HAS_GENRE"
-    HAS_PLAYLIST_SUBGENRE = "HAS_PLAYLIST_SUBGENRE"
+    HAS_SUBGENRE = "HAS_SUBGENRE"
     PERFORMED_BY = "PERFORMED_BY"
     HAS_MOOD = "HAS_MOOD"
     HAS_TEMPO = "HAS_TEMPO"

@@ -1,9 +1,11 @@
 import logging
+import os
 import time
 
 from app.agents.base_agent import BaseAgent
 from app.kag.adapters.kag_adapter import KagAdapter
 from app.kag.adapters.mock_kag_adapter import MockKagAdapter
+from app.kag.adapters.real_kag_adapter import RealKagAdapter
 
 logger = logging.getLogger("rimas.agent.kag_dispatch")
 
@@ -14,7 +16,7 @@ class KagDispatchAgent(BaseAgent):
     """
 
     def __init__(self, kag_adapter: KagAdapter | None = None):
-        self._adapter = kag_adapter or MockKagAdapter()
+        self._adapter = kag_adapter or self._build_default_adapter()
 
     def run(
         self,
@@ -49,3 +51,10 @@ class KagDispatchAgent(BaseAgent):
                 exc_info=True,
             )
             return {"status": "error", "error_reason": str(exc)}
+
+    @staticmethod
+    def _build_default_adapter() -> KagAdapter:
+        mode = os.getenv("RIMAS_KAG_MODE", "mock").strip().lower()
+        if mode == "real":
+            return RealKagAdapter()
+        return MockKagAdapter()

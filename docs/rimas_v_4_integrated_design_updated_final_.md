@@ -1365,11 +1365,15 @@ KAG는:
 
 ## 11.1 목적
 
-Elasticsearch는 추천 이유와 설명 근거 검색을 담당한다.
+Elasticsearch RAG는 KAG가 확정한 후보 `content_id`에 대해 추천 이유, 음악 설명, 분위기 설명, 검색 근거를 보강한다.
+
+RAG는 추천 후보를 새로 만들지 않는다. KAG가 제공한 `content_id` 범위 안에서만 evidence를 검색하고 `RAG_STATE`를 구성한다.
 
 ---
 
 ## 11.2 Index 구조
+
+목표 인덱스:
 
 - rimas_tracks
 - rimas_lyrics
@@ -1377,6 +1381,12 @@ Elasticsearch는 추천 이유와 설명 근거 검색을 담당한다.
 - rimas_genre_info
 - rimas_mood_info
 - rimas_recommendation_evidence
+
+현재 `app/rag` 추가 구현 기준 개발/검증 인덱스:
+
+- `spotify_songs`
+
+`spotify_songs`는 `content`, `embedding`, `metadata` 필드를 가진 개발용 Elasticsearch 인덱스로 사용한다. 운영 인덱스 명명과 최종 매핑은 위 목표 인덱스 구조에 맞춰 별도 확정한다.
 
 ---
 
@@ -1395,6 +1405,17 @@ MusicCatalog:
 - release_date
 - lyrics_summary
 
+현재 `app/rag/services/retrieval.py`와 `app/rag/musicCatalogRepository/sql_repostiory.py` 기준 검색 대상 메타데이터 후보:
+
+- metadata.song
+- metadata.Artist(s)
+- metadata.Genre
+- metadata.emotion
+- metadata.Album
+- metadata.text
+
+최종 운영 전에는 위 필드명을 `MusicCatalog`/PostgreSQL/Neo4j의 `track_id = content_id` 기준 필드명과 정렬해야 한다.
+
 ---
 
 ## 11.4 RAG 역할
@@ -1406,17 +1427,100 @@ RAG는:
 - 곡 정보 제공
 - 분위기 설명 제공
 - recommendation evidence 제공
+- retrieval_trace 제공
+- KAG 후보 `content_id`와 evidence의 매칭 검증
 
 ---
 
-## 11.5 RAG 금지 규칙
+## 11.5 현재 RAG 구현 계층
+
+`app/rag`는 다음 계층으로 분리한다.
+
+- `ragStateBuilder/`: `RagRequest`, `RagState`, `RagOutput` 계약과 경량 workflow 구성
+- `contractValidator/`: RAG 내부 최소 계약 검증 계층
+- `musicCatalogRepository/`: 음악 카탈로그/검색 저장소 접근 경계
+- `adapters/`: Mock/Real RAG 교체 지점
+- `services/`: retrieval, embedding, indexing, generation 실행 서비스
+- `common/`: Elasticsearch vector, pgvector 등 검색 보조 유틸리티
+- `data/`: 개발용 CSV/embedding JSON 데이터
+
+최종 Real RAG Adapter 기준 파일은 `app/rag/adapters/rag_real_adapter.py`로 확정한다. `app/rag/adapters/real_rag_adapter.py`는 구현 이전에 만들어진 임시 파일이며, 연결 완료 후 폐기 후보로 분류한다.
+
+`services/retrieval.py`, `services/indexing.py`, `services/embedding.py`는 Real RAG 연결을 위한 후보 구현/실험 코드로 취급하며, Dispatch Agent에 연결하기 전 계약 정리가 필요하다.
+
+---
+
+## 11.6 검색 전략
+
+Real RAG 검색은 다음 순서를 기준으로 한다.
+
+1. KAG가 전달한 후보 `content_id`와 사용자 질의를 기반으로 RAG 입력을 구성한다.
+2. 메타데이터 필터로 검색 범위를 제한한다.
+3. BM25/키워드 검색과 embedding 기반 vector 검색을 결합한다.
+4. 검색 결과를 reranking한다.
+5. `content_id`가 KAG 후보 범위를 벗어나지 않는지 검증한다.
+6. `RAG_STATE.recommended_content_evidence`와 `retrieval_trace`를 생성한다.
+
+현재 `services/retrieval.py`는 lexical, semantic, hybrid 검색 모드를 포함한다. embedding은 `app/rag/services/embedding.py`의 `qwen3-embedding:0.6b` Ollama 모델 후보를 사용한다.
+
+---
+
+## 11.7 RAG 내부 Validator 범위
+
+RAG 내부 Validator는 최소 계약 검증만 담당한다.
+
+검증 범위:
+
+- `recommended_content_evidence[*].content_id`가 KAG 후보 `content_id` 범위 안에 있는지
+- RAG 출력 필수 필드가 존재하는지
+- `evidence_summary`가 비어 있지 않은지
+- `retrieval_trace`가 존재하는지
+
+금지:
+
+- 최종 자연어 응답 검증
+- UI 표시 문구 검증
+- Recommendation Agent ranking 검증
+- LLM hallucination 전체 판정
+
+최종 응답/출처 검증은 공통 `app/validators` 계층에서 담당한다.
+
+---
+
+## 11.8 RAG 금지 규칙
 
 금지:
 
 - 추천 전략 결정
 - 존재하지 않는 곡 생성
+- KAG 후보에 없는 content_id 생성 또는 추가
 - 최종 응답 생성
 - KAG_STATE 수정
+- LLM으로 RAG_STATE 전체를 임의 생성
+
+---
+
+## 11.9 RAG Dispatch Adapter 선택 조건
+
+`app/agents/rag_dispatch_agent.py`는 환경변수 `RIMAS_RAG_MODE`로 Mock/Real RAG Adapter를 선택한다.
+
+선택 기준:
+
+- 기본값은 `mock`이다.
+- `RIMAS_RAG_MODE=mock`이면 Mock RAG Adapter를 사용한다.
+- `RIMAS_RAG_MODE=real`이면 `app/rag/adapters/rag_real_adapter.py` 기준 Real RAG Adapter를 사용한다.
+- Real RAG 선택 시 Elasticsearch 연결 실패, 인덱스 없음, 필수 evidence 부족이 발생하면 조용히 Mock으로 전환하지 않는다.
+- Real RAG 실패는 `fallback` 또는 `failed` 상태로 명시적으로 반환한다.
+
+요청 payload가 Adapter 선택권을 직접 갖지 않는다. Adapter 선택은 런타임 설정 책임이며, 클라이언트 입력으로 `rag_mode`를 받지 않는다.
+
+---
+
+## 11.10 정해야 하는 부분
+
+Real RAG 연결 전 확정이 필요한 항목:
+
+- `musicCatalogRepository`의 오타 파일명(`*_repostiory.py`)은 Real RAG 연결 완료 후 import 영향 범위를 확인한 뒤 한 번에 정리한다.
 
 ---
 
@@ -2128,6 +2232,52 @@ rimas/
         response_generator.py
         validator_controller.py
 
+      kag/
+        connection.py
+        constant.py
+        querys.py
+        adapters/
+          real_kag_adapter.py
+
+      rag/
+        design.md
+        output.md
+        adapters/
+          rag_adapter.py
+          mock_rag_adapter.py
+          real_rag_adapter.py
+          rag_mock_adapter.py
+          rag_real_adapter.py
+        builders/
+          rag_state_builder.py
+        ragStateBuilder/
+          schema.py
+          nodes.py
+          edges.py
+          builder.py
+        contractValidator/
+          base_validator.py
+          format_validator.py
+          logic_validator.py
+          hallucination_validator.py
+        musicCatalogRepository/
+          base_repostiory.py
+          sql_repostiory.py
+          loader.py
+          loader2.py
+          loader_lyrics.py
+        services/
+          retrieval.py
+          embedding.py
+          indexing.py
+          rag_generation.py
+        common/
+          elasticsearch_vector.py
+          custom_pgvector.py
+        data/
+          spotify_songs.csv
+          embedded_data_part111.json
+
       adapters/
         kag_adapter.py
         mock_kag_adapter.py
@@ -2302,21 +2452,24 @@ rimas/
 7. PostgreSQL 설계
 8. Redis Session 구조 구현
 9. Neo4j MusicCatalog 기반 Graph 구성
-10. Elasticsearch Index 구성
-11. LLM Layer 구현
-12. Input Planner Agent 구현
-13. KAG Dispatch Agent 구현
-14. RAG Dispatch Agent 구현
-15. FastAPI API 구현
-16. Multi-Agent Flow 구현
-17. Validator 구현
-18. Music Detail Flow 구현
-19. React UI 구현
-20. Docker Compose 통합
-21. 통합 테스트
-22. Session Flush 테스트
-23. Provenance Validation 테스트
-24. 배포 준비
+10. RAG_STATE/RAG_INPUT_JSON 계약과 `ragStateBuilder` 고정
+11. RAG `contractValidator` 형식/로직 검증 구현
+12. Elasticsearch Index 구성
+13. RAG retrieval/embedding/indexing 서비스 연결
+14. LLM Layer 구현
+15. Input Planner Agent 구현
+16. KAG Dispatch Agent 구현
+17. RAG Dispatch Agent 구현
+18. FastAPI API 구현
+19. Multi-Agent Flow 구현
+20. Validator 구현
+21. Music Detail Flow 구현
+22. React UI 구현
+23. Docker Compose 통합
+24. 통합 테스트
+25. Session Flush 테스트
+26. Provenance Validation 테스트
+27. 배포 준비
 
 ---
 

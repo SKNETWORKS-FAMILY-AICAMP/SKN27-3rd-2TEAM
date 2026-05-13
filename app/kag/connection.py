@@ -1,19 +1,14 @@
-# 로그 
 import logging
+import os
+
+from dotenv import load_dotenv
+from neo4j import GraphDatabase
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # 환경변수 로드 
-from dotenv import load_dotenv
 load_dotenv()
-
-# 패키지
-import os
-import psycopg
-# import streamlit as st
-from neo4j import GraphDatabase
-# from graphdatascience import GraphDataScience
-# from langchain_ollama import OllamaEmbeddings
 
 
 #####################################################################################
@@ -51,10 +46,10 @@ class Neo4j_Connection(metaclass=Singleton):
         해당 부분에서 연결 체크까지 처리한다. 
         - 사용하는 임배딩 모델은 qwen3-embedding:0.6b 를 사용한다. 
         '''
-        # 환경변수 및 기본 변수 설정 
-        uri = uri or os.getenv("NEO4J_URI")
-        user = user or os.getenv("NEO4J_USER")
-        password = password or os.getenv("NEO4J_PASSWORD")
+        # 루트 docker-compose.yml 기준 RIMAS_NEO4J_* 값을 우선 사용한다.
+        uri = uri or os.getenv("RIMAS_NEO4J_URI") or os.getenv("NEO4J_URI") or "bolt://localhost:7687"
+        user = user or os.getenv("RIMAS_NEO4J_USER") or os.getenv("NEO4J_USER") or "neo4j"
+        password = password or os.getenv("RIMAS_NEO4J_PASSWORD") or os.getenv("NEO4J_PASSWORD") or ""
         # if embedding_model is None:
         #     embedding_model = os.getenv("NEO4J_EMBEDDING_MODEL") or "qwen3-embedding:0.6b"
 

@@ -125,8 +125,44 @@ app/
 - `__init__.py`: RAG 패키지 초기화 파일입니다.
 - `adapters/rag_adapter.py`: RAG Adapter 인터페이스 또는 공통 계약입니다.
 - `adapters/mock_rag_adapter.py`: 테스트/로컬용 Mock RAG Adapter입니다.
-- `adapters/real_rag_adapter.py`: Elasticsearch 등 실제 RAG 연동용 Adapter입니다.
+- `adapters/real_rag_adapter.py`: 구현 이전에 만들어진 임시 Real RAG Adapter이며, 연결 완료 후 폐기 후보입니다.
+- `adapters/rag_mock_adapter.py`: 신규 RAG 설계 기준 Mock Adapter 후보 파일입니다.
+- `adapters/rag_real_adapter.py`: 최종 Real RAG Adapter 기준 파일입니다.
+- `adapters/description.md`: Adapter 계층의 책임과 교체 지점을 설명합니다.
 - `builders/rag_state_builder.py`: RAG 검색 결과를 Runtime State로 구성하는 Builder입니다.
+- `ragStateBuilder/schema.py`: RAG 요청, 내부 상태, 출력 계약을 정의합니다.
+- `ragStateBuilder/nodes.py`: RAG workflow node 후보 구현입니다.
+- `ragStateBuilder/edges.py`: RAG workflow 분기 조건 후보 구현입니다.
+- `ragStateBuilder/builder.py`: 경량 RAG graph compile/invoke 후보 구현입니다.
+- `ragStateBuilder/description.md`: RAG State Builder 계층 설명 문서입니다.
+- `contractValidator/base_validator.py`: RAG 최소 계약 검증기 공통 기반 후보입니다.
+- `contractValidator/format_validator.py`: RAG 출력 필수 필드/형식 검증 후보입니다.
+- `contractValidator/logic_validator.py`: KAG 후보 content_id 범위 검증 후보입니다.
+- `contractValidator/hallucination_validator.py`: 현재 MVP 필수 범위가 아니며, 최종 응답/출처 검증은 공통 validator가 담당합니다.
+- `contractValidator/description.md`: RAG 최소 계약 검증 계층 설명 문서입니다.
+- `musicCatalogRepository/base_repostiory.py`: RAG 음악 카탈로그 저장소 공통 경계 후보입니다.
+- `musicCatalogRepository/sql_repostiory.py`: Elasticsearch/SQL 연동 저장소 후보 구현입니다.
+- `musicCatalogRepository/loader.py`: RAG 카탈로그 데이터 로더 후보입니다.
+- `musicCatalogRepository/loader2.py`: RAG 카탈로그 데이터 로더 후보입니다.
+- `musicCatalogRepository/loader_lyrics.py`: RAG 가사 데이터 로더 후보입니다.
+- `musicCatalogRepository/description.md`: RAG 저장소 계층 설명 문서입니다.
+- `services/retrieval.py`: Elasticsearch lexical/semantic/hybrid 검색 후보 구현입니다.
+- `services/embedding.py`: Ollama embedding 생성 후보 구현입니다.
+- `services/indexing.py`: RAG indexing workflow 후보 구현입니다.
+- `services/rag_generation.py`: 검색 근거 기반 생성 단계 후보 파일입니다.
+- `services/description.md`: RAG service 계층 설명 문서입니다.
+- `common/elasticsearch_vector.py`: Elasticsearch vector 검색 보조 후보 모듈입니다.
+- `common/custom_pgvector.py`: pgvector 기반 검색 보조 후보 모듈입니다.
+- `data/spotify_songs.csv`: RAG 개발/검증용 Spotify CSV 데이터입니다.
+- `data/embedded_data_part111.json`: RAG 개발/검증용 embedding JSON 데이터입니다.
+- `design.md`: RAG 구현 순서와 계층별 책임을 정리한 설계 문서입니다.
+- `output.md`: RAG 출력 예시 문서입니다.
+
+현재 RAG 신규 파일은 실제 Dispatch 연결 완료 상태로 보지 않습니다. 최종 Adapter 기준은 `rag_real_adapter.py`이며, `real_rag_adapter.py`는 임시 파일/폐기 후보로 분류합니다. `retrieval.py`, `indexing.py`, `embedding.py`는 Real RAG 연결 후보 구현입니다.
+
+RAG Dispatch Adapter 선택 기준은 `RIMAS_RAG_MODE` 환경변수입니다. 기본값은 `mock`이고, `RIMAS_RAG_MODE=real`일 때만 Real RAG Adapter를 사용합니다. Real RAG 실패 시 조용히 Mock으로 전환하지 않고 `fallback` 또는 `failed` 상태를 명시해야 합니다.
+
+`musicCatalogRepository`의 `*_repostiory.py` 오타 파일명은 Real RAG 연결 완료 후 import 영향 범위를 확인한 뒤 한 번에 정리합니다.
 
 #### `app/repositories/`
 
