@@ -5,38 +5,63 @@ logger = logging.getLogger(__name__)
 
 # 모듈
 from common.querys import Query
-from common.utils import import_data
+from common.utils import (
+    import_data,
+    import_column,
+    import_music_catalog_scenarios,
+    remove_duplicate_genre_subgenre,
+    get_filepath,
+)
 from common.connection import Neo4j_Connection
+from common.constant import (
+    KagMoodLabel,
+    KagTempoLabel,
+)
 
 
 ###################################################################################################
 # 메인 함수 정의 (실행할 쿼리 함수 선언)
 ###################################################################################################
 def main():
-    """ 해당 부분에 사전에 정의한 쿼리 함수들을 설정해서 실행함 """
-    # 모든 데이터 삭제 (초기화) 
-    conn = Neo4j_Connection()
-    conn.clear_database()
-
-    # 유저 데이터 추가 
-    import_data(path="users.csv", row_query=Query.users)
-    import_data(path="genres.csv", row_query=Query.genres)
-    import_data(path="artists.csv", row_query=Query.artists)
-    import_data(path="moods.csv", row_query=Query.moods)
+    """ 
+    해당 부분에 사전에 정의한 쿼리 함수들을 설정해서 실행함 
+    작업에 필요한 부분이 있으면 해당 부분만 주석 해제해서 실행하면 된다. 
+    """
+    ######################## 모든 데이터 삭제 (초기화) ##############################
+    # conn = Neo4j_Connection()
+    # conn.clear_database()
 
 
+    ######################## 음원 데이터 전체 추가 (약 3만개) ##############################
+    # import_data(path="music_catalog.csv", query_params=Query.music_catalog)
 
 
+    ######################## 엣지 연결할 추가 노드 적제 ##############################
+    # import_column(path="music_catalog.csv", column_name="playlist_genre", query_params=Query.genres)
+    # import_column(path="music_catalog.csv", column_name="track_artist", query_params=Query.artists)
+    # import_column(path="music_catalog.csv", column_name="playlist_subgenre", query_params=Query.subgenres)
+    # import_column(path="music_catalog.csv", column_name="track_album_release_date", query_params=Query.year)
 
 
+    ############################### 서브노드 간 엣지 연결 ############################################
+    # 장르랑 서브 장르 연결을 위한 csv 데이터 생성 
+    # remove_duplicate_genre_subgenre(path=get_filepath("music_catalog.csv"))
+    # import_data(path="genre_subgenre.csv", query_params=Query.edge_has_genre_subgenre)
 
 
+    ############################### 엣지 연결 ############################################
+    # 데이터 전체를 주회해야 하므로 import_data 를 통해 실행하게 됨 
+    # 다만 각 쿼리 내부에 연결 여부를 매핑하는 함수가 들어있어야 한다. 조건에 맞으면 연결 / 아니면 pass 
+    import_data(path="music_catalog.csv", query_params=Query.edge_has_genre)
+    import_data(path="music_catalog.csv", query_params=Query.edge_has_subgenre)
+    import_data(path="music_catalog.csv", query_params=Query.edge_performed_by)
 
 
-
-
-
-
+    ######################## 검색 시나리오 dim_* 분류 (music_catalog_scenarios.csv) ##############################
+    # 열마다 별도 노드 라벨(DimWeather, DimSeason, …)로 tag_id 값을 적재하고,
+    # MusicCatalog에는 HAS_DIM_WEATHER 등 차원별 관계로 연결한다.
+    # 선행: music_catalog.csv로 MusicCatalog 트랙 노드가 이미 있어야 track_id 매칭된다.
+    # import_music_catalog_scenarios()
 
 
 
