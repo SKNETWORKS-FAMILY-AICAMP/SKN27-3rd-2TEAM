@@ -56,7 +56,7 @@ User
 → PostgreSQL Log
 → UI 출력
 
-기존 설계 기준상 KAG는 추천 방향과 큐레이션 경로를 결정하고, RAG는 추천 후보와 설명 근거를 제공한다. LLM은 추천 후보를 새로 만들지 않고 자연어 응답만 생성해야 한다.
+최신 구현 기준상 KAG는 Neo4j 그래프 탐색으로 추천 방향, 큐레이션 경로, 추천 후보 content_id를 결정하고, RAG는 해당 후보에 대한 설명 근거를 제공한다. LLM은 추천 후보나 content_id를 새로 만들지 않고 자연어 응답만 생성해야 한다.
 
 ---
 
@@ -423,7 +423,7 @@ Intent Agent는 Main Recommendation Flow에서도 INTENT_STATE를 검증하고 c
 2. URL Query 기반 detail 상태 생성
 3. 예시:
 
-/music?detail=track_001
+/music?detail=nl_track_001
 
 4. content_id 확보
 5. Frontend가 Music Detail API 호출
@@ -708,7 +708,7 @@ Recommendation Agent는 기존 Curation Agent 역할을 포함한다.
 {
   "selected_recommendations": [
     {
-      "content_id": "track_001",
+      "content_id": "nl_track_001",
       "title": "Midnight Loop",
       "artist": "Nova Lane",
       "section": "personalized",
@@ -885,7 +885,7 @@ MusicDetailPage는 URL 기반 Modal 구조를 우선 적용한다.
 
 예시:
 
-/music?detail=track_001
+/music?detail=nl_track_001
 
 필요 시 Full Page 구조로 확장 가능하다.
 
@@ -1277,35 +1277,59 @@ PostgreSQL은 canonical metadata 및 영속 저장을 담당한다.
 
 ## 10.1 목적
 
-Neo4j는 음악 관계 기반 추천 방향 탐색을 담당한다.
+Neo4j는 음악 관계 기반 추천 방향 탐색과 추천 후보 content_id 생성을 담당한다.
+
+현재 런타임 기준은 `neo4j/` 폴더에 구현된 MusicCatalog 중심 그래프 구조다. 설계서 초기안의 `Track` 중심 명칭은 앱 런타임에서는 `MusicCatalog`로 해석한다.
+
+KAG/RAG/API 공통 `content_id`는 `MusicCatalog.track_id`를 사용한다.
 
 ---
 
 ## 10.2 Node 구조
 
-- User
-- Track
-- Artist
+- MusicCatalog
 - Genre
+- SubGenre 또는 PlaylistSubGenre
+- Artist
 - Mood
-- Playlist
-- Situation
-- Emotion
+- Tempo
+- ReleaseYear
+- DimWeather
+- DimSeason
+- DimEmotion
+- DimTimeOfDay
+- DimEnergyLevel
+- DimCtxCommute
+- DimCtxHome
+- DimCtxFocus
+- DimCtxExercise
+- DimCtxSocial
+- DimCtxEmotionSit
+- DimCtxTravel
+- DimCtxSpecial
+
+User 기반 그래프 노드와 사용자 청취 관계는 확장 대상이며, 현재 Real KAG 1차 연결 범위에는 포함하지 않는다.
 
 ---
 
 ## 10.3 Relationship 구조
 
-- User -[:LIKES_GENRE]-> Genre
-- User -[:LIKES_MOOD]-> Mood
-- User -[:LISTENED_TO]-> Track
-- Track -[:HAS_GENRE]-> Genre
-- Track -[:HAS_MOOD]-> Mood
-- Track -[:SIMILAR_TO]-> Track
-- Genre -[:ADJACENT_TO]-> Genre
-- Mood -[:COMPATIBLE_WITH]-> Mood
-- Track -[:FITS_SITUATION]-> Situation
-- Track -[:HAS_EMOTION]-> Emotion
+- MusicCatalog -[:HAS_GENRE]-> Genre
+- MusicCatalog -[:HAS_SUBGENRE]-> SubGenre
+- MusicCatalog -[:PERFORMED_BY]-> Artist
+- MusicCatalog -[:HAS_MOOD]-> Mood
+- MusicCatalog -[:HAS_TEMPO]-> Tempo
+- MusicCatalog -[:RELEASED_IN]-> ReleaseYear
+- MusicCatalog -[:HAS_DIM_WEATHER]-> DimWeather
+- MusicCatalog -[:HAS_DIM_SEASON]-> DimSeason
+- MusicCatalog -[:HAS_DIM_EMOTION]-> DimEmotion
+- MusicCatalog -[:HAS_DIM_TIME_OF_DAY]-> DimTimeOfDay
+- MusicCatalog -[:HAS_DIM_ENERGY_LEVEL]-> DimEnergyLevel
+- MusicCatalog -[:HAS_DIM_CTX_*]-> DimCtx*
+
+관계명은 실제 Neo4j 적재 결과와 앱 KAG 쿼리 상수가 반드시 일치해야 한다. `HAS_SUBGENRE`와 `HAS_PLAYLIST_SUBGENRE`처럼 동일 의미의 관계명이 중복될 경우, 실제 적재 기준으로 하나를 선택해 런타임 쿼리를 정렬한다.
+
+초기 설계의 `LIKES_GENRE`, `LIKES_MOOD`, `LISTENED_TO`, `SIMILAR_TO`, `ADJACENT_TO`, `COMPATIBLE_WITH`, `FITS_SITUATION`, `HAS_EMOTION`은 사용자 이력 그래프 또는 확장 그래프 단계에서 다시 도입할 수 있다.
 
 ---
 
@@ -1315,6 +1339,7 @@ KAG는:
 
 - 추천 방향 결정
 - 추천 후보 탐색
+- 추천 후보 content_id 생성
 - 취향 확장 경로 탐색
 - recommendation_category 결정
 - route 결정
@@ -1328,6 +1353,8 @@ KAG는:
 
 - 최종 자연어 생성
 - 추천 이유 생성
+- LLM 호출
+- 존재하지 않는 content_id 생성
 - UI 렌더링
 - RAG_STATE 수정
 - RESPONSE_STATE 생성
@@ -1355,7 +1382,7 @@ Elasticsearch는 추천 이유와 설명 근거 검색을 담당한다.
 
 ## 11.3 저장 메타데이터
 
-Track:
+MusicCatalog:
 
 - track_id
 - title
@@ -1453,6 +1480,19 @@ RAG는:
   "recommendation_goal": {
     "primary_goal": "new_taste_discovery"
   },
+  "recommended_content_ids": [
+    "nl_track_001",
+    "nl_track_002"
+  ],
+  "candidate_tracks": [
+    {
+      "content_id": "nl_track_001",
+      "track_id": "nl_track_001",
+      "track_name": "Midnight Loop",
+      "track_artist": "Nova Lane",
+      "recommendation_score": 87
+    }
+  ],
   "curation_strategy": {
     "strategy_code": "SAFE_DISCOVERY_FROM_PERSONAL_TASTE"
   },
@@ -1473,6 +1513,10 @@ RAG는:
   "recommendation_goal": {
     "primary_goal": "new_taste_discovery"
   },
+  "recommended_content_ids": [
+    "nl_track_001",
+    "nl_track_002"
+  ],
   "target_section": "discovery_section"
 }
 ```
@@ -1486,7 +1530,7 @@ RAG는:
   "status": "success",
   "recommended_content_evidence": [
     {
-      "content_id": "track_001",
+      "content_id": "nl_track_001",
       "title": "Midnight Loop",
       "artist": "Nova Lane",
       "genre": ["indie"],
@@ -1509,7 +1553,7 @@ RAG는:
   "status": "success",
   "display_recommendations": [
     {
-      "content_id": "track_001",
+      "content_id": "nl_track_001",
       "title": "Midnight Loop",
       "artist": "Nova Lane",
       "display_reason": "차분한 밤 분위기와 연결되는 곡"
@@ -1528,8 +1572,8 @@ RAG는:
   "session_id": "session_001",
   "intent_type": "personalized_recommendation",
   "kag_recommended_content_ids": [
-    "track_001",
-    "track_002"
+    "nl_track_001",
+    "nl_track_002"
   ],
   "target_section": "personalized_section",
   "query_text": "차분한 밤 분위기의 인디 음악 추천 이유",
@@ -1556,7 +1600,7 @@ RAG는:
   "chatbot_response": "차분한 밤 분위기를 좋아한다면 Midnight Loop를 추천드릴게요.",
   "display_recommendations": [
     {
-      "content_id": "track_001",
+      "content_id": "nl_track_001",
       "title": "Midnight Loop",
       "artist": "Nova Lane",
       "label": "취향 기반 추천",
@@ -1564,7 +1608,7 @@ RAG는:
     }
   ],
   "used_content_ids": [
-    "track_001"
+    "nl_track_001"
   ]
 }
 ```
@@ -2165,27 +2209,32 @@ rimas/
       config/
         settings.py
 
-  infra/
-    docker-compose.yml
+  docker-compose.yml
+  Dockerfile
 
-    postgres/
+  db/
+    schema.sql
+    seed.sql
 
-    redis/
-
-    neo4j/
-
-    elasticsearch/
+  neo4j/
+    data/
+    common/
+    data_insert.py
 ```
 
 ---
 
 # 17. Docker Compose 구조
 
+런타임 Docker 기준은 루트 `docker-compose.yml`과 루트 `Dockerfile`이다.
+
+`neo4j/docker-compose.yml`은 Neo4j 단독 실행용 과거 구성 또는 참고 구성으로 취급하며, 운영/통합 런타임 기준에서 제외한다. Neo4j 데이터 적재 자동화가 필요하면 루트 compose 기준 one-shot loader 서비스 또는 별도 적재 명령으로 분리한다.
+
 ## 서비스 목록
 
 - frontend
 - backend
-- postgres
+- db(PostgreSQL)
 - redis
 - neo4j
 - elasticsearch
@@ -2222,6 +2271,10 @@ rimas/
 - RAG Dispatch Agent 없이 Retrieval 직접 호출 금지
 - Adapter 우회 금지
 - Mock/Real Adapter 직접 하드코딩 금지
+- LLM이 content_id 생성 금지
+- LLM이 title/artist 생성 금지
+- 백엔드 애플리케이션 시작 시 Neo4j 대량 적재 금지
+- 루트 compose를 우회한 Neo4j 런타임 compose 사용 금지
 - broad Zustand subscribe
 - duplicated API fetch
 - duplicated retrieval
@@ -2248,7 +2301,7 @@ rimas/
 6. CompactStateBuilder 구현
 7. PostgreSQL 설계
 8. Redis Session 구조 구현
-9. Neo4j Graph 구성
+9. Neo4j MusicCatalog 기반 Graph 구성
 10. Elasticsearch Index 구성
 11. LLM Layer 구현
 12. Input Planner Agent 구현
