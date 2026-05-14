@@ -79,6 +79,7 @@ def _empty_context(session_id: str) -> dict:
         "recent_genres": [],
         "recent_artists": [],
         "recent_moods": [],
+        "selected_tracks": [],
         "conversation_summary": "",
     }
 

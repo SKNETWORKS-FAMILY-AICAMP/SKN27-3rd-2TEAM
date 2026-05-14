@@ -27,6 +27,10 @@ def recommendation_metadata_key(session_id: str) -> str:
     return f"{_session_prefix(session_id)}:recommendation:metadata"
 
 
+def taste_events_key(session_id: str) -> str:
+    return f"{_session_prefix(session_id)}:taste_events"
+
+
 def _session_prefix(session_id: str) -> str:
     if not session_id:
         raise ValueError("session_id is required")

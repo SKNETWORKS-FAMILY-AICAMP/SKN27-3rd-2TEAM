@@ -173,3 +173,17 @@ def test_music_detail_view_model_contract():
     )
 
     assert detail.content_id == "track_001"
+
+
+def test_session_context_schema_accepts_selected_tracks():
+    from app.schemas.session_context_schema import SessionContextSchema
+
+    ctx = SessionContextSchema(
+        session_id="session_001",
+        recent_genres=["indie"],
+        recent_artists=["Nova Lane"],
+        recent_moods=["night"],
+        selected_tracks=["track_001"],
+    )
+
+    assert ctx.model_dump()["selected_tracks"] == ["track_001"]

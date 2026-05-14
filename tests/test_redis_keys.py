@@ -27,3 +27,9 @@ def test_session_redis_keys_reject_empty_session_id():
             assert str(exc) == "session_id is required"
         else:
             raise AssertionError(f"{build_key.__name__} accepted an empty session_id")
+
+
+def test_taste_events_key_contract():
+    from app.cache.redis_keys import taste_events_key
+
+    assert taste_events_key("session_001") == "rimas:session:session_001:taste_events"
