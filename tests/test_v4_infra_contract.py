@@ -90,6 +90,15 @@ def test_dockerfile_runs_fastapi_on_port_8000():
     assert "8501" not in dockerfile
 
 
+def test_taste_tables_exist_in_schema():
+    sql = read(SCHEMA)
+
+    assert "CREATE TABLE IF NOT EXISTS user_taste_events" in sql
+    assert "CREATE TABLE IF NOT EXISTS user_taste_profiles" in sql
+    assert "idx_user_taste_events_user_created_at" in sql
+    assert "idx_user_taste_profiles_updated_at" in sql
+
+
 def test_compose_defines_v4_runtime_services():
     compose = read(COMPOSE_FILE)
 
