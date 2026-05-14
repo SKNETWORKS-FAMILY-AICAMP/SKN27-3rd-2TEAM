@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from app.cache import redis_client
 from app.cache.redis_keys import session_context_key, session_history_key, taste_events_key
+from app.common.list_utils import merge_unique
 from app.config.settings import REDIS_SESSION_TTL
 
 logger = logging.getLogger("rimas.session")
@@ -66,17 +67,17 @@ def update_context_from_turn(
     new_genres = kag_state.get("user_context", {}).get("base_preference", {}).get("genres", [])
     new_moods = kag_state.get("user_context", {}).get("base_preference", {}).get("moods", [])
 
-    ctx["recent_genres"] = _merge_recent(ctx.get("recent_genres", []), new_genres, limit=5)
-    ctx["recent_moods"] = _merge_recent(ctx.get("recent_moods", []), new_moods, limit=5)
+    ctx["recent_genres"] = merge_unique(new_genres, ctx.get("recent_genres", []), limit=5)
+    ctx["recent_moods"] = merge_unique(new_moods, ctx.get("recent_moods", []), limit=5)
     new_dislikes = new_dislikes or {}
-    ctx["disliked_artists"] = _merge_recent(
-        ctx.get("disliked_artists", []),
+    ctx["disliked_artists"] = merge_unique(
         new_dislikes.get("disliked_artists", []),
+        ctx.get("disliked_artists", []),
         limit=50,
     )
-    ctx["disliked_tracks"] = _merge_recent(
-        ctx.get("disliked_tracks", []),
+    ctx["disliked_tracks"] = merge_unique(
         new_dislikes.get("disliked_tracks", []),
+        ctx.get("disliked_tracks", []),
         limit=50,
     )
 
@@ -84,6 +85,25 @@ def update_context_from_turn(
     if reason:
         ctx["conversation_summary"] = reason
 
+    set_context(session_id, ctx)
+    return ctx
+
+
+def update_context_from_taste(
+    session_id: str,
+    genre: list,
+    mood: list,
+    artist: str,
+    content_id: str,
+) -> dict:
+    """취향 추가 이벤트 이후 SESSION_CONTEXT를 즉시 갱신하고 저장한다."""
+    ctx = get_context(session_id)
+    ctx["recent_genres"] = merge_unique(genre, ctx.get("recent_genres", []), limit=5)
+    ctx["recent_moods"] = merge_unique(mood, ctx.get("recent_moods", []), limit=5)
+    ctx["recent_artists"] = merge_unique(
+        [artist] if artist else [], ctx.get("recent_artists", []), limit=5
+    )
+    ctx["selected_tracks"] = merge_unique([content_id], ctx.get("selected_tracks", []), limit=50)
     set_context(session_id, ctx)
     return ctx
 
@@ -123,7 +143,3 @@ def _empty_context(session_id: str) -> dict:
     }
 
 
-def _merge_recent(existing: list, new_items: list, limit: int) -> list:
-    """새 항목을 앞에 추가하고, 중복 제거 후 limit 개수를 유지한다."""
-    merged = new_items + [x for x in existing if x not in new_items]
-    return merged[:limit]

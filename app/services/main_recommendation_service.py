@@ -4,9 +4,11 @@ import time
 from app.agents.orchestrator_agent import OrchestratorAgent
 from app.agents.recommendation_agent import build_display_reason
 from app.cache import latest_state_cache, redis_client
-from app.config.settings import create_database_connection
+from app.config.settings import APP_ENV, create_database_connection
 from app.repositories.music_catalog_repository import MusicCatalogRepository
-from app.services import session_cache_service
+from app.cache import session_history_cache
+
+_DEBUG_ENVS = {"local", "dev", "development"}
 
 logger = logging.getLogger("rimas.service.main_recommendation")
 
@@ -25,7 +27,7 @@ class MainRecommendationService:
         start = time.perf_counter()
         session_degraded = not redis_client.is_healthy()
 
-        session_context = session_cache_service.load_context(session_id, user_id=user_id)
+        session_context = session_history_cache.get_context(session_id, user_id=user_id)
 
         result = self._orchestrator.run_recommendation(
             user_id=user_id,
@@ -122,7 +124,7 @@ class MainRecommendationService:
             session_context.get("recent_moods", [])
         )
 
-        return {
+        view = {
             "status": "success",
             "page_type": "main_recommendation_page",
             "user_id": user_id,
@@ -133,13 +135,15 @@ class MainRecommendationService:
             "new_release": groups["new_release"],
             "discovery": groups["discovery"],
             "personalized_guide": rag_state.get("recommendation_scripts", {}).get("discovery_message", ""),
-            "debug": {
+        }
+        if APP_ENV in _DEBUG_ENVS:
+            view["debug"] = {
                 "session_context": session_context,
                 "kag_state": kag_state,
                 "rag_state": rag_state,
                 "latency_ms": latency_ms,
-            },
-        }
+            }
+        return view
 
 
 def _fill_fallback_sections(

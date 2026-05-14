@@ -1,5 +1,6 @@
 import json
 import logging
+from functools import lru_cache
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -12,8 +13,15 @@ from app.services.request_lifecycle_cache import DuplicateRequestError, request_
 logger = logging.getLogger("rimas.api.chatbot")
 router = APIRouter()
 
-_service = ChatbotService()
-_stream_service = ChatbotStreamService(chatbot_service=_service)
+
+@lru_cache(maxsize=1)
+def _get_service() -> ChatbotService:
+    return ChatbotService()
+
+
+@lru_cache(maxsize=1)
+def _get_stream_service() -> ChatbotStreamService:
+    return ChatbotStreamService(chatbot_service=_get_service())
 
 
 class ChatRequest(BaseModel):
@@ -41,7 +49,7 @@ def respond(req: ChatRequest):
         except DuplicateRequestError as exc:
             raise HTTPException(status_code=409, detail="중복 요청이 처리 중입니다.") from exc
     try:
-        result = _service.submit_message(
+        result = _get_service().submit_message(
             user_id=req.user_id,
             session_id=req.session_id,
             user_input=req.user_input,
@@ -65,7 +73,7 @@ def respond_stream(req: ChatRequest):
 
     return StreamingResponse(
         _to_sse(
-            _stream_service.stream_response(
+            _get_stream_service().stream_response(
                 user_id=req.user_id,
                 session_id=req.session_id,
                 user_input=req.user_input,

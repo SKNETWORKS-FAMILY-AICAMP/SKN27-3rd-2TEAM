@@ -37,12 +37,13 @@ class TasteEventService:
         title = detail.get("title", "")
         recommendation_category = detail.get("recommendation_category", "")
 
-        ctx = self._cache.get_context(session_id)
-        ctx["recent_genres"] = _merge_unique(ctx.get("recent_genres", []), genre, limit=5)
-        ctx["recent_moods"] = _merge_unique(ctx.get("recent_moods", []), mood, limit=5)
-        ctx["recent_artists"] = _merge_unique(ctx.get("recent_artists", []), [artist] if artist else [], limit=5)
-        ctx["selected_tracks"] = _merge_unique(ctx.get("selected_tracks", []), [content_id], limit=50)
-        self._cache.set_context(session_id, ctx)
+        ctx = self._cache.update_context_from_taste(
+            session_id,
+            genre=genre,
+            mood=mood,
+            artist=artist,
+            content_id=content_id,
+        )
 
         event = {
             "event_id": f"evt_{uuid4().hex}",
@@ -64,6 +65,3 @@ class TasteEventService:
         return {"status": "success", "session_context": ctx}
 
 
-def _merge_unique(existing: list, new_items: list, limit: int) -> list:
-    merged = new_items + [x for x in existing if x not in new_items]
-    return merged[:limit]

@@ -2,7 +2,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.services import session_cache_service
+from app.cache import session_history_cache
 from app.services.session_flush_service import flush_session
 
 logger = logging.getLogger("rimas.api.session")
@@ -16,7 +16,7 @@ def get_history(
 ):
     """Redis에서 세션 히스토리 반환 (DB 조회 없음)."""
     try:
-        history = session_cache_service.get_history(session_id)
+        history = session_history_cache.get_history(session_id)
         return {"session_id": session_id, "history": history}
     except Exception as exc:
         logger.error("history_error", extra={"session_id": session_id, "error": str(exc)}, exc_info=True)
@@ -43,7 +43,7 @@ def flush(
 def clear(session_id: str):
     """Redis 세션만 삭제 (DB 저장 없음)."""
     try:
-        session_cache_service.clear(session_id)
+        session_history_cache.clear_session(session_id)
         return {"session_id": session_id, "cleared": True}
     except Exception as exc:
         logger.error("clear_error", extra={"session_id": session_id, "error": str(exc)}, exc_info=True)

@@ -2,7 +2,14 @@ import logging
 import re
 
 from app.agents.base_agent import BaseAgent
-from app.common.constants import ALLOWED_GENRES, ALLOWED_INTENT_TYPES, ALLOWED_MOODS, ALLOWED_SITUATIONS
+from app.common.constants import (
+    ALLOWED_GENRES,
+    ALLOWED_INTENT_TYPES,
+    ALLOWED_MOODS,
+    ALLOWED_SITUATIONS,
+    GENRE_KEYWORD_MAP,
+    MOOD_KEYWORD_MAP,
+)
 from app.policies.recommendation_policy import MAX_SELECTED_RECOMMENDATIONS
 from app.schemas.intent_state_schema import IntentStateSchema
 from app.schemas.kag_input_schema import KagInputSchema
@@ -143,17 +150,7 @@ class InputPlannerAgent(BaseAgent):
     @staticmethod
     def _detect_candidates(text: str, session_context: dict, context_key: str, allowed: set[str]) -> list[str]:
         candidates = [value for value in session_context.get(context_key, []) if value in allowed]
-        keyword_map = {
-            "calm": ["calm", "잔잔", "차분"],
-            "night": ["night", "밤", "야간"],
-            "bright": ["bright", "밝은"],
-            "clean": ["clean", "깔끔"],
-            "indie": ["indie", "인디"],
-            "dream_pop": ["dream pop", "드림팝"],
-            "ambient": ["ambient", "앰비언트"],
-            "rnb": ["rnb", "알앤비"],
-            "electro_pop": ["electro pop", "일렉트로"],
-        }
+        keyword_map = {**MOOD_KEYWORD_MAP, **GENRE_KEYWORD_MAP}
         lowered = (text or "").lower()
         for candidate, keywords in keyword_map.items():
             if candidate in allowed and any(keyword in lowered for keyword in keywords):

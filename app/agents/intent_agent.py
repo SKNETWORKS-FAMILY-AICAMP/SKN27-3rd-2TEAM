@@ -3,7 +3,13 @@ from app.common.constants import ALLOWED_INTENT_TYPES
 
 
 class IntentAgent(BaseAgent):
-    def run(self, user_input, kag_state=None, rag_state=None, intent_state=None):
+    def run(  # type: ignore[override]
+        self,
+        user_input: str,
+        kag_state: dict | None = None,
+        rag_state: dict | None = None,
+        intent_state: dict | None = None,
+    ) -> dict:
         text = user_input or ""
         intent_type = self._confirmed_intent_type(text, intent_state)
         return {

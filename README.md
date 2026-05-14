@@ -20,11 +20,13 @@
 |----|------|------|
 | FR-01 | 개인화 음악 추천 | 사용자 취향 프로파일과 그래프 관계 기반으로 3개 섹션(개인화·탐색·신규) 추천 제공 |
 | FR-02 | 자연어 챗봇 대화 | 사용자 자연어 입력을 분석하여 의도에 맞는 음악 추천 및 설명 응답 생성 |
-| FR-03 | 음악 상세 정보 조회 | 추천 카드 클릭 시 RAG 증거 기반 음악 상세 정보(장르·분위기·추천 이유) 제공 |
-| FR-04 | 세션 히스토리 관리 | 대화 히스토리와 세션 컨텍스트를 Redis에 보관하고 세션 수명 동안 유지 |
-| FR-05 | 세션 영속화 | Redis 세션 데이터를 PostgreSQL로 플러시하여 영구 보관 |
-| FR-06 | 취향 배지 표시 | 사용자 취향 태그(mood·genre)를 헤더 배지로 시각화 |
-| FR-07 | 음악 상세 URL 공유 | `?detail={content_id}` 파라미터로 상세 모달 직접 링크 지원 |
+| FR-03 | 챗봇 스트리밍 응답 | SSE(Server-Sent Events) 기반 실시간 응답 스트리밍 — delta/final/done 이벤트 순서로 전송 |
+| FR-04 | 음악 상세 정보 조회 | 추천 카드 클릭 시 RAG 증거 기반 음악 상세 정보(장르·분위기·추천 이유) 제공 |
+| FR-05 | 세션 히스토리 관리 | 대화 히스토리와 세션 컨텍스트를 Redis에 보관하고 세션 수명 동안 유지 |
+| FR-06 | 세션 영속화 | Redis 세션 데이터를 PostgreSQL로 플러시하여 영구 보관 |
+| FR-07 | 취향 피드백 | 추천 카드 "취향 추가" 버튼으로 genre·mood·artist를 SESSION_CONTEXT에 반영, taste event Redis 누적 후 flush 시 영속화 |
+| FR-08 | 취향 배지 표시 | SESSION_CONTEXT의 mood·genre 태그를 헤더 배지로 시각화 |
+| FR-09 | 음악 상세 URL 공유 | `?detail={content_id}` 파라미터로 상세 모달 직접 링크 지원 |
 
 ---
 
@@ -139,11 +141,12 @@ ResponseValidator + ProvenanceValidator
 
 | 구성요소 | 설계 |
 |---------|------|
-| 메시지 전송 | `useMutation` 기반 — `isPending` 가드로 중복 전송 차단 |
-| 낙관적 업데이트 | `appendTurn`으로 서버 응답 전 UI 즉시 반영 |
+| 메시지 전송 | SSE 스트리밍 — `sendChatMessageStream()` async generator로 delta 수신, `streamingRef`로 중복 전송 차단 |
+| 스트리밍 상태 머신 | `appendUserTurn` → `appendAssistantDelta` (delta 누적) → `finalizeAssistantTurn` (display_recommendations 주입) |
 | 히스토리 로드 | 마운트 1회 `useQuery` — Redis 세션 히스토리 조회 |
-| 자동 스크롤 | 메시지 추가마다 하단 자동 스크롤 |
-| 관련 추천 카드 | 마지막 챗봇 응답의 `display_recommendations`를 카드로 표시 |
+| 자동 스크롤 | history 변경마다 하단 자동 스크롤 |
+| 관련 추천 카드 | 마지막 챗봇 응답의 `display_recommendations`를 카드로 표시, "취향 추가" 클릭 시 `/api/taste` 호출 |
+| 세션 종료 모달 | 히스토리가 있을 때 홈 이동 클릭 시 저장/미저장 선택 모달 표시, 저장 시 `/api/sessions/{id}/flush` 호출 |
 | request_id | 전송마다 `generateRequestId()`로 새 ID 생성 |
 
 #### 음악 상세 모달
@@ -236,26 +239,47 @@ React Main Page
 -> Response: { status, session_degraded, page_type, view_model }
 ```
 
-### Chatbot
+### Chatbot (SSE Streaming)
 
 ```text
 React Chatbot Page
--> POST /api/chatbot/respond
--> Redis health check (session_degraded 플래그)
--> Session Context (Redis)
--> OrchestratorAgent.run_chatbot
-   -> InputPlannerAgent (LLM optional → rule-based fallback)
-   -> KagDispatchAgent  -> KAG_STATE
-   -> ContractValidator
-   -> RagDispatchAgent  -> RAG_STATE
-   -> IntentAgent
-   -> RecommendationAgent (최대 5곡 선택)
-   -> ResponseGenerator (LLM)
-   -> ResponseValidator + ProvenanceValidator
--> session_history_cache.append_turn (Redis)
--> latest_state_cache.save_latest_states (Redis)
--> LoggingService → interaction_logs (PostgreSQL)
--> Response: { status, session_degraded, response_state, latency_ms }
+-> POST /api/chatbot/respond/stream
+-> ChatbotStreamService.stream_response
+   -> ChatbotService.submit_message (전체 처리 후 텍스트 청크 분할)
+      -> Redis health check (session_degraded 플래그)
+      -> Session Context (Redis)
+      -> OrchestratorAgent.run_chatbot
+         -> InputPlannerAgent (LLM optional → rule-based fallback)
+         -> KagDispatchAgent  -> KAG_STATE
+         -> ContractValidator
+         -> RagDispatchAgent  -> RAG_STATE
+         -> IntentAgent
+         -> RecommendationAgent (최대 5곡 선택)
+         -> ResponseGenerator (LLM)
+         -> ResponseValidator + ProvenanceValidator
+      -> session_history_cache.append_turn (Redis)
+      -> latest_state_cache.save_latest_states (Redis)
+      -> LoggingService → interaction_logs (PostgreSQL)
+      -> NegativePreferenceService → PostgreSQL
+   -> SSE: event: delta  (12자 청크 단위 텍스트)
+   -> SSE: event: final  (response_state 전체)
+   -> SSE: event: done
+```
+
+### Taste Feedback
+
+```text
+추천 카드 "취향 추가" 클릭
+-> POST /api/taste/add  { user_id, session_id, content_id, request_id }
+-> TasteEventService.add_to_taste
+   -> MusicDetailService로 곡 genre·mood·artist 조회
+   -> SESSION_CONTEXT 즉시 갱신 (recent_genres, recent_moods, recent_artists, selected_tracks)
+   -> Redis에 taste event 누적 (rimas:session:{id}:taste_events)
+-> Response: { status, session_context }
+
+세션 종료 (flush) 시
+-> session_flush_service → taste_events → PostgreSQL taste_profiles upsert
+-> Redis taste_events 키 삭제
 ```
 
 ### Music Detail
@@ -292,11 +316,13 @@ POST /api/sessions/{session_id}/flush?user_id=&flush_logs=false
 |--------|------|------|
 | GET | `/health` | 서버 상태 확인 |
 | GET | `/api/recommendations/main` | 메인 추천 페이지 뷰모델 |
-| POST | `/api/chatbot/respond` | 챗봇 메시지 처리 |
+| POST | `/api/chatbot/respond` | 챗봇 메시지 처리 (일반 응답) |
+| POST | `/api/chatbot/respond/stream` | 챗봇 메시지 처리 — SSE 스트리밍 (delta / final / done) |
 | GET | `/api/sessions/{session_id}/history` | Redis 세션 히스토리 |
-| POST | `/api/sessions/{session_id}/flush` | Redis → PostgreSQL 플러시 |
+| POST | `/api/sessions/{session_id}/flush` | Redis → PostgreSQL 플러시 (taste events 포함) |
 | DELETE | `/api/sessions/{session_id}` | Redis 세션 삭제 |
 | GET | `/api/music/detail/{content_id}` | 음악 상세 뷰모델 |
+| POST | `/api/taste/add` | 추천 곡을 취향에 추가 — SESSION_CONTEXT 즉시 반영, taste event Redis 누적 |
 
 ---
 
@@ -306,27 +332,30 @@ POST /api/sessions/{session_id}/flush?user_id=&flush_logs=false
 
 | 구분 | 내용 |
 |------|------|
-| Agent 흐름 | Orchestrator → InputPlanner → KAG → RAG → Intent → Recommendation → ResponseGenerator → Validators |
-| Mock Adapter | MockKagAdapter, MockRagAdapter (고정 데이터, Real 연결 전 전체 흐름 검증용) |
-| Redis 세션 | 히스토리, 컨텍스트, latest KAG/RAG/RESPONSE state, 추천 메타데이터 |
-| Session flush | Redis → PostgreSQL, 완료 후 6개 Redis 키 전체 삭제 |
+| Agent 흐름 | Orchestrator → InputPlanner → KAG → ContractValidator → RAG → Intent → Recommendation → ResponseGenerator → ResponseValidator → ProvenanceValidator |
+| 챗봇 스트리밍 | SSE 기반 — `POST /api/chatbot/respond/stream`, `ChatbotStreamService`, 12자 청크 분할 전송 |
+| Mock Adapter | MockKagAdapter, MockRagAdapter — Real 연결 전 전체 흐름 검증용 |
+| Redis 세션 | history, context, latest kag/rag/response state, recommendation metadata, taste events (6종 키) |
+| Session flush | Redis → PostgreSQL (chat_sessions, chat_session_turns, taste_profiles), flush 후 Redis 6개 키 전체 삭제 |
+| Taste 피드백 | `/api/taste/add` — 곡 추가 시 SESSION_CONTEXT 즉시 갱신 + taste event Redis 누적 → flush 시 PostgreSQL 영속화 |
+| 부정 선호도 | 챗봇 대화에서 "싫어"/"빼줘" 감지 → NegativePreferenceService → PostgreSQL 저장 + SESSION_CONTEXT 반영 |
+| 세션 컨텍스트 수화 | 세션 cold-start 시 taste_profile → SESSION_CONTEXT 자동 로드 (SessionContextHydrationService) |
 | flush_logs | `flush_logs=true` — local/dev 전용, session_id 기준 interaction_logs 삭제 |
-| session_degraded | Redis 장애 시 응답 wrapper 최상위에 플래그 포함, 추천 흐름은 계속 진행 |
-| Music Detail | latest RAG_STATE 연결 (session_id), view log 저장 (user_id) |
-| LLM Planner | optional OpenAI 의도 분류, 실패 시 rule-based fallback |
-| 스키마 확장 | KAG_STATE optional 필드 5개, RAG_STATE optional 필드 4개 |
-| Contract Validator | KAG/RAG/session_context 계약 검증 + optional 타입 검증 |
+| session_degraded | Redis 장애 시 응답 최상위에 플래그, 추천 흐름은 계속 진행 |
+| Music Detail | latest RAG_STATE 연결 (session_id), music_catalog fallback, view log 저장 (user_id) |
+| LLM Planner | optional OpenAI 의도 분류 (JSON schema 강제), 실패 시 rule-based fallback 자동 전환 |
+| Contract Validator | KAG/RAG/session_context 필드·타입·enum 검증 + optional 필드 타입 검증 |
 | prod fail-fast | 필수 env 누락 시 서버 시작 즉시 실패 |
-| 정책 문서 | `docs/policies/` (RecommendationPolicy, RankingPolicy, PromptPolicy) |
-| Frontend | 홈 별자리 네비게이션, React 메인 추천 페이지, 카테고리별 추천 화면, 챗봇 페이지, 음악 상세 모달 |
-| Frontend request_id | `generateRequestId` 유틸, `useRequestId` / `useRequestIdPerKey` 훅, 전 API에 request_id 전달, `session_degraded` 배너 표시 |
+| Frontend | 홈 별자리 네비게이션(cosmos 컴포넌트), 메인 추천 3섹션, 챗봇 스트리밍 UI, 음악 상세 모달, 세션 종료 모달 |
+| Frontend 상태 관리 | chatStore 스트리밍 상태 머신, sessionStore, themeStore, `generateRequestId` 유틸 |
+| 중복 요청 차단 | `request_lifecycle_cache` — request_id 기반 409 차단, `streamingRef`로 프론트 이중 전송 방지 |
 
 ### 미구현 (stub)
 
 | 구분 | 내용 |
 |------|------|
-| Real KAG Adapter | Neo4j 기반 그래프 탐색 (`NotImplementedError`) |
-| Real RAG Adapter | Elasticsearch 기반 하이브리드 검색 (`NotImplementedError`) |
+| Real KAG Adapter | Neo4j 기반 그래프 탐색 (`NotImplementedError` — `app/kag/adapters/real_kag_adapter.py`) |
+| Real RAG Adapter | Elasticsearch 기반 하이브리드 검색 (`NotImplementedError` — `app/rag/adapters/rag_real_adapter.py`) |
 
 ---
 
@@ -358,9 +387,25 @@ docker compose up --build
 ```
 Frontend:                   http://localhost:5173
 Backend health:             http://localhost:8000/health
+API 문서 (Swagger UI):       http://localhost:8000/docs
 Main Recommendation API:    http://localhost:8000/api/recommendations/main?user_id=user_001&session_id=session_001
+Chatbot stream test:        POST http://localhost:8000/api/chatbot/respond/stream
 Neo4j Browser:              http://localhost:7474
 Elasticsearch:              http://localhost:9200
+```
+
+Redis 세션 확인 (Docker 내부):
+
+```powershell
+docker exec -it rimas-redis redis-cli
+# 세션 키 목록
+KEYS rimas:session:session_001:*
+# 세션 컨텍스트 확인
+GET rimas:session:session_001:context
+# 대화 히스토리 확인 (최신 순)
+LRANGE rimas:session:session_001:history 0 -1
+# taste event 확인
+LRANGE rimas:session:session_001:taste_events 0 -1
 ```
 
 ---
@@ -369,26 +414,43 @@ Elasticsearch:              http://localhost:9200
 
 ```text
 app/
-  agents/          Orchestrator, InputPlanner, KAG/RAG Dispatch, Intent, Recommendation, Response
-  api/             FastAPI routes (chatbot, recommendation, session, music)
-  cache/           Redis 클라이언트, 세션 히스토리, latest state 캐시
-  config/          settings.py (환경 변수, prod fail-fast)
-  kag/adapters/    KAG adapter (Mock / Real stub)
-  llm/             OpenAI LLM 클라이언트
-  policies/        추천·랭킹 정책 (Python)
-  prompts/         LLM 프롬프트 (InputPlanner)
-  rag/adapters/    RAG adapter (Mock / Real stub)
-  repositories/    PostgreSQL query constants, 카탈로그·로그 레포지토리
-  services/        비즈니스 서비스 (chatbot, recommendation, flush, logging, detail)
-  validators/      Contract, Response, Provenance Validator
+  agents/          Orchestrator, InputPlanner, KAG/RAG Dispatch, Intent, Recommendation, ResponseGenerator, ValidatorController
+  api/             FastAPI routes — chatbot (일반+스트리밍), recommendation, session, music, taste
+  cache/           Redis 클라이언트, redis_keys, session_history_cache, latest_state_cache
+  common/          constants (ALLOWED_MOODS/GENRES 등 enum), default_state (fallback), labels
+  config/          settings.py (환경 변수 로드, prod fail-fast)
+  contracts/       KagStateField, RagStateField, SessionContextField enum
+  core/            logging_config, LoggingMiddleware
+  json_templates/  Agent 간 계약 JSON 스키마 파일
+  kag/             KAG 연결·쿼리·adapters (Mock / Real stub)
+  llm/             OpenAI LLM 클라이언트, response_state_schema
+  policies/        RecommendationPolicy, RankingPolicy (Python)
+  prompts/         LLM 프롬프트 — InputPlanner용 system prompt + JSON schema
+  rag/             RAG adapters (Mock / Real stub), services, builders, validators
+  repositories/    BaseRepository, query_constants, PostgreSQL 레포지토리 8개
+  schemas/         Pydantic 스키마 — intent, kag_input, kag_state, rag_input, rag_state, response_state, session_context, music_detail
+  services/        비즈니스 서비스 — chatbot, chatbot_stream, main_recommendation,
+                   session_cache, session_flush, session_context_hydration,
+                   logging, taste_event, negative_preference, music_detail,
+                   compact_state_builder, request_lifecycle_cache
+  validators/      BaseValidator, ContractValidator, ResponseValidator, ProvenanceValidator, DisplayReasonValidator
 
-frontend/
-  src/api/         API clients (chatbot, recommendation, musicDetail)
-  src/components/  UI components (home, chatbot, recommendation, background, mascot)
-  src/hooks/       useRequestId 훅
-  src/pages/       MainRecommendationPage, ChatbotPage
-  src/stores/      Zustand stores (chat, session)
-  src/utils/       generateRequestId 유틸
+frontend/src/
+  api/             chatbot (일반+스트리밍+flush), recommendation, musicDetailApi, taste
+  components/
+    background/    DreamBackground, SoftGlowLayer, StaticStarLayer
+    chatbot/       ChatbotHeader, ChatHistory, ChatInput, RelatedRecommendationCards
+    cosmos/        CenterMascotOrb, ConstellationLines, CosmicBackground, FloatingParticles, GlowRing, OrbitNode, StarField
+    home/          ConstellationHome
+    mascot/        MascotCharacter
+    recommendation/ CharacterDjBanner, MusicDetailModal, RecommendationCard, RecommendationSection, TopTasteHeader
+    ui/            DreamButton, GlassPanel
+  hooks/           useRequestId
+  pages/           Home, MainRecommendationPage, ChatbotPage
+  stores/          chatStore (스트리밍 상태 머신), sessionStore, themeStore
+  styles/          theme, motion
+  types/           API 응답 TypeScript 타입 전체
+  utils/           generateRequestId (crypto.randomUUID)
 
 docs/
   policies/        RecommendationPolicy, RankingPolicy, PromptPolicy
