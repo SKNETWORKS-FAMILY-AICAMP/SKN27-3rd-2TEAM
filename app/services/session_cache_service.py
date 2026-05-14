@@ -12,8 +12,8 @@ from app.cache import session_history_cache as cache
 logger = logging.getLogger("rimas.service.session_cache")
 
 
-def load_context(session_id: str) -> dict:
-    return cache.get_context(session_id)
+def load_context(session_id: str, user_id: str | None = None) -> dict:
+    return cache.get_context(session_id, user_id=user_id)
 
 
 def save_turn_and_update_context(

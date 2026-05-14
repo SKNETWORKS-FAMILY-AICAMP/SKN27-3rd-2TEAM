@@ -35,11 +35,16 @@ def append_turn(session_id: str, user_input: str, response_state: dict) -> None:
     logger.info("session_turn_appended", extra={"session_id": session_id})
 
 
-def get_context(session_id: str) -> dict:
+def get_context(session_id: str, user_id: str | None = None) -> dict:
     key = session_context_key(session_id)
     ctx = redis_client.cache_get(key)
     if ctx is None:
         logger.debug("session_context_cold_start", extra={"session_id": session_id})
+        if user_id:
+            from app.services.session_context_hydration_service import SessionContextHydrationService
+            hydrated = SessionContextHydrationService().hydrate(user_id=user_id, session_id=session_id)
+            set_context(session_id, hydrated)
+            return hydrated
         return _empty_context(session_id)
     return ctx
 
