@@ -28,9 +28,9 @@ class StubSessionCacheService:
         self.loaded = []
         self.saved = []
 
-    def load_context(self, session_id):
+    def load_context(self, session_id, user_id=None):
         self.loaded.append(session_id)
-        return {"session_id": session_id, "recent_genres": [], "recent_artists": [], "recent_moods": [], "conversation_summary": ""}
+        return {"session_id": session_id, "recent_genres": [], "recent_artists": [], "recent_moods": [], "selected_tracks": [], "conversation_summary": ""}
 
     def save_turn_and_update_context(self, **kwargs):
         self.saved.append(kwargs)

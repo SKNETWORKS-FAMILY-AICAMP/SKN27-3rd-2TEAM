@@ -41,12 +41,13 @@ class StubOrchestrator:
 
 
 class StubSessionCacheService:
-    def load_context(self, session_id):
+    def load_context(self, session_id, user_id=None):
         return {
             "session_id": session_id,
             "recent_genres": ["rnb", "indie"],
             "recent_artists": [],
             "recent_moods": ["calm"],
+            "selected_tracks": [],
             "conversation_summary": "",
         }
 

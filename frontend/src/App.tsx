@@ -89,7 +89,7 @@ function AppContent() {
             onChatOpen={() => setPage("chatbot")}
           />
         )}
-        {page === "chatbot" && <ChatbotPage />}
+        {page === "chatbot" && <ChatbotPage onNavigateHome={() => setPage("home")} />}
       </main>
     </div>
   );

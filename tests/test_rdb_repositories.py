@@ -124,5 +124,48 @@ class RdbRepositoryTest(unittest.TestCase):
         )
 
 
+class FakeConnectionWithCommitted:
+    def __init__(self):
+        self.cursor_instance = FakeCursor()
+        self.committed = False
+
+    def cursor(self, *args, **kwargs):
+        return self.cursor_instance
+
+    def commit(self):
+        self.committed = True
+
+
+def test_taste_profile_repository_saves_event_and_upserts_profile():
+    from app.repositories.taste_profile_repository import TasteProfileRepository
+
+    repo = TasteProfileRepository(FakeConnectionWithCommitted())
+    event = {
+        "event_id": "evt_001",
+        "user_id": "user_001",
+        "session_id": "session_001",
+        "content_id": "track_001",
+        "event_type": "add_to_taste",
+        "source": "music_detail_modal",
+        "title": "Midnight Loop",
+        "artist": "Nova Lane",
+        "genre": ["indie"],
+        "mood": ["night"],
+        "recommendation_category": "discovery_candidate",
+        "created_at": "2026-05-14T00:00:00+00:00",
+    }
+
+    repo.insert_event(event)
+    repo.upsert_profile(
+        user_id="user_001",
+        preferred_genres=["indie"],
+        preferred_moods=["night"],
+        preferred_artists=["Nova Lane"],
+        selected_content_ids=["track_001"],
+    )
+
+    assert repo._connection.committed
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -107,6 +107,72 @@ DELETE FROM interaction_logs
 WHERE session_id = %(session_id)s;
 """
 
+INSERT_USER_TASTE_EVENT = """
+INSERT INTO user_taste_events (
+    event_id,
+    user_id,
+    session_id,
+    content_id,
+    event_type,
+    source,
+    title,
+    artist,
+    genre_json,
+    mood_json,
+    recommendation_category,
+    created_at
+) VALUES (
+    %(event_id)s,
+    %(user_id)s,
+    %(session_id)s,
+    %(content_id)s,
+    %(event_type)s,
+    %(source)s,
+    %(title)s,
+    %(artist)s,
+    %(genre_json)s,
+    %(mood_json)s,
+    %(recommendation_category)s,
+    %(created_at)s
+);
+"""
+
+UPSERT_USER_TASTE_PROFILE = """
+INSERT INTO user_taste_profiles (
+    user_id,
+    preferred_genres_json,
+    preferred_moods_json,
+    preferred_artists_json,
+    selected_content_ids_json,
+    updated_at
+) VALUES (
+    %(user_id)s,
+    %(preferred_genres_json)s,
+    %(preferred_moods_json)s,
+    %(preferred_artists_json)s,
+    %(selected_content_ids_json)s,
+    NOW()
+)
+ON CONFLICT (user_id) DO UPDATE SET
+    preferred_genres_json = EXCLUDED.preferred_genres_json,
+    preferred_moods_json = EXCLUDED.preferred_moods_json,
+    preferred_artists_json = EXCLUDED.preferred_artists_json,
+    selected_content_ids_json = EXCLUDED.selected_content_ids_json,
+    updated_at = NOW();
+"""
+
+SELECT_USER_TASTE_PROFILE = """
+SELECT
+    user_id,
+    preferred_genres_json,
+    preferred_moods_json,
+    preferred_artists_json,
+    selected_content_ids_json,
+    updated_at
+FROM user_taste_profiles
+WHERE user_id = %(user_id)s;
+"""
+
 INSERT_DETAIL_VIEW_LOG = """
 INSERT INTO interaction_logs (
     log_id,

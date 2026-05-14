@@ -11,6 +11,7 @@ class SessionContextField(StrEnum):
     RECENT_GENRES = "recent_genres"
     RECENT_ARTISTS = "recent_artists"
     RECENT_MOODS = "recent_moods"
+    SELECTED_TRACKS = "selected_tracks"
     CONVERSATION_SUMMARY = "conversation_summary"
 
 

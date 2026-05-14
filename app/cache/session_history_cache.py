@@ -8,7 +8,7 @@ import logging
 from datetime import datetime, timezone
 
 from app.cache import redis_client
-from app.cache.redis_keys import session_context_key, session_history_key
+from app.cache.redis_keys import session_context_key, session_history_key, taste_events_key
 from app.config.settings import REDIS_SESSION_TTL
 
 logger = logging.getLogger("rimas.session")
@@ -35,11 +35,16 @@ def append_turn(session_id: str, user_input: str, response_state: dict) -> None:
     logger.info("session_turn_appended", extra={"session_id": session_id})
 
 
-def get_context(session_id: str) -> dict:
+def get_context(session_id: str, user_id: str | None = None) -> dict:
     key = session_context_key(session_id)
     ctx = redis_client.cache_get(key)
     if ctx is None:
         logger.debug("session_context_cold_start", extra={"session_id": session_id})
+        if user_id:
+            from app.services.session_context_hydration_service import SessionContextHydrationService
+            hydrated = SessionContextHydrationService().hydrate(user_id=user_id, session_id=session_id)
+            set_context(session_id, hydrated)
+            return hydrated
         return _empty_context(session_id)
     return ctx
 
@@ -67,9 +72,25 @@ def update_context_from_turn(session_id: str, kag_state: dict, rag_state: dict) 
     return ctx
 
 
+def append_taste_event(session_id: str, event: dict) -> None:
+    key = taste_events_key(session_id)
+    redis_client.cache_lpush(key, event, ttl=REDIS_SESSION_TTL)
+
+
+def get_taste_events(session_id: str) -> list[dict]:
+    key = taste_events_key(session_id)
+    items = redis_client.cache_lrange(key, 0, _MAX_HISTORY - 1)
+    return list(reversed(items))
+
+
+def clear_taste_events(session_id: str) -> None:
+    redis_client.cache_delete(taste_events_key(session_id))
+
+
 def clear_session(session_id: str) -> None:
     redis_client.cache_delete(session_history_key(session_id))
     redis_client.cache_delete(session_context_key(session_id))
+    clear_taste_events(session_id)
     logger.info("session_cleared", extra={"session_id": session_id})
 
 
@@ -79,6 +100,7 @@ def _empty_context(session_id: str) -> dict:
         "recent_genres": [],
         "recent_artists": [],
         "recent_moods": [],
+        "selected_tracks": [],
         "conversation_summary": "",
     }
 

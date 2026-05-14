@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchMusicDetail } from "../api/musicDetailApi";
 import { fetchMainRecommendations } from "../api/recommendation";
+import { addToTaste } from "../api/taste";
 import { DreamBackground } from "../components/background/DreamBackground";
 import { CharacterDjBanner } from "../components/recommendation/CharacterDjBanner";
 import { MusicDetailModal } from "../components/recommendation/MusicDetailModal";
@@ -9,6 +10,7 @@ import { RecommendationSection } from "../components/recommendation/Recommendati
 import { TopTasteHeader } from "../components/recommendation/TopTasteHeader";
 import { useRequestId, useRequestIdPerKey } from "../hooks/useRequestId";
 import { useSessionStore } from "../stores/sessionStore";
+import { generateRequestId } from "../utils/requestId";
 import type { RecommendationCategoryTarget } from "../components/home/ConstellationHome";
 
 interface Props {
@@ -21,6 +23,8 @@ export function MainRecommendationPage({ onChatOpen, category }: Props) {
   const [detailContentId, setDetailContentId] = useState(() => {
     return new URLSearchParams(window.location.search).get("detail");
   });
+  const [tasteSavingId, setTasteSavingId] = useState<string | null>(null);
+  const addedTasteIds = useRef<Set<string>>(new Set());
 
   // API 호출 흐름과 React Query key는 기존 계약을 그대로 유지한다.
   const mainRequestId = useRequestId();
@@ -65,6 +69,19 @@ export function MainRecommendationPage({ onChatOpen, category }: Props) {
     url.searchParams.delete("detail");
     window.history.pushState({}, "", `${url.pathname}${url.search}`);
     setDetailContentId(null);
+  };
+
+  const handleAddToTaste = async (contentId: string) => {
+    if (addedTasteIds.current.has(contentId) || tasteSavingId) return;
+    setTasteSavingId(contentId);
+    try {
+      await addToTaste({ userId, sessionId, contentId, requestId: generateRequestId() });
+      addedTasteIds.current.add(contentId);
+    } catch (err) {
+      console.error("[MainRecommendationPage] addToTaste error", err);
+    } finally {
+      setTasteSavingId(null);
+    }
   };
 
   if (isLoading) {
@@ -177,6 +194,9 @@ export function MainRecommendationPage({ onChatOpen, category }: Props) {
             isLoading={detailQuery.isLoading}
             isError={detailQuery.isError}
             onClose={closeDetail}
+            onAddToTaste={handleAddToTaste}
+            isTasteSaving={tasteSavingId === detailContentId}
+            isTasteAdded={addedTasteIds.current.has(detailContentId)}
           />
         )}
       </div>

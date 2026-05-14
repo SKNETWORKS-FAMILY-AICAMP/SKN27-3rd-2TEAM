@@ -24,7 +24,7 @@ class ChatbotService:
         start = time.perf_counter()
         session_degraded = not redis_client.is_healthy()
 
-        session_context = session_cache_service.load_context(session_id)
+        session_context = session_cache_service.load_context(session_id, user_id=user_id)
         result = self._orchestrator.run_chatbot(
             user_id=user_id,
             session_id=session_id,

@@ -1,15 +1,19 @@
+import json
 import logging
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.services.chatbot_service import ChatbotService
+from app.services.chatbot_stream_service import ChatbotStreamService
 from app.services.request_lifecycle_cache import DuplicateRequestError, request_lifecycle_cache
 
 logger = logging.getLogger("rimas.api.chatbot")
 router = APIRouter()
 
 _service = ChatbotService()
+_stream_service = ChatbotStreamService(chatbot_service=_service)
 
 
 class ChatRequest(BaseModel):
@@ -49,3 +53,24 @@ def respond(req: ChatRequest):
     finally:
         if req.request_id:
             request_lifecycle_cache.finish(req.request_id)
+
+
+@router.post("/respond/stream")
+def respond_stream(req: ChatRequest):
+    """챗봇 메시지 처리 — SSE 스트리밍."""
+
+    def _to_sse(events):
+        for event in events:
+            yield f"event: {event['event']}\n"
+            yield f"data: {json.dumps(event['data'], ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        _to_sse(
+            _stream_service.stream_response(
+                user_id=req.user_id,
+                session_id=req.session_id,
+                user_input=req.user_input,
+            )
+        ),
+        media_type="text/event-stream",
+    )

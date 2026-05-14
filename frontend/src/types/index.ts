@@ -88,3 +88,25 @@ export interface SessionHistoryResponse {
   session_id: string;
   history: ChatTurn[];
 }
+
+// ─── Taste ────────────────────────────────────────────────────────────────────
+
+export interface TasteEventRequest {
+  user_id: string;
+  session_id: string;
+  content_id: string;
+  event_type: string;
+  source: string;
+  request_id?: string;
+}
+
+export interface TasteEventResponse {
+  status: string;
+  session_context: Record<string, unknown>;
+}
+
+export interface FlushSessionResponse {
+  flushed: number;
+  taste_events_flushed: number;
+  logs_deleted: number;
+}

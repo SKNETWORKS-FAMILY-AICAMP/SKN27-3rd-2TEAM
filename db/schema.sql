@@ -148,3 +148,38 @@ ON chat_session_turns(session_id, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_detail_view_logs_content_created_at
 ON detail_view_logs(content_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS user_taste_events (
+    event_id VARCHAR(100) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL REFERENCES users(user_id),
+    session_id VARCHAR(100),
+    content_id VARCHAR(140) NOT NULL REFERENCES music_catalog(content_id),
+    event_type VARCHAR(64) NOT NULL,
+    source VARCHAR(64) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    artist VARCHAR(255) NOT NULL,
+    genre_json JSONB NOT NULL DEFAULT '[]'::JSONB,
+    mood_json JSONB NOT NULL DEFAULT '[]'::JSONB,
+    recommendation_category VARCHAR(64),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_user_taste_events_event_type
+        CHECK (event_type IN ('add_to_taste'))
+);
+
+CREATE TABLE IF NOT EXISTS user_taste_profiles (
+    user_id VARCHAR(64) PRIMARY KEY REFERENCES users(user_id),
+    preferred_genres_json JSONB NOT NULL DEFAULT '[]'::JSONB,
+    preferred_moods_json JSONB NOT NULL DEFAULT '[]'::JSONB,
+    preferred_artists_json JSONB NOT NULL DEFAULT '[]'::JSONB,
+    selected_content_ids_json JSONB NOT NULL DEFAULT '[]'::JSONB,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_taste_events_user_created_at
+ON user_taste_events(user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_user_taste_events_session_created_at
+ON user_taste_events(session_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_user_taste_profiles_updated_at
+ON user_taste_profiles(updated_at DESC);
