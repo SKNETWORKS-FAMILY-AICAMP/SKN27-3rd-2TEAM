@@ -111,7 +111,6 @@ def _map_es_to_evidence(doc: dict) -> RecommendedContentEvidence:
         "recommendation_category": "personalized_match",
         "evidence_summary": evidence_summary,
         "score": score,
-        "raw_content": doc.get("content", ""),
         "match_reason": {
             "genre_match": True,
             "mood_match": True,

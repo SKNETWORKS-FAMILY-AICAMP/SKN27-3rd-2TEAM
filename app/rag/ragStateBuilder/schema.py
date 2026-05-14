@@ -98,7 +98,6 @@ class RecommendedContentEvidence(TypedDict, total=False):
     evidence_summary: str
     match_reason: MatchReason
     score: float
-    raw_content: str
 
 
 class RecommendationReason(TypedDict):
