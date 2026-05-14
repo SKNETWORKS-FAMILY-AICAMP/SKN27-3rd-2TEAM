@@ -75,3 +75,35 @@ def test_taste_event_service_rejects_missing_content_id():
     service = TasteEventService()
     with pytest.raises(ValueError, match="content_id"):
         service.add_to_taste(user_id="user_001", session_id="session_001", content_id="", source="music_detail_modal")
+
+
+def test_taste_route_factory_injects_music_detail_service(monkeypatch):
+    from app.api import taste_routes
+
+    class FakeConnection:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    class FakeRepository:
+        def __init__(self, connection):
+            self.connection = connection
+
+    connection = FakeConnection()
+    monkeypatch.setattr(taste_routes, "create_database_connection", lambda: connection)
+    monkeypatch.setattr(taste_routes, "MusicCatalogRepository", FakeRepository)
+
+    dependency = taste_routes.get_taste_event_service()
+    service = next(dependency)
+
+    assert service._detail_service is not None
+    assert service._detail_service._music_catalog_repository.connection is connection
+
+    try:
+        next(dependency)
+    except StopIteration:
+        pass
+
+    assert connection.closed

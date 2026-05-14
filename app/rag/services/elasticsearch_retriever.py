@@ -27,6 +27,7 @@ class ElasticsearchRagHit:
     mood: list[str]
     content: str
     score: float
+    release_type: str = "existing_catalog"
 
 
 class ElasticsearchRagRetriever:
@@ -167,6 +168,8 @@ class ElasticsearchRagRetriever:
                     ),
                     content=self._first_text(source.get("content"), source.get("text"), metadata.get("text")),
                     score=float(hit.get("_score") or 0),
+                    release_type=self._first_text(source.get("release_type"), metadata.get("release_type"))
+                    or "existing_catalog",
                 )
             )
         return mapped

@@ -54,7 +54,12 @@ def set_context(session_id: str, context: dict) -> None:
     redis_client.cache_set(key, context, ttl=REDIS_SESSION_TTL)
 
 
-def update_context_from_turn(session_id: str, kag_state: dict, rag_state: dict) -> dict:
+def update_context_from_turn(
+    session_id: str,
+    kag_state: dict,
+    rag_state: dict,
+    new_dislikes: dict | None = None,
+) -> dict:
     """대화 턴 이후 SESSION_CONTEXT를 누적 업데이트하고 저장한다."""
     ctx = get_context(session_id)
 
@@ -63,6 +68,17 @@ def update_context_from_turn(session_id: str, kag_state: dict, rag_state: dict) 
 
     ctx["recent_genres"] = _merge_recent(ctx.get("recent_genres", []), new_genres, limit=5)
     ctx["recent_moods"] = _merge_recent(ctx.get("recent_moods", []), new_moods, limit=5)
+    new_dislikes = new_dislikes or {}
+    ctx["disliked_artists"] = _merge_recent(
+        ctx.get("disliked_artists", []),
+        new_dislikes.get("disliked_artists", []),
+        limit=50,
+    )
+    ctx["disliked_tracks"] = _merge_recent(
+        ctx.get("disliked_tracks", []),
+        new_dislikes.get("disliked_tracks", []),
+        limit=50,
+    )
 
     reason = rag_state.get("recommendation_reason", {}).get("summary", "")
     if reason:
@@ -101,6 +117,8 @@ def _empty_context(session_id: str) -> dict:
         "recent_artists": [],
         "recent_moods": [],
         "selected_tracks": [],
+        "disliked_artists": [],
+        "disliked_tracks": [],
         "conversation_summary": "",
     }
 

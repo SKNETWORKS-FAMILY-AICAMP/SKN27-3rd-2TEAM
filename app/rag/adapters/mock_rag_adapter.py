@@ -22,7 +22,10 @@ class MockRagAdapter(RagAdapter):
 
         logger.debug("rag_mock_build", extra={"primary_goal": primary_goal})
 
-        evidence = self._mock_evidence(genres, moods)
+        evidence = self._filter_excluded(
+            self._mock_evidence(genres, moods),
+            kag_state.get("excluded_nodes", []),
+        )
         query = (rag_input_json or {}).get("query_text", "")
         return RagStateBuilder.build(
             context_type=primary_goal,
@@ -85,4 +88,15 @@ class MockRagAdapter(RagAdapter):
                 "evidence_summary": "최근 업데이트된 곡 중 indie 선호와 일부 연결되는 곡이다.",
                 "match_reason": {"genre_match": True, "mood_match": False, "new_taste_expansion": True},
             },
+        ]
+
+    @staticmethod
+    def _filter_excluded(evidence: list[dict], excluded_nodes: list[dict]) -> list[dict]:
+        excluded_artists = {node["value"] for node in excluded_nodes if node.get("type") == "artist"}
+        excluded_tracks = {node["value"] for node in excluded_nodes if node.get("type") == "track"}
+        return [
+            item
+            for item in evidence
+            if item.get("content_id") not in excluded_tracks
+            and item.get("artist") not in excluded_artists
         ]

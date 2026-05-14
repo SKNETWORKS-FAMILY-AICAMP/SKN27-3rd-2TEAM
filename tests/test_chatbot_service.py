@@ -321,3 +321,50 @@ def test_chatbot_service_logging_failure_does_not_block_response(monkeypatch):
     ).submit_message("user_001", "session_abc", "추천해줘")
 
     assert result["status"] == "success"
+
+
+def test_chatbot_service_saves_new_negative_preferences_to_context(monkeypatch):
+    saved = {}
+    persisted = {}
+
+    class NegativeOrchestrator:
+        def run_chatbot(self, user_id, session_id, user_input, session_context):
+            return {
+                "status": "success",
+                "response_type": "curator_recommendation",
+                "chatbot_response": "반영했습니다.",
+                "display_recommendations": [],
+                "used_content_ids": [],
+                "_meta": {
+                    "kag_state": {},
+                    "rag_state": {},
+                    "latency_ms": 1.0,
+                    "new_dislikes": {"disliked_artists": ["Billie Eilish"], "disliked_tracks": []},
+                },
+            }
+
+    def fake_save_turn_and_update_context(**kwargs):
+        saved.update(kwargs)
+        return {}
+
+    class StubNegativePreferenceService:
+        def merge_and_save(self, **kwargs):
+            persisted.update(kwargs)
+            return {}
+
+    monkeypatch.setattr(
+        "app.services.chatbot_service.session_cache_service.save_turn_and_update_context",
+        fake_save_turn_and_update_context,
+    )
+
+    ChatbotService(
+        orchestrator=NegativeOrchestrator(),
+        negative_preference_service=StubNegativePreferenceService(),
+    ).submit_message(
+        "user_001",
+        "session_001",
+        "Billie Eilish 싫어",
+    )
+
+    assert saved["new_dislikes"]["disliked_artists"] == ["Billie Eilish"]
+    assert persisted["new_artists"] == ["Billie Eilish"]

@@ -2,15 +2,24 @@ import logging
 import time
 import uuid
 
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 logger = logging.getLogger("rimas.http")
 
 
-class LoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next) -> Response:
+class LoggingMiddleware:
+    """순수 ASGI 미들웨어 — BaseHTTPMiddleware 대신 사용해 StreamingResponse 버퍼링을 방지한다."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        request = Request(scope, receive)
         req_id = uuid.uuid4().hex[:8]
         start = time.perf_counter()
 
@@ -24,15 +33,21 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             },
         )
 
+        status_code = 500
+
+        async def send_wrapper(message: dict) -> None:
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = message.get("status", 500)
+                headers = list(message.get("headers", []))
+                headers.append((b"x-request-id", req_id.encode()))
+                message = {**message, "headers": headers}
+            await send(message)
+
         try:
-            response = await call_next(request)
+            await self.app(scope, receive, send_wrapper)
             ms = round((time.perf_counter() - start) * 1000, 1)
-            logger.info(
-                "response",
-                extra={"req_id": req_id, "status": response.status_code, "ms": ms},
-            )
-            response.headers["X-Request-Id"] = req_id
-            return response
+            logger.info("response", extra={"req_id": req_id, "status": status_code, "ms": ms})
         except Exception as exc:
             ms = round((time.perf_counter() - start) * 1000, 1)
             logger.error(

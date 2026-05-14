@@ -11,6 +11,9 @@ class IntentAgent(BaseAgent):
             "intent_type": intent_type,
             "confidence": 0.86,
             "target_content_id": self._find_target_content_id(text, rag_state or {}),
+            "requested_count": (intent_state or {}).get("requested_count"),
+            "disliked_artists": (intent_state or {}).get("disliked_artists", []),
+            "disliked_tracks": (intent_state or {}).get("disliked_tracks", []),
             "requires_recommendation": intent_type
             in {
                 "personalized_recommendation",

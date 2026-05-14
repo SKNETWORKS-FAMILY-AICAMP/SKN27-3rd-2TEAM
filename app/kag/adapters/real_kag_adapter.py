@@ -29,6 +29,7 @@ class RealKagAdapter(KagAdapter):
         conditions = self._extract_conditions(user_input, session_context or {})
         query_key, params = self._select_query(conditions, safe_limit)
         rows = self._query_tools.execute(query_key, params, self._get_conn())
+        excluded_nodes = self._build_excluded_nodes(session_context or {})
 
         primary_goal = self._decide_primary_goal(user_input)
         category = self._decide_category(primary_goal)
@@ -46,12 +47,15 @@ class RealKagAdapter(KagAdapter):
                 "target_section": target_section,
                 "traversal_reason": "neo4j traversal returned no candidates",
                 "matched_nodes": matched_nodes,
-                "excluded_nodes": [],
+                "excluded_nodes": excluded_nodes,
                 "candidate_tracks": [],
                 "diversity_metadata": {"source": "neo4j", "degraded": True},
             }
 
-        candidate_tracks = self._map_candidate_tracks(rows)
+        candidate_tracks = self._filter_candidate_tracks(
+            self._map_candidate_tracks(rows),
+            excluded_nodes,
+        )[:safe_limit]
         recommended_content_ids = [track["content_id"] for track in candidate_tracks]
 
         return {
@@ -63,7 +67,7 @@ class RealKagAdapter(KagAdapter):
             "target_section": target_section,
             "traversal_reason": f"neo4j deterministic traversal via {query_key}",
             "matched_nodes": matched_nodes,
-            "excluded_nodes": [],
+            "excluded_nodes": excluded_nodes,
             "candidate_tracks": candidate_tracks,
             "diversity_metadata": {
                 "source": "neo4j",
@@ -154,6 +158,28 @@ class RealKagAdapter(KagAdapter):
             {"type": key, "value": value}
             for key, value in conditions.items()
             if value
+        ]
+
+    @staticmethod
+    def _build_excluded_nodes(session_context: dict) -> list[dict]:
+        nodes = []
+        for artist in session_context.get("disliked_artists", []) or []:
+            if artist:
+                nodes.append({"type": "artist", "value": artist})
+        for track in session_context.get("disliked_tracks", []) or []:
+            if track:
+                nodes.append({"type": "track", "value": track})
+        return nodes
+
+    @staticmethod
+    def _filter_candidate_tracks(candidates: list[dict], excluded_nodes: list[dict]) -> list[dict]:
+        excluded_artists = {node["value"] for node in excluded_nodes if node.get("type") == "artist"}
+        excluded_tracks = {node["value"] for node in excluded_nodes if node.get("type") == "track"}
+        return [
+            candidate
+            for candidate in candidates
+            if candidate.get("content_id") not in excluded_tracks
+            and candidate.get("artist") not in excluded_artists
         ]
 
     @staticmethod

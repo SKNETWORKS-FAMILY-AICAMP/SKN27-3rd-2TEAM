@@ -669,3 +669,252 @@ general_chat
 반대로 `ALLOWED_MOODS`, `ALLOWED_GENRES`, `ALLOWED_SITUATIONS` 같은 enum 자체는 설계서상 필요한 장치다. 이 부분을 LLM 자유 분류로 바꾸는 것은 안전하지 않다. 올바른 방향은 LLM이 사용자 입력을 해석하되, 결과는 반드시 허용 enum과 Runtime Contract 검증을 통과하도록 제한하는 것이다.
 
 현재 단계에서 가장 먼저 정리해야 할 것은 코드 수정이 아니라 실행 흐름의 기준 확정이다. 특히 `InputPlannerAgent -> IntentAgent -> KAG -> RAG` 순서를 설계서대로 복원할지, 현재 구현 흐름을 새 기준으로 문서화할지 먼저 결정해야 한다.
+
+---
+
+## 8. 구조·모듈화·리팩토링 점검 (2026-05-14)
+
+이 섹션은 설계서 정합성과 무관하게 현재 코드 자체의 구조적 문제점을 정리한다.
+소스 수정은 하지 않았으며, 수정이 필요한 항목과 근거만 기록한다.
+
+---
+
+### 8.1 `session_cache_service.py` — 의미 없는 thin wrapper
+
+**파일**: `app/services/session_cache_service.py`
+
+현재 코드가 하는 일:
+
+```python
+def load_context(session_id, user_id=None):
+    return cache.get_context(session_id, user_id=user_id)
+
+def save_turn_and_update_context(...):
+    cache.append_turn(...)
+    cache.update_context_from_turn(...)
+```
+
+`session_history_cache`를 1:1로 위임만 하고 추가 로직이 없다. 현재 구조에서 이 파일은 `import alias`와 다를 바 없고, 호출 경로만 늘려 가독성을 해친다.
+
+**수정 방향**:
+- 서비스 계층이 캐시를 직접 쓰거나
+- 이 파일에 실제 비즈니스 판단(예: degraded 모드 처리, 컨텍스트 병합 정책)을 담거나
+- 둘 중 하나를 선택해야 한다. 현재 상태는 양쪽 어느 쪽도 아니다.
+
+---
+
+### 8.2 `_merge_unique` 함수 중복 정의
+
+**파일 A**: `app/cache/session_history_cache.py:127`
+**파일 B**: `app/services/taste_event_service.py:67`
+
+두 파일에 각각 `_merge_unique(existing, new_items, limit)` 함수가 정의되어 있고, 로직도 유사하다.
+
+```python
+# session_history_cache.py
+def _merge_recent(existing: list, new_items: list, limit: int) -> list:
+    merged = new_items + [x for x in existing if x not in new_items]
+    return merged[:limit]
+
+# taste_event_service.py
+def _merge_unique(existing: list, new_items: list, limit: int) -> list:
+    merged = new_items + [x for x in existing if x not in new_items]
+    return merged[:limit]
+```
+
+코드가 완전히 동일하다. 하나가 수정되면 다른 하나는 버그가 생기는 구조다.
+
+**수정 방향**: `app/common/` 또는 `app/utils/` 아래 공용 유틸리티로 추출하고 두 곳에서 import해서 사용한다.
+
+---
+
+### 8.3 `rag/` 내부 이중 디렉토리 구조
+
+**경로 A**: `app/rag/ragStateBuilder/` — `builder.py`, `edges.py`, `nodes.py`, `schema.py`
+**경로 B**: `app/rag/builders/` — `rag_state_builder.py`
+
+같은 목적처럼 보이는 두 디렉토리가 공존한다. 어느 쪽이 실제 사용 중인지, 어느 쪽이 구버전인지 코드만으로는 명확하지 않다.
+
+추가로 `app/rag/adapters/rag_adapter.py`와 `app/rag/adapters/rag_real_adapter.py`도 역할이 겹쳐 보인다.
+
+**수정 방향**:
+- 실제 import 경로를 추적해 사용 중인 쪽을 확인하고, 미사용 디렉토리를 제거하거나 통합한다.
+- 어느 쪽을 쓸지 결정하고 나머지를 삭제한다.
+
+---
+
+### 8.4 검증 레이어가 두 곳에 분산
+
+**경로 A**: `app/validators/` — `base_validator.py`, `contract_validator.py`, `response_validator.py`, `provenance_validator.py`, `display_reason_validator.py`
+**경로 B**: `app/rag/contractValidator/` — `base_validator.py`, `format_validator.py`, `hallucination_validator.py`, `logic_validator.py`
+
+최상위 `validators/`와 `rag/contractValidator/` 둘 다 계약 검증 코드를 포함한다. `base_validator.py`가 두 곳에 각각 존재한다.
+
+**수정 방향**:
+- RAG 전용 검증이 맞다면 `app/rag/contractValidator/`는 `app/rag/validators/`로 이름을 바꾸고 역할을 명확히 한다.
+- 최상위 `BaseValidator`를 공용 기반 클래스로 사용하도록 정리한다.
+- 같은 이름의 `base_validator.py`가 두 곳에 있으면 import 혼란이 생긴다.
+
+---
+
+### 8.5 `BaseAgent` 인터페이스가 너무 느슨함
+
+**파일**: `app/agents/base_agent.py`
+
+```python
+class BaseAgent(ABC):
+    @abstractmethod
+    def run(self, **kwargs) -> dict:
+        raise NotImplementedError
+```
+
+`run(**kwargs) -> dict`는 시그니처가 없어서:
+- 각 Agent가 어떤 인자를 필수로 받아야 하는지 강제할 수 없다.
+- IDE에서 타입 힌트가 나오지 않는다.
+- 잘못된 인자를 넘겨도 정적 분석이 잡아주지 못한다.
+
+현재 각 Agent가 실제로 받는 파라미터는 모두 다르고, 기반 클래스는 이를 전혀 표현하지 않는다.
+
+**수정 방향 (선택)**:
+- `BaseAgent`를 마커 클래스로만 유지하고 타입 문서를 각 구현체에 충분히 작성한다.
+- 또는 Protocol이나 Generic을 사용해 각 Agent의 입출력 계약을 명시한다.
+- 최소한 각 `run()` 구현체에 파라미터 타입 힌트라도 완성한다 (현재 일부만 있음).
+
+---
+
+### 8.6 라우터에 모듈 레벨 싱글톤 생성
+
+**파일**: `app/api/chatbot_routes.py:15-16`
+
+```python
+_service = ChatbotService()
+_stream_service = ChatbotStreamService(chatbot_service=_service)
+```
+
+모듈 import 시 즉시 `ChatbotService()`가 생성된다. `ChatbotService`는 내부에서 `OrchestratorAgent`를, `OrchestratorAgent`는 `OpenAiLlmClient`를 생성하려 시도한다. DB/Redis 연결 없이 import만 해도 초기화 오류가 발생할 수 있다.
+
+`recommendation_routes.py`, `taste_routes.py` 등도 동일한 패턴이다.
+
+**수정 방향**:
+- FastAPI의 `Depends()`를 사용하거나
+- `@app.on_event("startup")` / `lifespan`에서 초기화하거나
+- 최소한 함수 레벨로 지연 초기화(`_service = None` + `def get_service()`)를 적용한다.
+
+---
+
+### 8.7 `main_recommendation_service.py`의 `debug` 필드 정보 노출
+
+**파일**: `app/services/main_recommendation_service.py:125-142`
+
+```python
+return {
+    ...
+    "debug": {
+        "session_context": session_context,
+        "kag_state": kag_state,
+        "rag_state": rag_state,
+        "latency_ms": latency_ms,
+    },
+}
+```
+
+`session_context`(사용자 취향, 싫어하는 아티스트 목록), `kag_state`, `rag_state`(내부 추천 전략) 전체가 API 응답에 포함된다. 프론트엔드가 이를 렌더링하지 않더라도 네트워크 응답에 노출된다.
+
+**수정 방향**:
+- `APP_ENV == "prod"`일 때는 `debug` 키를 응답에서 제거한다.
+- 또는 `compact_state_builder`를 통해 내부 state가 외부로 나가지 않도록 한다.
+- 8.6의 라우터 싱글톤과 함께 수정하면 환경 변수 기반 분기가 자연스럽게 가능하다.
+
+---
+
+### 8.8 `InputPlannerAgent._detect_candidates`의 키워드 맵 혼재
+
+**파일**: `app/agents/input_planner_agent.py:147-161`
+
+`_detect_candidates()`는 mood와 genre 모두를 처리하는 공용 함수인데, 내부 `keyword_map`에 mood(`calm`, `night`, `bright`)와 genre(`indie`, `dream_pop`, `ambient`, `rnb`)가 섞여 있다. 함수는 `allowed` 파라미터로 걸러내지만, 매핑 테이블 자체가 분류 없이 합쳐져 있다.
+
+```python
+keyword_map = {
+    "calm": [...],      # mood
+    "night": [...],     # mood
+    "indie": [...],     # genre
+    "dream_pop": [...], # genre
+}
+```
+
+**수정 방향**:
+- `MOOD_KEYWORD_MAP`, `GENRE_KEYWORD_MAP`을 `app/common/constants.py`에 분리해 정의한다.
+- `_detect_candidates`를 mood/genre별로 각각 호출하거나, 매핑 테이블을 인자로 주입한다.
+- `ALLOWED_MOODS`, `ALLOWED_GENRES` 상수와 이 매핑 테이블이 같은 파일에 있어야 동기화가 쉽다.
+
+---
+
+### 8.9 `rag/` 내 설계 문서와 소스코드 혼재
+
+다음 파일들이 소스 코드 트리 안에 존재한다:
+
+- `app/rag/design.md`
+- `app/rag/output.md`
+- `app/rag/kag_query_implementation_classification.md`
+- `app/rag/real_neo4j_kag_adapter_design.md`
+- `app/rag/rimas_kag_query_mvp_plan_v_1.md`
+- `app/rag/adapters/description.md`
+- `app/rag/contractValidator/description.md`
+- `app/rag/musicCatalogRepository/description.md`
+- `app/rag/ragStateBuilder/description.md`
+- `app/rag/services/description.md`
+
+마크다운 설계 문서가 Python 패키지 디렉토리에 섞여 있으면 `glob`이나 패키지 탐색 시 의도치 않게 포함될 수 있고, Python 파일과 문서 파일의 경계가 모호해진다.
+
+**수정 방향**: 최상위 `docs/rag/` 또는 `docs/design/` 아래로 이동한다. 단, 이동 시 git history에서 파일을 추적하기 위해 `git mv`를 사용해야 한다.
+
+---
+
+### 8.10 `IntentType`과 `ALLOWED_INTENT_TYPES` 이중 관리
+
+**파일 A**: `app/schemas/intent_state_schema.py` — `IntentType` Literal
+**파일 B**: `app/common/constants.py` — `ALLOWED_INTENT_TYPES` set
+
+동일한 intent 목록이 두 곳에 별도로 정의되어 있다. 하나가 바뀌면 다른 하나도 수동으로 바꿔야 하는 drift 구조다. 실제로 `IntentAgent`는 둘과 다른 값을 반환하고 있어 현재도 이미 불일치 상태다 (섹션 3.2 참조).
+
+**수정 방향**:
+- `IntentType` Literal을 단일 기준으로 삼고 `ALLOWED_INTENT_TYPES = set(get_args(IntentType))`으로 파생한다.
+- 또는 `constants.py`의 `ALLOWED_INTENT_TYPES`를 기준으로 하고, schema는 `Literal[tuple(ALLOWED_INTENT_TYPES)]`로 참조한다.
+- 어느 방향이든 한 곳에서만 관리해야 한다.
+
+---
+
+### 8.11 `TasteEventService`가 session context를 직접 읽고 쓴다
+
+**파일**: `app/services/taste_event_service.py:40-45`
+
+```python
+ctx = self._cache.get_context(session_id)
+ctx["recent_genres"] = _merge_unique(...)
+...
+self._cache.set_context(session_id, ctx)
+```
+
+서비스 계층이 캐시 객체를 직접 읽어 dict를 수정하고 다시 저장하는 패턴이다. 이는 `session_history_cache.update_context_from_turn()`이 하는 일과 동일한 레이어다. 두 코드 경로가 독립적으로 context를 수정하면 race condition이나 데이터 유실 위험이 있다.
+
+**수정 방향**:
+- context 수정은 `session_history_cache`의 함수를 통해서만 하거나
+- `update_context_from_taste_event()` 같은 전용 함수를 캐시 레이어에 추가해 서비스가 이를 호출하도록 한다.
+
+---
+
+### 8.12 우선순위 요약
+
+| 항목 | 위험도 | 수정 난이도 |
+|------|--------|------------|
+| 8.2 `_merge_unique` 중복 | 중 (버그 drift) | 낮음 |
+| 8.3 `rag/` 이중 디렉토리 | 중 (혼란) | 중간 |
+| 8.4 검증 레이어 분산 | 중 (import 혼란) | 중간 |
+| 8.7 `debug` 필드 노출 | 높음 (정보 노출) | 낮음 |
+| 8.10 `IntentType` 이중 관리 | 높음 (버그 drift) | 낮음 |
+| 8.11 context 직접 수정 | 높음 (race condition) | 중간 |
+| 8.1 thin wrapper | 낮음 (가독성) | 낮음 |
+| 8.5 `BaseAgent` 시그니처 | 낮음 (타입 안전성) | 중간 |
+| 8.6 모듈 레벨 싱글톤 | 중 (초기화 오류) | 중간 |
+| 8.8 키워드 맵 혼재 | 낮음 (유지보수) | 낮음 |
+| 8.9 문서/코드 혼재 | 낮음 (구조 혼란) | 낮음 |

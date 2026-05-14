@@ -48,6 +48,27 @@ class MusicCatalogRepository(BaseRepository):
             )
             return cursor.fetchone()
 
+    def find_fallback_new_releases(self, limit, excluded_content_ids, excluded_artists):
+        return self._fetch_all(
+            query_constants.SELECT_FALLBACK_NEW_RELEASES,
+            {
+                "limit": limit,
+                "excluded_content_ids": excluded_content_ids or [],
+                "excluded_artists": excluded_artists or [],
+            },
+        )
+
+    def find_fallback_discovery(self, limit, preferred_genres, excluded_content_ids, excluded_artists):
+        return self._fetch_all(
+            query_constants.SELECT_FALLBACK_DISCOVERY,
+            {
+                "limit": limit,
+                "preferred_genres": preferred_genres or [],
+                "excluded_content_ids": excluded_content_ids or [],
+                "excluded_artists": excluded_artists or [],
+            },
+        )
+
     def _fetch_all(self, query, params):
         with self._cursor() as cursor:
             cursor.execute(query, params)

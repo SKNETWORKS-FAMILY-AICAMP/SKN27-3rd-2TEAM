@@ -1,11 +1,13 @@
 import logging
 
 from app.agents.base_agent import BaseAgent
+from app.agents.recommendation_agent import build_display_reason
 from app.common.default_state import FALLBACK_RESPONSE_STATE
 from app.common.labels import CATEGORY_LABELS
 from app.config import settings
 from app.llm.openai_llm_client import OpenAiLlmClient
 from app.llm.response_state_schema import RESPONSE_STATE_JSON_SCHEMA
+from app.validators.display_reason_validator import DisplayReasonValidator
 
 logger = logging.getLogger("rimas.agent.response_generator")
 
@@ -75,13 +77,18 @@ class ResponseGenerator(BaseAgent):
     @staticmethod
     def _build_local_response(selected: dict) -> dict:
         recommendations = selected.get("selected_recommendations", [])
+        reason_validator = DisplayReasonValidator()
         display_recommendations = [
             {
                 "content_id": item.get("content_id", ""),
                 "title": item.get("title", ""),
                 "artist": item.get("artist", ""),
                 "label": item.get("label", ""),
-                "display_reason": item.get("display_reason", ""),
+                "display_reason": (
+                    item.get("display_reason", "")
+                    if reason_validator.validate(item.get("display_reason", ""), item).get("passed")
+                    else build_display_reason(item)
+                ),
             }
             for item in recommendations
         ]

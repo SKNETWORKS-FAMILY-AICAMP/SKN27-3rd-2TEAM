@@ -33,7 +33,7 @@ class RealRagAdapter(RagAdapter):
             logger.warning("real_rag_retriever_error", extra={"error": str(exc)})
             return self._failed("retriever_error", query_text, content_ids, str(exc))
 
-        evidence = self._build_evidence(hits, set(content_ids))
+        evidence = self._build_evidence(hits, set(content_ids), kag_state, rag_input_json)
         if not evidence:
             return self._fallback("no_candidate_matched_evidence", query_text, content_ids)
 
@@ -68,10 +68,19 @@ class RealRagAdapter(RagAdapter):
         return [str(content_id) for content_id in raw_ids if str(content_id).strip()]
 
     @staticmethod
-    def _build_evidence(hits: list[ElasticsearchRagHit], allowed_ids: set[str]) -> list[dict]:
+    def _build_evidence(
+        hits: list[ElasticsearchRagHit],
+        allowed_ids: set[str],
+        kag_state: dict | None = None,
+        rag_input_json: dict | None = None,
+    ) -> list[dict]:
+        excluded_artists, excluded_tracks = RealRagAdapter._excluded_sets(kag_state or {})
+        target_section = (rag_input_json or {}).get("target_section", "personalized_section")
         evidence = []
         for hit in hits:
             if hit.content_id not in allowed_ids:
+                continue
+            if hit.content_id in excluded_tracks or hit.artist in excluded_artists:
                 continue
             evidence.append(
                 {
@@ -82,11 +91,36 @@ class RealRagAdapter(RagAdapter):
                     "genre": hit.genre,
                     "mood": hit.mood,
                     "evidence_summary": hit.content,
-                    "recommendation_category": "personalized_match",
+                    "release_type": hit.release_type,
+                    "recommendation_category": RealRagAdapter._recommendation_category(hit, target_section),
                     "retrieval_score": hit.score,
                 }
             )
         return evidence
+
+    @staticmethod
+    def _excluded_sets(kag_state: dict) -> tuple[set[str], set[str]]:
+        excluded_artists = set()
+        excluded_tracks = set()
+        for node in kag_state.get("excluded_nodes", []) or []:
+            value = node.get("value")
+            if not value:
+                continue
+            if node.get("type") == "artist":
+                excluded_artists.add(value)
+            if node.get("type") == "track":
+                excluded_tracks.add(value)
+        return excluded_artists, excluded_tracks
+
+    @staticmethod
+    def _recommendation_category(hit: ElasticsearchRagHit, target_section: str) -> str:
+        if hit.release_type == "new_release":
+            return "new_release"
+        if target_section == "discovery_section":
+            return "discovery_candidate"
+        if target_section == "new_release_section":
+            return "new_release"
+        return "personalized_match"
 
     @staticmethod
     def _fallback(reason: str, query_text: str, content_ids: list[str]) -> dict:

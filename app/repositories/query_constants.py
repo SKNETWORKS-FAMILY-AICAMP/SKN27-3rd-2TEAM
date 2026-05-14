@@ -33,6 +33,26 @@ WHERE content_id = %(content_id)s
 LIMIT 1;
 """
 
+SELECT_FALLBACK_NEW_RELEASES = """
+SELECT *
+FROM music_catalog
+WHERE release_type = 'new_release'
+  AND NOT (content_id = ANY(%(excluded_content_ids)s))
+  AND NOT (artist = ANY(%(excluded_artists)s))
+ORDER BY created_at DESC, content_id ASC
+LIMIT %(limit)s;
+"""
+
+SELECT_FALLBACK_DISCOVERY = """
+SELECT *
+FROM music_catalog
+WHERE recommendation_category = 'discovery_candidate'
+  AND NOT (content_id = ANY(%(excluded_content_ids)s))
+  AND NOT (artist = ANY(%(excluded_artists)s))
+ORDER BY created_at DESC, content_id ASC
+LIMIT %(limit)s;
+"""
+
 UPSERT_CHAT_SESSION = """
 INSERT INTO chat_sessions (session_id, user_id, started_at)
 VALUES (%(session_id)s, %(user_id)s, NOW())
@@ -170,6 +190,34 @@ SELECT
     selected_content_ids_json,
     updated_at
 FROM user_taste_profiles
+WHERE user_id = %(user_id)s;
+"""
+
+UPSERT_USER_NEGATIVE_PREFERENCES = """
+INSERT INTO user_negative_preferences (
+    user_id,
+    disliked_artists_json,
+    disliked_tracks_json,
+    updated_at
+) VALUES (
+    %(user_id)s,
+    %(disliked_artists_json)s,
+    %(disliked_tracks_json)s,
+    NOW()
+)
+ON CONFLICT (user_id) DO UPDATE SET
+    disliked_artists_json = EXCLUDED.disliked_artists_json,
+    disliked_tracks_json = EXCLUDED.disliked_tracks_json,
+    updated_at = NOW();
+"""
+
+SELECT_USER_NEGATIVE_PREFERENCES = """
+SELECT
+    user_id,
+    disliked_artists_json,
+    disliked_tracks_json,
+    updated_at
+FROM user_negative_preferences
 WHERE user_id = %(user_id)s;
 """
 

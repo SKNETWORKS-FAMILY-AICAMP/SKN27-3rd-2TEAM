@@ -29,6 +29,32 @@ def test_input_planner_agent_builds_intent_and_kag_input_without_track_identity(
     assert "artist" not in result["kag_input_json"]
 
 
+def test_input_planner_extracts_requested_count_from_korean_number():
+    result = InputPlannerAgent().run(
+        user_id="user_001",
+        session_id="session_001",
+        request_id="req_001",
+        user_input="잔잔한 곡 두 곡 추천해줘",
+        session_context={},
+    )
+
+    assert result["intent_state"]["requested_count"] == 2
+    assert result["kag_input_json"]["constraints"]["max_candidates"] == 2
+
+
+def test_input_planner_extracts_disliked_artist_and_excludes_existing_context():
+    result = InputPlannerAgent().run(
+        user_id="user_001",
+        session_id="session_001",
+        request_id="req_001",
+        user_input="Billie Eilish 싫어 추천하지 마",
+        session_context={"disliked_artists": ["Adele"], "disliked_tracks": []},
+    )
+
+    assert "Billie Eilish" in result["intent_state"]["disliked_artists"]
+    assert result["kag_input_json"]["constraints"]["excluded_artists"] == ["Billie Eilish", "Adele"]
+
+
 def test_intent_agent_returns_only_v4_allowed_intent_types():
     agent = IntentAgent()
 
@@ -124,6 +150,68 @@ def test_recommendation_agent_outputs_v4_selected_recommendation_contract():
     assert selected["rank"] == 1
     assert selected["score"] > 0
     assert selected["source"] == {"kag": False, "rag": True}
+
+
+def test_recommendation_agent_deduplicates_content_id_and_respects_requested_count():
+    evidence = [
+        {
+            "content_id": "track_001",
+            "title": "A",
+            "artist": "X",
+            "genre": ["indie"],
+            "mood": ["calm"],
+            "recommendation_category": "personalized_match",
+            "evidence_summary": "raw one",
+        },
+        {
+            "content_id": "track_001",
+            "title": "A",
+            "artist": "X",
+            "genre": ["indie"],
+            "mood": ["calm"],
+            "recommendation_category": "personalized_match",
+            "evidence_summary": "raw two",
+        },
+        {
+            "content_id": "track_002",
+            "title": "B",
+            "artist": "Y",
+            "genre": ["rnb"],
+            "mood": ["night"],
+            "recommendation_category": "personalized_match",
+            "evidence_summary": "raw three",
+        },
+    ]
+
+    result = RecommendationAgent().run(
+        intent_result={"intent_type": "personalized_recommendation", "requested_count": 1},
+        rag_state={"recommended_content_evidence": evidence},
+    )
+
+    assert len(result["selected_recommendations"]) == 1
+    assert result["selected_recommendations"][0]["content_id"] == "track_001"
+
+
+def test_recommendation_agent_does_not_copy_raw_evidence_to_display_reason():
+    raw = "lyrics lyrics lyrics raw document"
+    result = RecommendationAgent().run(
+        intent_result={"intent_type": "personalized_recommendation"},
+        rag_state={
+            "recommended_content_evidence": [
+                {
+                    "content_id": "track_001",
+                    "title": "A",
+                    "artist": "X",
+                    "genre": ["indie"],
+                    "mood": ["calm"],
+                    "recommendation_category": "personalized_match",
+                    "evidence_summary": raw,
+                }
+            ]
+        },
+    )
+
+    assert result["selected_recommendations"][0]["display_reason"] != raw
 
 
 def test_recommendation_agent_uses_policy_modules_for_selection_and_score():

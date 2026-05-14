@@ -24,3 +24,16 @@ def test_mock_kag_adapter_returns_kag_state():
     assert isinstance(kag_state["excluded_nodes"], list)
     assert isinstance(kag_state["candidate_tracks"], list)
     assert isinstance(kag_state["diversity_metadata"], dict)
+
+
+def test_mock_kag_adapter_records_excluded_nodes_and_respects_limit():
+    state = MockKagAdapter().build_state(
+        "user_001",
+        "추천",
+        {"disliked_artists": ["Nova Lane"], "disliked_tracks": ["track_003"]},
+        limit=2,
+    )
+
+    assert {"type": "artist", "value": "Nova Lane"} in state["excluded_nodes"]
+    assert {"type": "track", "value": "track_003"} in state["excluded_nodes"]
+    assert len(state["recommended_content_ids"]) <= 2

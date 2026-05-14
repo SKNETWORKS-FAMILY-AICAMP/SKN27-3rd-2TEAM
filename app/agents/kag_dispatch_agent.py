@@ -32,7 +32,13 @@ class KagDispatchAgent(BaseAgent):
                 .get("query_context", {})
                 .get("normalized_query", user_input)
             )
-            kag_state = self._adapter.build_state(user_id, normalized_input, session_context)
+            constraints = (kag_input_json or {}).get("constraints", {})
+            kag_state = self._adapter.build_state(
+                user_id,
+                normalized_input,
+                session_context,
+                limit=constraints.get("max_candidates", 10),
+            )
             ms = round((time.perf_counter() - start) * 1000, 1)
             logger.info(
                 "kag_dispatch_ok",

@@ -56,6 +56,10 @@ intent_type별로 우선 노출 카테고리가 다르다.
 - LLM이 추천 후보 순서를 변경하거나 content_id를 생성하지 않는다.
 - 카테고리 외 임의 섹션을 생성하지 않는다.
 - 5곡 초과 선택 금지.
+- disliked track은 최종 추천에서 제외한다.
+- disliked artist는 최종 추천에서 제외한다.
+- 같은 content_id는 최종 추천에서 한 번만 노출한다.
+- requested_count가 있으면 최종 추천 개수에 반영한다.
 
 ---
 

@@ -99,6 +99,15 @@ def test_taste_tables_exist_in_schema():
     assert "idx_user_taste_profiles_updated_at" in sql
 
 
+def test_schema_contains_user_negative_preferences_table():
+    sql = read(SCHEMA)
+
+    assert "CREATE TABLE IF NOT EXISTS user_negative_preferences" in sql
+    assert "disliked_artists_json JSONB NOT NULL DEFAULT '[]'::JSONB" in sql
+    assert "disliked_tracks_json JSONB NOT NULL DEFAULT '[]'::JSONB" in sql
+    assert "idx_user_negative_preferences_updated_at" in sql
+
+
 def test_compose_defines_v4_runtime_services():
     compose = read(COMPOSE_FILE)
 

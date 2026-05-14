@@ -143,6 +143,10 @@ class OrchestratorAgent:
                 "kag_state": kag_state,
                 "rag_state": rag_state,
                 "latency_ms": ms,
+                "new_dislikes": {
+                    "disliked_artists": intent_state.get("disliked_artists", []),
+                    "disliked_tracks": intent_state.get("disliked_tracks", []),
+                },
             },
         }
 

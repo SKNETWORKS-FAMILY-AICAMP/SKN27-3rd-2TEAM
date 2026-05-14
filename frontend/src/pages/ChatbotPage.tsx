@@ -6,6 +6,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { fetchSessionHistory, flushSession, sendChatMessageStream } from "../api/chatbot";
+import { addToTaste } from "../api/taste";
 import { DreamBackground } from "../components/background/DreamBackground";
 import { ChatHistory } from "../components/chatbot/ChatHistory";
 import { ChatInput } from "../components/chatbot/ChatInput";
@@ -24,7 +25,7 @@ export function ChatbotPage({ onNavigateHome }: Props) {
   const { userId, sessionId, resetSession } = useSessionStore();
   const {
     history, isLoading,
-    appendUserTurn, appendAssistantPlaceholder,
+    appendUserTurn,
     appendAssistantDelta, finalizeAssistantTurn, replaceLastAssistantMessage,
     setHistory, setLoading, clear,
   } = useChatStore();
@@ -59,7 +60,6 @@ export function ChatbotPage({ onNavigateHome }: Props) {
     streamingRef.current = true;
 
     appendUserTurn(trimmed);
-    appendAssistantPlaceholder();
 
     try {
       const stream = sendChatMessageStream(userId, sessionId, trimmed, generateRequestId());
@@ -79,7 +79,7 @@ export function ChatbotPage({ onNavigateHome }: Props) {
       setLoading(false);
       streamingRef.current = false;
     }
-  }, [input, isLoading, userId, sessionId, appendUserTurn, appendAssistantPlaceholder, appendAssistantDelta, finalizeAssistantTurn, replaceLastAssistantMessage, setLoading]);
+  }, [input, isLoading, userId, sessionId, appendUserTurn, appendAssistantDelta, finalizeAssistantTurn, replaceLastAssistantMessage, setLoading]);
 
   const handleHomeClick = () => {
     if (history.length > 0) {
@@ -120,12 +120,15 @@ export function ChatbotPage({ onNavigateHome }: Props) {
           <ChatbotHeader userId={userId} onHomeClick={handleHomeClick} />
 
           <div className="chat-body">
-            <ChatHistory history={history} />
+            <ChatHistory history={history} isLoading={isLoading} />
             <div ref={bottomRef} />
           </div>
 
           {lastTurn?.display_recommendations?.length > 0 && (
-            <RelatedRecommendationCards cards={lastTurn.display_recommendations} />
+            <RelatedRecommendationCards
+              cards={lastTurn.display_recommendations}
+              onAddToTaste={(contentId) => addToTaste({ userId, sessionId, contentId, requestId: generateRequestId() }).then(() => {})}
+            />
           )}
 
           <ChatInput

@@ -81,6 +81,9 @@ detected_situations: late_night
 - LLM 출력을 validator 없이 직접 사용하지 않는다.
 - strict=True JSON schema 없이 LLM을 호출하지 않는다.
 - temperature > 0.5로 설정하지 않는다 (현재 0.2).
+- LLM은 display_reason의 곡, 아티스트, content_id를 변경하지 않는다.
+- LLM은 raw evidence_summary, lyrics, Elasticsearch document를 그대로 복사하지 않는다.
+- LLM display_reason 결과는 validator 통과 시에만 사용자 응답에 사용한다.
 
 ---
 

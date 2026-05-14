@@ -61,8 +61,7 @@ def respond_stream(req: ChatRequest):
 
     def _to_sse(events):
         for event in events:
-            yield f"event: {event['event']}\n"
-            yield f"data: {json.dumps(event['data'], ensure_ascii=False)}\n\n"
+            yield f"event: {event['event']}\ndata: {json.dumps(event['data'], ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         _to_sse(
@@ -73,4 +72,9 @@ def respond_stream(req: ChatRequest):
             )
         ),
         media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
     )

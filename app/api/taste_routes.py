@@ -1,14 +1,15 @@
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from app.config.settings import create_database_connection
+from app.repositories.music_catalog_repository import MusicCatalogRepository
+from app.services.music_detail_service import MusicDetailService
 from app.services.taste_event_service import TasteEventService
 
 logger = logging.getLogger("rimas.api.taste")
 router = APIRouter()
-
-_service = TasteEventService()
 
 
 class TasteEventRequest(BaseModel):
@@ -20,10 +21,29 @@ class TasteEventRequest(BaseModel):
     request_id: str | None = Field(None, description="요청 ID")
 
 
-@router.post("/events")
-def add_taste_event(req: TasteEventRequest):
+def get_taste_event_service() -> TasteEventService:
+    connection = None
     try:
-        return _service.add_to_taste(
+        connection = create_database_connection()
+    except Exception as exc:
+        logger.warning("taste_event_catalog_unavailable", extra={"error": str(exc)})
+        yield TasteEventService()
+        return
+
+    try:
+        detail_service = MusicDetailService(music_catalog_repository=MusicCatalogRepository(connection))
+        yield TasteEventService(detail_service=detail_service)
+    finally:
+        connection.close()
+
+
+@router.post("/events")
+def add_taste_event(
+    req: TasteEventRequest,
+    service: TasteEventService = Depends(get_taste_event_service),
+):
+    try:
+        return service.add_to_taste(
             user_id=req.user_id,
             session_id=req.session_id,
             content_id=req.content_id,

@@ -47,6 +47,9 @@ score = max(MIN_SCORE, BASE_SCORE - ((rank - 1) * RANK_DECAY))
 - LLM이 점수를 계산하거나 순위를 조정하지 않는다.
 - 점수 기반으로 카테고리 섹션을 변경하지 않는다.
 - 점수만으로 추천 여부를 결정하지 않는다 (카테고리 우선순위가 우선).
+- excluded candidate는 ranking 대상에 들어가기 전에 제거한다.
+- dedup은 최종 slice 전에 수행한다.
+- section fallback은 기존 content_id와 중복되면 안 된다.
 
 ---
 

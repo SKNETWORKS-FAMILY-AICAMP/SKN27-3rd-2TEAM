@@ -6,7 +6,7 @@ logger = logging.getLogger("rimas.kag.mock")
 
 
 class MockKagAdapter(KagAdapter):
-    def build_state(self, user_id: str, user_input: str, session_context: dict) -> dict:
+    def build_state(self, user_id: str, user_input: str, session_context: dict, limit: int = 10) -> dict:
         if not user_id:
             raise ValueError("user_id is required")
 
@@ -17,7 +17,9 @@ class MockKagAdapter(KagAdapter):
         )
 
         category = self._decide_category(primary_goal)
-        recommended_content_ids = ["track_001", "track_002", "track_003"]
+        excluded_nodes = self._build_excluded_nodes(session_context or {})
+        candidates = self._filter_candidates(self._mock_candidates(), excluded_nodes)[: self._normalize_limit(limit)]
+        recommended_content_ids = [candidate["content_id"] for candidate in candidates]
         return {
             "status": "success",
             "recommendation_goal": {
@@ -29,17 +31,52 @@ class MockKagAdapter(KagAdapter):
             "target_section": self._decide_target_section(category),
             "traversal_reason": f"mock traversal for {primary_goal}",
             "matched_nodes": [],
-            "excluded_nodes": [],
-            "candidate_tracks": [
-                {"content_id": content_id}
-                for content_id in recommended_content_ids
-            ],
+            "excluded_nodes": excluded_nodes,
+            "candidate_tracks": candidates,
             "diversity_metadata": {"source": "mock"},
         }
 
+    @staticmethod
+    def _mock_candidates() -> list[dict]:
+        return [
+            {"content_id": "track_001", "artist": "Nova Lane"},
+            {"content_id": "track_002", "artist": "Luna Field"},
+            {"content_id": "track_003", "artist": "Mira Tone"},
+        ]
+
+    @staticmethod
+    def _normalize_limit(limit: int) -> int:
+        try:
+            parsed = int(limit)
+        except (TypeError, ValueError):
+            parsed = 10
+        return max(1, min(parsed, 50))
+
+    @staticmethod
+    def _build_excluded_nodes(session_context: dict) -> list[dict]:
+        nodes = []
+        for artist in session_context.get("disliked_artists", []) or []:
+            if artist:
+                nodes.append({"type": "artist", "value": artist})
+        for track in session_context.get("disliked_tracks", []) or []:
+            if track:
+                nodes.append({"type": "track", "value": track})
+        return nodes
+
+    @staticmethod
+    def _filter_candidates(candidates: list[dict], excluded_nodes: list[dict]) -> list[dict]:
+        excluded_artists = {node["value"] for node in excluded_nodes if node.get("type") == "artist"}
+        excluded_tracks = {node["value"] for node in excluded_nodes if node.get("type") == "track"}
+        return [
+            candidate
+            for candidate in candidates
+            if candidate.get("content_id") not in excluded_tracks
+            and candidate.get("artist") not in excluded_artists
+        ]
+
     def _decide_primary_goal(self, user_input: str) -> str:
         text = user_input or ""
-        if "왜" in text or "이유" in text:
+        if "이유" in text or "왜" in text:
             return "recommendation_reason_question"
         if "최신" in text or "새로 나온" in text or "신곡" in text:
             return "new_release_recommendation"

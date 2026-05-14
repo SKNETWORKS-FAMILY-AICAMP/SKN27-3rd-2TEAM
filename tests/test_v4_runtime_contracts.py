@@ -187,3 +187,16 @@ def test_session_context_schema_accepts_selected_tracks():
     )
 
     assert ctx.model_dump()["selected_tracks"] == ["track_001"]
+
+
+def test_session_context_schema_accepts_negative_preferences():
+    from app.schemas.session_context_schema import SessionContextSchema
+
+    ctx = SessionContextSchema(
+        session_id="session_001",
+        disliked_artists=["Billie Eilish"],
+        disliked_tracks=["track_999"],
+    )
+
+    assert ctx.disliked_artists == ["Billie Eilish"]
+    assert ctx.disliked_tracks == ["track_999"]

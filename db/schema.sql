@@ -183,3 +183,13 @@ ON user_taste_events(session_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_user_taste_profiles_updated_at
 ON user_taste_profiles(updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS user_negative_preferences (
+    user_id VARCHAR(64) PRIMARY KEY REFERENCES users(user_id),
+    disliked_artists_json JSONB NOT NULL DEFAULT '[]'::JSONB,
+    disliked_tracks_json JSONB NOT NULL DEFAULT '[]'::JSONB,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_negative_preferences_updated_at
+ON user_negative_preferences(updated_at DESC);

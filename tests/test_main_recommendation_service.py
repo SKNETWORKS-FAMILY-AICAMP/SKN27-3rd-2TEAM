@@ -93,3 +93,127 @@ def test_main_recommendation_service_returns_page_view_model(monkeypatch):
         "user_id": "user_001",
         "latency_ms": view_model["debug"]["latency_ms"],
     }
+
+
+def test_main_recommendation_service_deduplicates_and_fills_sections():
+    class StubRepo:
+        def find_fallback_new_releases(self, limit, excluded_content_ids, excluded_artists):
+            return [
+                {
+                    "content_id": "new_001",
+                    "title": "New",
+                    "artist": "Fresh",
+                    "album": "",
+                    "genres": ["indie"],
+                    "moods": ["bright"],
+                    "evidence_summary": "new",
+                }
+            ]
+
+        def find_fallback_discovery(self, limit, preferred_genres, excluded_content_ids, excluded_artists):
+            return [
+                {
+                    "content_id": "disc_001",
+                    "title": "Discover",
+                    "artist": "Wide",
+                    "album": "",
+                    "genres": ["ambient"],
+                    "moods": ["calm"],
+                    "evidence_summary": "discover",
+                }
+            ]
+
+    view_model = MainRecommendationService._build_view_model(
+        user_id="user_001",
+        session_context={
+            "disliked_artists": [],
+            "disliked_tracks": [],
+            "recent_genres": ["indie"],
+            "recent_moods": [],
+        },
+        kag_state={},
+        rag_state={
+            "recommended_content_evidence": [
+                {
+                    "content_id": "track_001",
+                    "title": "Same",
+                    "artist": "A",
+                    "genre": ["indie"],
+                    "mood": ["calm"],
+                    "recommendation_category": "personalized_match",
+                    "evidence_summary": "raw",
+                },
+                {
+                    "content_id": "track_001",
+                    "title": "Same",
+                    "artist": "A",
+                    "genre": ["indie"],
+                    "mood": ["calm"],
+                    "recommendation_category": "personalized_match",
+                    "evidence_summary": "raw",
+                },
+            ]
+        },
+        latency_ms=1.0,
+        catalog_repository=StubRepo(),
+    )
+
+    assert len(view_model["personalized"]) == 1
+    assert view_model["new_release"]
+    assert view_model["discovery"]
+
+
+def test_main_recommendation_service_uses_injected_repository_for_runtime_fallback(monkeypatch):
+    class EmptySectionOrchestrator:
+        def run_recommendation(self, user_id, session_id, session_context):
+            return {
+                "status": "success",
+                "kag_state": {},
+                "rag_state": {
+                    "recommended_content_evidence": [
+                        {
+                            "content_id": "track_001",
+                            "title": "Same",
+                            "artist": "A",
+                            "genre": ["indie"],
+                            "mood": ["calm"],
+                            "recommendation_category": "personalized_match",
+                            "evidence_summary": "raw",
+                        }
+                    ],
+                    "recommendation_reason": {"summary": ""},
+                    "recommendation_scripts": {},
+                },
+            }
+
+    class StubSessionCache:
+        def load_context(self, session_id, user_id=None):
+            return {
+                "session_id": session_id,
+                "recent_genres": ["indie"],
+                "recent_moods": [],
+                "disliked_artists": [],
+                "disliked_tracks": [],
+            }
+
+    class StubLatestStateCache:
+        def save_latest_states(self, **kwargs):
+            pass
+
+    class StubRepo:
+        def find_fallback_new_releases(self, limit, excluded_content_ids, excluded_artists):
+            return [{"content_id": "new_001", "title": "New", "artist": "Fresh", "genres": ["indie"], "moods": ["bright"]}]
+
+        def find_fallback_discovery(self, limit, preferred_genres, excluded_content_ids, excluded_artists):
+            return [{"content_id": "disc_001", "title": "Discover", "artist": "Wide", "genres": ["ambient"], "moods": ["calm"]}]
+
+    monkeypatch.setattr("app.services.main_recommendation_service.session_cache_service", StubSessionCache())
+    monkeypatch.setattr("app.services.main_recommendation_service.latest_state_cache", StubLatestStateCache())
+
+    view_model, _ = MainRecommendationService(
+        orchestrator=EmptySectionOrchestrator(),
+        music_catalog_repository=StubRepo(),
+    ).get_page_view_model("user_001", "session_001")
+
+    assert view_model["new_release"][0]["content_id"] == "new_001"
+    assert view_model["discovery"][0]["content_id"] == "disc_001"

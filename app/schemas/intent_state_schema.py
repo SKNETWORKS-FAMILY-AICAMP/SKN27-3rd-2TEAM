@@ -22,5 +22,8 @@ class IntentStateSchema(BaseModel):
     detected_moods: list[str] = Field(default_factory=list)
     detected_genres: list[str] = Field(default_factory=list)
     detected_situations: list[str] = Field(default_factory=list)
+    requested_count: int | None = Field(default=None, ge=1)
+    disliked_artists: list[str] = Field(default_factory=list)
+    disliked_tracks: list[str] = Field(default_factory=list)
     requires_kag: bool
     requires_rag: bool
