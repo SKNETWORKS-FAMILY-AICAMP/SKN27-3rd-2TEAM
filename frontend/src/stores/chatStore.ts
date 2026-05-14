@@ -18,6 +18,11 @@ interface ChatState {
     chatbotResponse: string,
     displayRecommendations: ChatDisplayRecommendation[]
   ) => void;
+  appendUserTurn: (userInput: string) => void;
+  appendAssistantPlaceholder: () => void;
+  appendAssistantDelta: (delta: string) => void;
+  finalizeAssistantTurn: (displayRecommendations: ChatDisplayRecommendation[]) => void;
+  replaceLastAssistantMessage: (message: string) => void;
   setHistory: (turns: ChatTurn[]) => void;
   setLoading: (v: boolean) => void;
   clear: () => void;
@@ -39,6 +44,52 @@ export const useChatStore = create<ChatState>((set) => ({
         },
       ],
     })),
+
+  appendUserTurn: (userInput) =>
+    set((state) => ({
+      history: [
+        ...state.history,
+        { user_input: userInput, chatbot_response: "", display_recommendations: [], created_at: new Date().toISOString() },
+      ],
+    })),
+
+  appendAssistantPlaceholder: () =>
+    set((state) => ({
+      history: [
+        ...state.history,
+        { user_input: "", chatbot_response: "", display_recommendations: [], created_at: new Date().toISOString() },
+      ],
+    })),
+
+  appendAssistantDelta: (delta) =>
+    set((state) => {
+      if (state.history.length === 0) return state;
+      const updated = [...state.history];
+      const last = { ...updated[updated.length - 1] };
+      last.chatbot_response += delta;
+      updated[updated.length - 1] = last;
+      return { history: updated };
+    }),
+
+  finalizeAssistantTurn: (displayRecommendations) =>
+    set((state) => {
+      if (state.history.length === 0) return state;
+      const updated = [...state.history];
+      const last = { ...updated[updated.length - 1] };
+      last.display_recommendations = displayRecommendations;
+      updated[updated.length - 1] = last;
+      return { history: updated };
+    }),
+
+  replaceLastAssistantMessage: (message) =>
+    set((state) => {
+      if (state.history.length === 0) return state;
+      const updated = [...state.history];
+      const last = { ...updated[updated.length - 1] };
+      last.chatbot_response = message;
+      updated[updated.length - 1] = last;
+      return { history: updated };
+    }),
 
   setHistory: (turns) => set({ history: turns }),
   setLoading: (v) => set({ isLoading: v }),

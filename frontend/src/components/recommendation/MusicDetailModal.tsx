@@ -7,12 +7,17 @@ interface Props {
   isLoading: boolean;
   isError: boolean;
   onClose: () => void;
+  onAddToTaste?: (contentId: string) => Promise<void>;
+  isTasteSaving?: boolean;
+  isTasteAdded?: boolean;
 }
 
-export function MusicDetailModal({ detail, isLoading, isError, onClose }: Props) {
+export function MusicDetailModal({ detail, isLoading, isError, onClose, onAddToTaste, isTasteSaving, isTasteAdded }: Props) {
   const title = detail?.title?.trim() || "제목 정보가 없습니다";
   const artist = detail?.artist?.trim() || "아티스트 정보가 없습니다";
   const reason = detail?.display_reason?.trim() || "추천 사유가 제공되지 않았습니다.";
+
+  const tasteButtonLabel = isTasteAdded ? "취향에 추가됨" : isTasteSaving ? "추가 중..." : "내 취향에 추가";
 
   return (
     <div className="detail-modal" role="dialog" aria-modal="true" aria-labelledby="music-detail-title">
@@ -46,6 +51,16 @@ export function MusicDetailModal({ detail, isLoading, isError, onClose }: Props)
                 <h3>추천 이유</h3>
                 <p>{reason}</p>
               </section>
+
+              {onAddToTaste && (
+                <DreamButton
+                  className="detail-modal__taste-btn"
+                  onClick={() => onAddToTaste(detail.content_id)}
+                  disabled={isTasteSaving || isTasteAdded}
+                >
+                  {tasteButtonLabel}
+                </DreamButton>
+              )}
             </div>
           </>
         )}
