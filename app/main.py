@@ -11,6 +11,7 @@ from app.api.recommendation_routes import router as recommendation_router
 from app.api.chatbot_routes import router as chatbot_router
 from app.api.session_routes import router as session_router
 from app.api.music_detail_routes import router as music_detail_router
+from app.api.taste_routes import router as taste_router
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ app.include_router(recommendation_router, prefix="/api/recommendations", tags=["
 app.include_router(chatbot_router, prefix="/api/chatbot", tags=["chatbot"])
 app.include_router(session_router, prefix="/api/sessions", tags=["sessions"])
 app.include_router(music_detail_router, prefix="/api/music", tags=["music"])
+app.include_router(taste_router, prefix="/api/taste", tags=["taste"])
 
 
 @app.get("/health")
