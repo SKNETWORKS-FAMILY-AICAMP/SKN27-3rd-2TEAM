@@ -3,6 +3,19 @@ from typing import Any
 
 from app.config import settings
 
+CONTENT_ID_KEYWORD_FIELDS = (
+    "content_id",
+    "content_id.keyword",
+    "track_id",
+    "track_id.keyword",
+    "metadata.content_id",
+    "metadata.content_id.keyword",
+    "metadata.track_id",
+    "metadata.track_id.keyword",
+    "metadata.doc_id",
+    "metadata.doc_id.keyword",
+)
+
 
 @dataclass(frozen=True)
 class ElasticsearchRagHit:
@@ -63,11 +76,7 @@ class ElasticsearchRagRetriever:
             "query": {
                 "bool": {
                     "filter": [
-                        {
-                            "terms": {
-                                "metadata.track_id.keyword": content_ids,
-                            }
-                        }
+                        ElasticsearchRagRetriever._build_content_id_filter(content_ids)
                     ],
                     "should": [
                         {
@@ -90,6 +99,18 @@ class ElasticsearchRagRetriever:
                     "minimum_should_match": 0,
                 }
             },
+        }
+
+    @staticmethod
+    def _build_content_id_filter(content_ids: list[str]) -> dict:
+        return {
+            "bool": {
+                "should": [
+                    {"terms": {field: content_ids}}
+                    for field in CONTENT_ID_KEYWORD_FIELDS
+                ],
+                "minimum_should_match": 1,
+            }
         }
 
     def _map_hits(self, hits: list[dict[str, Any]], allowed_ids: set[str]) -> list[ElasticsearchRagHit]:

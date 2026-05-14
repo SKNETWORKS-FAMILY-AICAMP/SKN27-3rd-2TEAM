@@ -1,7 +1,7 @@
 import pytest
 
 from app.rag.adapters.rag_real_adapter import RealRagAdapter
-from app.rag.services.elasticsearch_retriever import ElasticsearchRagHit
+from app.rag.services.elasticsearch_retriever import ElasticsearchRagHit, ElasticsearchRagRetriever
 
 
 class StubRetriever:
@@ -114,3 +114,34 @@ def test_real_rag_adapter_returns_failed_when_retriever_raises():
     assert result["status"] == "failed"
     assert result["recommended_content_evidence"] == []
     assert result["retrieval_metadata"]["reason"] == "retriever_error"
+
+
+def test_elasticsearch_query_filters_all_supported_content_id_fields_and_uses_query_text():
+    query = ElasticsearchRagRetriever._build_query(
+        query_text="calm indie night",
+        content_ids=["track_001", "track_002"],
+        max_evidence_per_track=2,
+    )
+
+    bool_query = query["query"]["bool"]
+    content_id_filter = bool_query["filter"][0]["bool"]
+    filter_fields = {
+        next(iter(terms["terms"].keys()))
+        for terms in content_id_filter["should"]
+    }
+
+    assert query["size"] == 4
+    assert content_id_filter["minimum_should_match"] == 1
+    assert filter_fields == {
+        "content_id",
+        "content_id.keyword",
+        "track_id",
+        "track_id.keyword",
+        "metadata.content_id",
+        "metadata.content_id.keyword",
+        "metadata.track_id",
+        "metadata.track_id.keyword",
+        "metadata.doc_id",
+        "metadata.doc_id.keyword",
+    }
+    assert bool_query["should"][0]["multi_match"]["query"] == "calm indie night"

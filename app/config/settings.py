@@ -1,5 +1,9 @@
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 APP_ENV = os.getenv("APP_ENV", "local").lower()
 _PROD_ENVS = {"prod", "production"}
 
@@ -28,7 +32,7 @@ RIMAS_ELASTICSEARCH_TIMEOUT = float(os.getenv("RIMAS_ELASTICSEARCH_TIMEOUT_SECON
 
 # LLM
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-RIMAS_LLM_MODEL = os.getenv("RIMAS_LLM_MODEL", "GPT-5.4 mini")
+RIMAS_LLM_MODEL = os.getenv("RIMAS_LLM_MODEL", "gpt-4.1-mini")
 RIMAS_LLM_TIMEOUT = float(os.getenv("RIMAS_LLM_TIMEOUT_SECONDS", "30"))
 
 # CORS

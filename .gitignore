@@ -56,3 +56,5 @@ app/rag/elasticsearch/*
 spotify_60k_sampled.json
 spotify_songs.json
 
+# data
+\data

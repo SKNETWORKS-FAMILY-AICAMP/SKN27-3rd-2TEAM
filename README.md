@@ -332,6 +332,22 @@ POST /api/sessions/{session_id}/flush?user_id=&flush_logs=false
 
 ## 실행
 
+`.env.example`을 기준으로 로컬 `.env`를 만든 뒤 실행합니다.
+
+```env
+RIMAS_DB_NAME=rimas
+RIMAS_DB_USER=rimas
+RIMAS_DB_PASSWORD=change_me_postgres_password
+RIMAS_NEO4J_USER=neo4j
+RIMAS_NEO4J_PASSWORD=change_me_neo4j_password
+OPENAI_API_KEY=
+RIMAS_KAG_MODE=real
+RIMAS_RAG_MODE=real
+RIMAS_ELASTICSEARCH_INDEX=spotify_songs
+```
+
+`.env`는 Git에 커밋하지 않습니다. `OPENAI_API_KEY`가 비어 있으면 챗봇 응답 생성은 로컬 fallback 문구를 사용합니다.
+
 ```powershell
 docker compose down -v
 docker compose up --build

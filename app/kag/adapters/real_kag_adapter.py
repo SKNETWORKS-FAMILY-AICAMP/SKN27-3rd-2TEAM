@@ -142,8 +142,6 @@ class RealKagAdapter(KagAdapter):
             )
         if conditions.get("genre"):
             return KagQueryTemplateConstants.Q_REC_001, {"genre": conditions["genre"], "limit": limit}
-        if conditions.get("mood"):
-            return KagQueryTemplateConstants.Q_REC_002, {"mood": conditions["mood"], "limit": limit}
         if conditions.get("situation"):
             return KagQueryTemplateConstants.Q_REC_003, {"situation": conditions["situation"], "limit": limit}
         if conditions.get("weather"):

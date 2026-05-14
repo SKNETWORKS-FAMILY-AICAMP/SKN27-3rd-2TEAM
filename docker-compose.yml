@@ -8,13 +8,16 @@ services:
       RIMAS_DB_PORT: "5432"
       RIMAS_DB_NAME: ${RIMAS_DB_NAME:-rimas}
       RIMAS_DB_USER: ${RIMAS_DB_USER:-rimas}
-      RIMAS_DB_PASSWORD: ${RIMAS_DB_PASSWORD:-rimas_password}
+      RIMAS_DB_PASSWORD: ${RIMAS_DB_PASSWORD:?RIMAS_DB_PASSWORD is required}
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       RIMAS_NEO4J_URI: bolt://neo4j:7687
       RIMAS_NEO4J_USER: ${RIMAS_NEO4J_USER:-neo4j}
-      RIMAS_NEO4J_PASSWORD: ${RIMAS_NEO4J_PASSWORD:-rimas_neo4j_password}
+      RIMAS_NEO4J_PASSWORD: ${RIMAS_NEO4J_PASSWORD:?RIMAS_NEO4J_PASSWORD is required}
       RIMAS_ELASTICSEARCH_URL: http://elasticsearch:9200
+      RIMAS_ELASTICSEARCH_INDEX: ${RIMAS_ELASTICSEARCH_INDEX:-spotify_songs}
+      RIMAS_KAG_MODE: ${RIMAS_KAG_MODE:-mock}
+      RIMAS_RAG_MODE: ${RIMAS_RAG_MODE:-mock}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       CORS_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173"
     ports:
@@ -50,7 +53,7 @@ services:
     environment:
       POSTGRES_DB: ${RIMAS_DB_NAME:-rimas}
       POSTGRES_USER: ${RIMAS_DB_USER:-rimas}
-      POSTGRES_PASSWORD: ${RIMAS_DB_PASSWORD:-rimas_password}
+      POSTGRES_PASSWORD: ${RIMAS_DB_PASSWORD:?RIMAS_DB_PASSWORD is required}
     ports:
       - "${RIMAS_DB_HOST_PORT:-5432}:5432"
     volumes:
@@ -79,7 +82,7 @@ services:
   neo4j:
     image: neo4j:5-community
     environment:
-      NEO4J_AUTH: ${RIMAS_NEO4J_USER:-neo4j}/${RIMAS_NEO4J_PASSWORD:-rimas_neo4j_password}
+      NEO4J_AUTH: ${RIMAS_NEO4J_USER:-neo4j}/${RIMAS_NEO4J_PASSWORD:?RIMAS_NEO4J_PASSWORD is required}
     ports:
       - "${NEO4J_BROWSER_PORT:-7474}:7474"
       - "${NEO4J_BOLT_PORT:-7687}:7687"
@@ -90,6 +93,33 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+
+  neo4j-loader:
+    build:
+      context: ./neo4j
+      dockerfile: Dockerfile.loader
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${RIMAS_NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${RIMAS_NEO4J_PASSWORD:?RIMAS_NEO4J_PASSWORD is required}
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    restart: "no"
+
+  elasticsearch-loader:
+    build:
+      context: .
+      dockerfile: Dockerfile.es-loader
+    environment:
+      RIMAS_ELASTICSEARCH_URL: http://elasticsearch:9200
+      RIMAS_ELASTICSEARCH_INDEX: ${RIMAS_ELASTICSEARCH_INDEX:-spotify_songs}
+    volumes:
+      - ./data/elasticsearch:/workspace/data/elasticsearch:ro
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: "no"
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3

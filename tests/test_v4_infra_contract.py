@@ -118,3 +118,10 @@ def test_compose_defines_v4_runtime_services():
 
     for fragment in expected_fragments:
         assert fragment in compose
+
+
+def test_settings_uses_valid_openai_model_id_default():
+    settings = read(ROOT / "app" / "config" / "settings.py")
+
+    assert 'os.getenv("RIMAS_LLM_MODEL", "gpt-4.1-mini")' in settings
+    assert "GPT-5.4 mini" not in settings
