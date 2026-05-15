@@ -411,21 +411,22 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
+    autonumber
     actor User as 사용자
-    participant FE as React MainRecommendationPage
-    participant API as FastAPI /api/recommendations/main
-    participant SVC as MainRecommendationService
-    participant ORCH as OrchestratorAgent
+    participant FE as Main Page
+    participant API as API
+    participant SVC as Main Service
+    participant ORCH as Orchestrator
     participant KAG as KAG
     participant RAG as RAG
     participant VAL as Validators
-    participant Redis as Redis
-    participant PG as PostgreSQL
+    participant Cache as Redis
+    participant DB as PostgreSQL
 
     User->>FE: 추천 페이지 진입
-    FE->>API: user_id, session_id, request_id
-    API->>SVC: get_page_view_model()
-    SVC->>Redis: session context 조회
+    FE->>API: /api/recommendations/main 요청
+    API->>SVC: get_page_view_model(user_id/session_id/request_id)
+    SVC->>Cache: session context 조회
     SVC->>ORCH: run_recommendation()
     ORCH->>KAG: 후보 content_id 생성
     KAG-->>ORCH: KAG_STATE
@@ -434,8 +435,8 @@ sequenceDiagram
     ORCH->>VAL: contract/provenance 검증
     VAL-->>ORCH: validation_result
     ORCH-->>SVC: response_state
-    SVC->>Redis: latest states 저장
-    SVC->>PG: interaction log 저장
+    SVC->>Cache: latest states 저장
+    SVC->>DB: interaction log 저장
     SVC-->>API: view_model
     API-->>FE: 추천 섹션 3종 반환
     FE-->>User: 개인화/발견/신규 추천 표시
@@ -445,27 +446,28 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
+    autonumber
     actor User as 사용자
-    participant FE as React ChatbotPage
-    participant API as FastAPI /api/chatbot/respond/stream
-    participant SVC as ChatbotStreamService
-    participant BOT as ChatbotService
-    participant ORCH as OrchestratorAgent
-    participant Redis as Redis
-    participant PG as PostgreSQL
+    participant FE as Chat Page
+    participant API as API
+    participant Stream as Stream Service
+    participant BOT as Chatbot Service
+    participant ORCH as Orchestrator
+    participant Cache as Redis
+    participant DB as PostgreSQL
 
     User->>FE: 자연어 음악 요청 입력
-    FE->>API: SSE stream 요청
-    API->>SVC: stream_response()
-    SVC->>BOT: submit_message()
-    BOT->>Redis: session context/history 조회
+    FE->>API: /api/chatbot/respond/stream SSE 요청
+    API->>Stream: stream_response()
+    Stream->>BOT: submit_message()
+    BOT->>Cache: session context/history 조회
     BOT->>ORCH: run_chatbot()
     ORCH-->>BOT: response_state
-    BOT->>Redis: latest states + turn 저장
-    BOT->>PG: interaction log 저장
-    SVC-->>FE: delta 이벤트
-    SVC-->>FE: final 이벤트
-    SVC-->>FE: done 이벤트
+    BOT->>Cache: latest states + turn 저장
+    BOT->>DB: interaction log 저장
+    Stream-->>FE: delta 이벤트
+    Stream-->>FE: final 이벤트
+    Stream-->>FE: done 이벤트
     FE-->>User: 답변과 추천 카드 표시
 ```
 
@@ -473,25 +475,26 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
+    autonumber
     actor User as 사용자
-    participant FE as MusicDetailModal
-    participant API as FastAPI /api/music/detail/{content_id}
-    participant SVC as MusicDetailService
-    participant Redis as Redis Latest State
-    participant PG as PostgreSQL music_catalog
+    participant FE as Detail Modal
+    participant API as API
+    participant SVC as Detail Service
+    participant Cache as Redis
+    participant DB as PostgreSQL
 
     User->>FE: 추천 카드 클릭
-    FE->>API: content_id, user_id, session_id
-    API->>Redis: 최신 RAG_STATE 조회
+    FE->>API: /api/music/detail/{content_id} 요청
+    API->>Cache: 최신 RAG_STATE 조회
     API->>SVC: get_detail(content_id, recent_rag_state)
     alt 최신 RAG evidence에 존재
         SVC-->>API: source=rag_state 상세 모델
     else RAG evidence에 없음
-        SVC->>PG: music_catalog 조회
-        PG-->>SVC: catalog item
+        SVC->>DB: music_catalog 조회
+        DB-->>SVC: catalog item
         SVC-->>API: source=music_catalog 상세 모델
     end
-    API->>PG: detail_view_logs 저장
+    API->>DB: detail_view_logs 저장
     API-->>FE: music_detail
     FE-->>User: 상세 모달 표시
 ```
@@ -500,24 +503,25 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
+    autonumber
     actor User as 사용자
     participant FE as React UI
-    participant Taste as /api/taste/events
-    participant Session as /api/sessions/{session_id}/flush
-    participant Redis as Redis
-    participant PG as PostgreSQL
+    participant Taste as Taste API
+    participant Session as Session API
+    participant Cache as Redis
+    participant DB as PostgreSQL
 
     User->>FE: 취향 추가 클릭
-    FE->>Taste: user_id, session_id, content_id
-    Taste->>Redis: session context 업데이트
-    Taste->>Redis: taste event append
+    FE->>Taste: /api/taste/events 요청
+    Taste->>Cache: session context 업데이트
+    Taste->>Cache: taste event append
     Taste-->>FE: updated_context
 
     User->>FE: 저장하고 종료
-    FE->>Session: flush session
-    Session->>Redis: history/context/taste events 조회
-    Session->>PG: chat_sessions, turns, taste profile 저장
-    Session->>Redis: latest/session cache 정리
+    FE->>Session: /api/sessions/{session_id}/flush 요청
+    Session->>Cache: history/context/taste events 조회
+    Session->>DB: chat_sessions, turns, taste profile 저장
+    Session->>Cache: latest/session cache 정리
     Session-->>FE: flush result
 ```
 
