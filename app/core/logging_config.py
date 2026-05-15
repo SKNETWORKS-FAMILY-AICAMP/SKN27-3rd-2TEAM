@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import sys
 from datetime import datetime, timezone
 
@@ -32,13 +33,14 @@ class JSONFormatter(logging.Formatter):
         return json.dumps(log, ensure_ascii=False)
 
 
-def setup_logging(level: str = "INFO") -> None:
+def setup_logging(level: str | None = None) -> None:
+    effective_level = (level or os.getenv("LOG_LEVEL", "ERROR")).upper()
     root = logging.getLogger()
-    root.setLevel(level)
+    root.setLevel(effective_level)
     root.handlers.clear()
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JSONFormatter())
     root.addHandler(handler)
-    # suppress noisy third-party loggers
-    for noisy in ("uvicorn.access", "httpx", "httpcore"):
-        logging.getLogger(noisy).setLevel(logging.WARNING)
+    # 운영 기본값은 오류 로그만 출력한다. 필요 시 LOG_LEVEL로 낮출 수 있다.
+    for noisy in ("uvicorn.access", "uvicorn.error", "httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(effective_level)

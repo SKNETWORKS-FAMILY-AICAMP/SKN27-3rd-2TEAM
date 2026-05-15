@@ -43,6 +43,13 @@ def get_latest_rag_state(session_id: str) -> dict | None:
     return None
 
 
+def get_latest_response_state(session_id: str) -> dict | None:
+    cached = redis_client.cache_get(latest_response_state_key(session_id))
+    if isinstance(cached, dict):
+        return cached
+    return None
+
+
 def clear_latest_states(session_id: str) -> None:
     redis_client.cache_delete(latest_kag_state_key(session_id))
     redis_client.cache_delete(latest_rag_state_key(session_id))

@@ -73,6 +73,7 @@ class OrchestratorAgent:
         )
         intent_state = planned_input["intent_state"]
         kag_input_json = planned_input["kag_input_json"]
+        new_dislikes = self._build_new_dislikes(intent_state)
 
         # 2. KAG — KAG_INPUT_JSON 기준으로 추천 방향을 결정한다.
         kag_state = self._kag.run(
@@ -82,13 +83,13 @@ class OrchestratorAgent:
             kag_input_json=kag_input_json,
         )
         if kag_state.get("status") == "error":
-            return self._fallback("KAG_DISPATCH_FAILED", kag_state, {})
+            return self._fallback("KAG_DISPATCH_FAILED", kag_state, {}, new_dislikes=new_dislikes)
 
         # 3. Contract Validation: SESSION_CONTEXT와 KAG_STATE 계약을 검증한다.
         contract_result = self._contract.validate(session_context, kag_state, {})
         if not contract_result["passed"]:
             logger.warning("contract_validation_failed", extra={"errors": contract_result["errors"]})
-            return self._fallback("CONTRACT_VALIDATION_FAILED", kag_state, {})
+            return self._fallback("CONTRACT_VALIDATION_FAILED", kag_state, {}, new_dislikes=new_dislikes)
 
         # 4. RAG — 추천 근거 검색
         rag_state = self._rag.run(
@@ -100,7 +101,7 @@ class OrchestratorAgent:
             kag_input_json=kag_input_json,
         )
         if rag_state.get("status") == "error":
-            return self._fallback("RAG_DISPATCH_FAILED", kag_state, rag_state)
+            return self._fallback("RAG_DISPATCH_FAILED", kag_state, rag_state, new_dislikes=new_dislikes)
 
         # 5. Intent Agent — Input Planner 결과를 검증/확정한다.
         intent_result = self._intent.run(
@@ -113,7 +114,7 @@ class OrchestratorAgent:
         # 6. Recommendation Agent
         selected = self._rec.run(intent_result=intent_result, rag_state=rag_state)
         if not selected.get("selected_recommendations"):
-            return self._fallback("NO_RECOMMENDATIONS", kag_state, rag_state)
+            return self._fallback("NO_RECOMMENDATIONS", kag_state, rag_state, new_dislikes=new_dislikes)
 
         # 7. Response Generator
         try:
@@ -127,7 +128,7 @@ class OrchestratorAgent:
             )
         except Exception as exc:
             logger.error("response_generator_error", extra={"error": str(exc)}, exc_info=True)
-            return self._fallback("LLM_CALL_FAILED", kag_state, rag_state)
+            return self._fallback("LLM_CALL_FAILED", kag_state, rag_state, new_dislikes=new_dislikes)
 
         # 8. Validation
         resp_result = self._resp_val.validate(response_state)
@@ -135,7 +136,7 @@ class OrchestratorAgent:
         if not resp_result["passed"] or not prov_result["passed"]:
             errors = resp_result.get("errors", []) + prov_result.get("errors", [])
             logger.warning("response_validation_failed", extra={"errors": errors})
-            return self._fallback("RESPONSE_VALIDATION_FAILED", kag_state, rag_state)
+            return self._fallback("RESPONSE_VALIDATION_FAILED", kag_state, rag_state, new_dislikes=new_dislikes)
 
         ms = round((time.perf_counter() - total_start) * 1000, 1)
         logger.info("orchestrator_chatbot_ok", extra={"user_id": user_id, "ms": ms})
@@ -146,10 +147,7 @@ class OrchestratorAgent:
                 "kag_state": kag_state,
                 "rag_state": rag_state,
                 "latency_ms": ms,
-                "new_dislikes": {
-                    "disliked_artists": intent_state.get("disliked_artists", []),
-                    "disliked_tracks": intent_state.get("disliked_tracks", []),
-                },
+                "new_dislikes": new_dislikes,
             },
         }
 
@@ -224,7 +222,21 @@ class OrchestratorAgent:
         return f"req_{uuid4().hex}"
 
     @staticmethod
-    def _fallback(error_type: str, kag_state: dict, rag_state: dict) -> dict:
+    def _build_new_dislikes(intent_state: dict | None) -> dict:
+        intent_state = intent_state or {}
+        return {
+            "disliked_artists": intent_state.get("disliked_artists", []) or [],
+            "disliked_tracks": intent_state.get("disliked_tracks", []) or [],
+            "disliked_genres": intent_state.get("disliked_genres", []) or [],
+        }
+
+    @staticmethod
+    def _fallback(
+        error_type: str,
+        kag_state: dict,
+        rag_state: dict,
+        new_dislikes: dict | None = None,
+    ) -> dict:
         logger.warning("orchestrator_fallback", extra={"error_type": error_type})
         return {
             **dict(FALLBACK_RESPONSE_STATE),
@@ -233,5 +245,6 @@ class OrchestratorAgent:
                 "rag_state": rag_state,
                 "error_type": error_type,
                 "latency_ms": 0,
+                "new_dislikes": new_dislikes or OrchestratorAgent._build_new_dislikes(None),
             },
         }

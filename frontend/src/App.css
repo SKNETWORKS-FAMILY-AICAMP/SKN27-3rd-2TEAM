@@ -970,6 +970,36 @@
   line-height: 1.6;
 }
 
+.detail-modal__section--evidence {
+  gap: 10px;
+}
+
+.detail-modal__evidence {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+.detail-modal__evidence div {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 10px;
+}
+
+.detail-modal__evidence dt {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.detail-modal__evidence dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .detail-modal__state {
   grid-column: 1 / -1;
   padding: 48px 16px;

@@ -16,6 +16,8 @@ export function MusicDetailModal({ detail, isLoading, isError, onClose, onAddToT
   const title = detail?.title?.trim() || "제목 정보가 없습니다";
   const artist = detail?.artist?.trim() || "아티스트 정보가 없습니다";
   const reason = detail?.display_reason?.trim() || "추천 사유가 제공되지 않았습니다.";
+  const evidenceSummary = detail ? detail.evidence_summary.trim() : "";
+  const sourceLabel = formatSourceLabel(detail ? detail.source : undefined);
 
   const tasteButtonLabel = isTasteAdded ? "취향에 추가됨" : isTasteSaving ? "추가 중..." : "내 취향에 추가";
 
@@ -52,6 +54,22 @@ export function MusicDetailModal({ detail, isLoading, isError, onClose, onAddToT
                 <p>{reason}</p>
               </section>
 
+              <section className="detail-modal__section detail-modal__section--evidence">
+                <h3>큐레이션 근거</h3>
+                <dl className="detail-modal__evidence">
+                  <div>
+                    <dt>근거 출처</dt>
+                    <dd>{sourceLabel}</dd>
+                  </div>
+                  {evidenceSummary && (
+                    <div>
+                      <dt>검색 근거 요약</dt>
+                      <dd>{evidenceSummary}</dd>
+                    </div>
+                  )}
+                </dl>
+              </section>
+
               {onAddToTaste && (
                 <DreamButton
                   className="detail-modal__taste-btn"
@@ -67,4 +85,14 @@ export function MusicDetailModal({ detail, isLoading, isError, onClose, onAddToT
       </GlassPanel>
     </div>
   );
+}
+
+function formatSourceLabel(source?: string) {
+  if (source === "rag_state") {
+    return "RAG 근거 기반";
+  }
+  if (source === "music_catalog") {
+    return "음악 카탈로그 기반";
+  }
+  return "확인된 상세 모델 기반";
 }

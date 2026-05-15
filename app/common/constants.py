@@ -13,6 +13,25 @@ ALLOWED_MOODS = {"calm", "night", "bright", "clean"}
 ALLOWED_GENRES = {"indie", "dream_pop", "ambient", "rnb", "electro_pop", "pop"}
 ALLOWED_SITUATIONS = {"late_night"}
 
+ARTIST_ALIAS_MAP: dict[str, str] = {
+    "아리아나그란데": "Ariana Grande",
+    "아리아나 그란데": "Ariana Grande",
+    "ariana grande": "Ariana Grande",
+}
+
+DISCOVERY_KEYWORDS = (
+    "discover",
+    "new taste",
+    "색다른",
+    "색다르게",
+    "새로운 취향",
+    "새 취향",
+    "다른 분위기",
+    "안 듣던",
+    "처음 듣는",
+    "신선한",
+)
+
 MOOD_KEYWORD_MAP: dict[str, list[str]] = {
     "calm": ["calm", "잔잔", "차분"],
     "night": ["night", "밤", "야간"],

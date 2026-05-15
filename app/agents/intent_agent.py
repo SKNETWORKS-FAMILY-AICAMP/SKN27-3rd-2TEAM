@@ -1,5 +1,5 @@
 from app.agents.base_agent import BaseAgent
-from app.common.constants import ALLOWED_INTENT_TYPES
+from app.common.constants import ALLOWED_INTENT_TYPES, DISCOVERY_KEYWORDS
 
 
 class IntentAgent(BaseAgent):
@@ -40,6 +40,9 @@ class IntentAgent(BaseAgent):
         return self._classify(text)
 
     def _classify(self, text):
+        lowered = (text or "").lower()
+        if any(keyword in lowered for keyword in DISCOVERY_KEYWORDS):
+            return "discovery_recommendation"
         if "왜" in text or "이유" in text:
             return "recommendation_reason"
         if "최신" in text or "새로 나온" in text or "신곡" in text:

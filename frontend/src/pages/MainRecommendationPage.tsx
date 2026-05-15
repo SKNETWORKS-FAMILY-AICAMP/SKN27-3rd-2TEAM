@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchMusicDetail } from "../api/musicDetailApi";
 import { fetchMainRecommendations } from "../api/recommendation";
@@ -24,7 +24,7 @@ export function MainRecommendationPage({ onChatOpen, category }: Props) {
     return new URLSearchParams(window.location.search).get("detail");
   });
   const [tasteSavingId, setTasteSavingId] = useState<string | null>(null);
-  const addedTasteIds = useRef<Set<string>>(new Set());
+  const [addedTasteIds, setAddedTasteIds] = useState<Set<string>>(() => new Set());
 
   // API 호출 흐름과 React Query key는 기존 계약을 그대로 유지한다.
   const mainRequestId = useRequestId();
@@ -72,11 +72,11 @@ export function MainRecommendationPage({ onChatOpen, category }: Props) {
   };
 
   const handleAddToTaste = async (contentId: string) => {
-    if (addedTasteIds.current.has(contentId) || tasteSavingId) return;
+    if (addedTasteIds.has(contentId) || tasteSavingId) return;
     setTasteSavingId(contentId);
     try {
       await addToTaste({ userId, sessionId, contentId, requestId: generateRequestId() });
-      addedTasteIds.current.add(contentId);
+      setAddedTasteIds((current) => new Set(current).add(contentId));
     } catch (err) {
       console.error("[MainRecommendationPage] addToTaste error", err);
     } finally {
@@ -196,7 +196,7 @@ export function MainRecommendationPage({ onChatOpen, category }: Props) {
             onClose={closeDetail}
             onAddToTaste={handleAddToTaste}
             isTasteSaving={tasteSavingId === detailContentId}
-            isTasteAdded={addedTasteIds.current.has(detailContentId)}
+            isTasteAdded={addedTasteIds.has(detailContentId)}
           />
         )}
       </div>

@@ -6,6 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config.settings import CORS_ORIGINS
 from app.core.logging_config import setup_logging
+
+setup_logging()
+
 from app.core.middleware import LoggingMiddleware
 from app.api.recommendation_routes import router as recommendation_router
 from app.api.chatbot_routes import router as chatbot_router
@@ -13,7 +16,6 @@ from app.api.session_routes import router as session_router
 from app.api.music_detail_routes import router as music_detail_router
 from app.api.taste_routes import router as taste_router
 
-setup_logging()
 logger = logging.getLogger(__name__)
 
 

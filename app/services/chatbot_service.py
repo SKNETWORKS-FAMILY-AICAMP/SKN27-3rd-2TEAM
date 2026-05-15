@@ -30,6 +30,7 @@ class ChatbotService:
         session_degraded = not redis_client.is_healthy()
 
         session_context = session_cache_service.load_context(session_id, user_id=user_id)
+        session_context = self._with_latest_displayed_tracks(session_id, session_context)
         result = self._orchestrator.run_chatbot(
             user_id=user_id,
             session_id=session_id,
@@ -41,7 +42,10 @@ class ChatbotService:
         kag_state = meta.get("kag_state", {})
         rag_state = meta.get("rag_state", {})
         latency_ms = meta.get("latency_ms", round((time.perf_counter() - start) * 1000, 1))
-        new_dislikes = meta.get("new_dislikes", {"disliked_artists": [], "disliked_tracks": []})
+        new_dislikes = meta.get(
+            "new_dislikes",
+            {"disliked_artists": [], "disliked_tracks": [], "disliked_genres": []},
+        )
         self._save_negative_preferences(user_id, session_context, new_dislikes)
 
         session_cache_service.save_turn_and_update_context(
@@ -119,3 +123,40 @@ class ChatbotService:
     def _build_negative_preference_service() -> NegativePreferenceService:
         conn = create_database_connection()
         return NegativePreferenceService(repository=NegativePreferenceRepository(conn))
+
+    @staticmethod
+    def _with_latest_displayed_tracks(session_id: str, session_context: dict) -> dict:
+        latest_response = latest_state_cache.get_latest_response_state(session_id)
+        displayed_tracks = _extract_displayed_content_ids(latest_response or {})
+        if not displayed_tracks:
+            return session_context
+
+        enriched_context = dict(session_context or {})
+        enriched_context["selected_tracks"] = _merge_unique(
+            displayed_tracks,
+            enriched_context.get("selected_tracks", []),
+        )
+        return enriched_context
+
+
+def _extract_displayed_content_ids(response_state: dict) -> list[str]:
+    items = []
+    for key in ("display_recommendations", "personalized", "new_release", "discovery"):
+        values = response_state.get(key, [])
+        if isinstance(values, list):
+            items.extend(values)
+    return _merge_unique(
+        [item.get("content_id") for item in items if isinstance(item, dict)],
+        [],
+    )
+
+
+def _merge_unique(new_items: list, existing_items: list) -> list[str]:
+    merged = []
+    seen = set()
+    for value in list(new_items or []) + list(existing_items or []):
+        text = str(value).strip()
+        if text and text not in seen:
+            seen.add(text)
+            merged.append(text)
+    return merged

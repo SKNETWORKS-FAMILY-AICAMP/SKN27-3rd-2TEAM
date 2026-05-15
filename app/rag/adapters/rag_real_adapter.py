@@ -1,6 +1,7 @@
 import logging
 
 from app.rag.adapters.rag_adapter import RagAdapter
+from app.common.genre_utils import normalize_genre_tokens
 from app.rag.builders.rag_state_builder import RagStateBuilder
 from app.rag.services.elasticsearch_retriever import ElasticsearchRagHit, ElasticsearchRagRetriever
 
@@ -82,7 +83,7 @@ class RealRagAdapter(RagAdapter):
                 continue
             if hit.content_id in excluded_tracks or hit.artist in excluded_artists:
                 continue
-            if set(hit.genre or []) & excluded_genres:
+            if normalize_genre_tokens(hit.genre) & excluded_genres:
                 continue
             evidence.append(
                 {
@@ -114,7 +115,7 @@ class RealRagAdapter(RagAdapter):
             if node.get("type") == "track":
                 excluded_tracks.add(value)
             if node.get("type") == "genre":
-                excluded_genres.add(value)
+                excluded_genres.update(normalize_genre_tokens(value))
         return excluded_artists, excluded_tracks, excluded_genres
 
     @staticmethod

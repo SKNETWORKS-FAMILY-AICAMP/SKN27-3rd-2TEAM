@@ -18,6 +18,7 @@ class KagQueryContextSchema(BaseModel):
     normalized_query: str = ""
     mood_candidates: list[str] = Field(default_factory=list)
     genre_candidates: list[str] = Field(default_factory=list)
+    artist_candidates: list[str] = Field(default_factory=list)
     situation_candidates: list[str] = Field(default_factory=list)
 
 

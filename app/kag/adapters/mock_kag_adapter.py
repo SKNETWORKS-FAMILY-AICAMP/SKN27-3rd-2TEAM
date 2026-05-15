@@ -1,5 +1,7 @@
 import logging
 
+from app.common.constants import DISCOVERY_KEYWORDS
+from app.common.genre_utils import normalize_genre_tokens
 from app.kag.adapters.kag_adapter import KagAdapter
 
 logger = logging.getLogger("rimas.kag.mock")
@@ -70,17 +72,23 @@ class MockKagAdapter(KagAdapter):
     def _filter_candidates(candidates: list[dict], excluded_nodes: list[dict]) -> list[dict]:
         excluded_artists = {node["value"] for node in excluded_nodes if node.get("type") == "artist"}
         excluded_tracks = {node["value"] for node in excluded_nodes if node.get("type") == "track"}
-        excluded_genres = {node["value"] for node in excluded_nodes if node.get("type") == "genre"}
+        excluded_genres = set()
+        for node in excluded_nodes:
+            if node.get("type") == "genre":
+                excluded_genres.update(normalize_genre_tokens(node.get("value")))
         return [
             candidate
             for candidate in candidates
             if candidate.get("content_id") not in excluded_tracks
             and candidate.get("artist") not in excluded_artists
-            and not (set(candidate.get("genre", [])) & excluded_genres)
+            and not (normalize_genre_tokens(candidate.get("genre", [])) & excluded_genres)
         ]
 
     def _decide_primary_goal(self, user_input: str) -> str:
         text = user_input or ""
+        lowered = text.lower()
+        if any(keyword in lowered for keyword in DISCOVERY_KEYWORDS):
+            return "new_taste_discovery"
         if "이유" in text or "왜" in text:
             return "recommendation_reason_question"
         if "최신" in text or "새로 나온" in text or "신곡" in text:

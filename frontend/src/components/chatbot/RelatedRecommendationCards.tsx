@@ -25,7 +25,7 @@ export const RelatedRecommendationCards = memo(function RelatedRecommendationCar
 
   return (
     <div className="related-cards">
-      <p className="related-cards__title">관련 추천</p>
+      <p className="related-cards__title">큐레이터 추천</p>
       <div className="related-cards__list">
         {cards.map((card) => {
           const isAdded = addedIds.has(card.content_id);

@@ -2,6 +2,8 @@ from app.kag.adapters.kag_adapter import KagAdapter
 from app.kag.connection import Neo4j_Connection
 from app.kag.constant import KagQueryTemplateConstants
 from app.kag.querys import KagQueryTools
+from app.common.constants import DISCOVERY_KEYWORDS
+from app.common.genre_utils import normalize_genre_tokens
 
 
 class RealKagAdapter(KagAdapter):
@@ -26,12 +28,12 @@ class RealKagAdapter(KagAdapter):
             raise ValueError("user_id is required")
 
         safe_limit = self._normalize_limit(limit)
+        primary_goal = self._decide_primary_goal(user_input)
         conditions = self._extract_conditions(user_input, session_context or {})
-        query_key, params = self._select_query(conditions, safe_limit)
+        query_key, params = self._select_query(conditions, safe_limit, primary_goal=primary_goal)
         rows = self._query_tools.execute(query_key, params, self._get_conn())
         excluded_nodes = self._build_excluded_nodes(session_context or {})
 
-        primary_goal = self._decide_primary_goal(user_input)
         category = self._decide_category(primary_goal)
         route = self._decide_route(primary_goal)
         target_section = self._decide_target_section(category)
@@ -106,12 +108,17 @@ class RealKagAdapter(KagAdapter):
 
     def _extract_conditions(self, user_input: str, session_context: dict) -> dict:
         text = (user_input or "").lower()
+        excluded_genres = normalize_genre_tokens(session_context.get("disliked_genres", []) or [])
+        genre = (
+            self._first_value(session_context.get("preferred_genres"))
+            or self._first_value(session_context.get("recent_genres"))
+            or self._detect_keyword(text, ("indie", "pop", "rock", "rnb", "hip hop", "edm", "latin"))
+        )
+        if normalize_genre_tokens(genre) & excluded_genres:
+            genre = None
         return {
-            "genre": (
-                self._first_value(session_context.get("preferred_genres"))
-                or self._first_value(session_context.get("recent_genres"))
-                or self._detect_keyword(text, ("indie", "pop", "rock", "rnb", "hip hop", "edm", "latin"))
-            ),
+            "artist": self._first_value(session_context.get("artist_candidates")),
+            "genre": genre,
             "mood": (
                 self._first_value(session_context.get("recent_moods"))
                 or self._detect_keyword(text, ("calm", "night", "bright", "energetic", "sad", "focus"))
@@ -131,8 +138,33 @@ class RealKagAdapter(KagAdapter):
         return None
 
     @staticmethod
-    def _select_query(conditions: dict, limit: int) -> tuple[str, dict]:
+    def _select_query(
+        conditions: dict,
+        limit: int,
+        primary_goal: str | None = None,
+    ) -> tuple[str, dict]:
+        if primary_goal == "new_taste_discovery":
+            return (
+                KagQueryTemplateConstants.Q_REC_007,
+                {
+                    "genre": conditions.get("genre"),
+                    "mood": conditions.get("mood"),
+                    "situation": conditions.get("situation"),
+                    "weather": conditions.get("weather"),
+                    "limit": limit,
+                },
+            )
         active_conditions = {key: value for key, value in conditions.items() if value}
+        if conditions.get("artist"):
+            return (
+                KagQueryTemplateConstants.Q_REC_006,
+                {
+                    "genre": conditions.get("genre"),
+                    "subgenre": None,
+                    "artist": conditions["artist"],
+                    "limit": limit,
+                },
+            )
         if len(active_conditions) >= 2:
             return (
                 KagQueryTemplateConstants.Q_REC_008,
@@ -178,14 +210,19 @@ class RealKagAdapter(KagAdapter):
     def _filter_candidate_tracks(candidates: list[dict], excluded_nodes: list[dict]) -> list[dict]:
         excluded_artists = {node["value"] for node in excluded_nodes if node.get("type") == "artist"}
         excluded_tracks = {node["value"] for node in excluded_nodes if node.get("type") == "track"}
-        excluded_genres = {node["value"] for node in excluded_nodes if node.get("type") == "genre"}
+        excluded_genres = set()
+        for node in excluded_nodes:
+            if node.get("type") == "genre":
+                excluded_genres.update(normalize_genre_tokens(node.get("value")))
         return [
             candidate
             for candidate in candidates
             if candidate.get("content_id") not in excluded_tracks
             and candidate.get("artist") not in excluded_artists
-            and candidate.get("genre") not in excluded_genres
-            and candidate.get("subgenre") not in excluded_genres
+            and not (
+                normalize_genre_tokens([candidate.get("genre"), candidate.get("subgenre")])
+                & excluded_genres
+            )
         ]
 
     @staticmethod
@@ -220,6 +257,9 @@ class RealKagAdapter(KagAdapter):
     @staticmethod
     def _decide_primary_goal(user_input: str) -> str:
         text = user_input or ""
+        lowered = text.lower()
+        if any(keyword in lowered for keyword in DISCOVERY_KEYWORDS):
+            return "new_taste_discovery"
         if "왜" in text or "이유" in text:
             return "recommendation_reason_question"
         if "최신" in text or "새로 나온" in text or "신곡" in text:

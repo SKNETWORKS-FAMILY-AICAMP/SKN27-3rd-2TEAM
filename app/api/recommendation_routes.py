@@ -8,7 +8,7 @@ from app.services.request_lifecycle_cache import DuplicateRequestError, request_
 logger = logging.getLogger("rimas.api.recommendation")
 router = APIRouter()
 
-_service = MainRecommendationService()
+_service: MainRecommendationService | None = None
 
 
 @router.get("/main")
@@ -30,7 +30,7 @@ def get_main_recommendations(
         except DuplicateRequestError as exc:
             raise HTTPException(status_code=409, detail="중복 요청이 처리 중입니다.") from exc
     try:
-        view_model, session_degraded = _service.get_page_view_model(user_id=user_id, session_id=session_id)
+        view_model, session_degraded = _get_service().get_page_view_model(user_id=user_id, session_id=session_id)
         return {
             "status": "success",
             "session_degraded": session_degraded,
@@ -43,3 +43,10 @@ def get_main_recommendations(
     finally:
         if request_id:
             request_lifecycle_cache.finish(request_id)
+
+
+def _get_service() -> MainRecommendationService:
+    global _service
+    if _service is None:
+        _service = MainRecommendationService()
+    return _service

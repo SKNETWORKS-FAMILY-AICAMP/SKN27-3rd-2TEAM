@@ -13,19 +13,12 @@ export const apiClient = axios.create({
 // ─── Request interceptor: log every outgoing call ────────────────────────────
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   (config as InternalAxiosRequestConfig & { _t: number })._t = performance.now();
-  console.log(`[API] → ${config.method?.toUpperCase()} ${config.url}`, {
-    params: config.params,
-    data: config.data,
-  });
   return config;
 });
 
 // ─── Response interceptor: log timing and errors ─────────────────────────────
 apiClient.interceptors.response.use(
   (res: AxiosResponse) => {
-    const cfg = res.config as InternalAxiosRequestConfig & { _t: number };
-    const ms = cfg._t ? Math.round(performance.now() - cfg._t) : -1;
-    console.log(`[API] ← ${res.status} ${res.config.url} (${ms}ms)`);
     return res;
   },
   (err: AxiosError) => {

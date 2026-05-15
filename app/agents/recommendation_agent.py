@@ -1,4 +1,5 @@
 from app.agents.base_agent import BaseAgent
+from app.common.genre_utils import normalize_genre_tokens
 from app.policies.ranking_policy import score_for_rank
 from app.policies.recommendation_policy import (
     CATEGORY_SECTION_MAP,
@@ -25,6 +26,7 @@ class RecommendationAgent(BaseAgent):
             requested_count=intent_result.get("requested_count"),
             disliked_artists=intent_result.get("disliked_artists", []),
             disliked_tracks=intent_result.get("disliked_tracks", []),
+            disliked_genres=intent_result.get("disliked_genres", []),
         )
         return {
             "status": "success" if selected else "empty_result",
@@ -38,11 +40,13 @@ class RecommendationAgent(BaseAgent):
         requested_count: int | None = None,
         disliked_artists: list[str] | None = None,
         disliked_tracks: list[str] | None = None,
+        disliked_genres: list[str] | None = None,
     ) -> list[dict]:
         priority = INTENT_CATEGORY_PRIORITY.get(intent_type, DEFAULT_CATEGORY_PRIORITY)
         target_count = self._target_count(requested_count)
         excluded_artists = set(disliked_artists or [])
         excluded_tracks = set(disliked_tracks or [])
+        excluded_genres = normalize_genre_tokens(disliked_genres or [])
 
         ordered: list[dict] = []
         used_ids: set[str] = set()
@@ -54,6 +58,8 @@ class RecommendationAgent(BaseAgent):
                 if not content_id or content_id in used_ids:
                     continue
                 if content_id in excluded_tracks or item.get("artist") in excluded_artists:
+                    continue
+                if self._has_excluded_genre(item, excluded_genres):
                     continue
                 ordered.append(self._to_selected(item, rank=len(ordered) + 1))
                 used_ids.add(content_id)
@@ -71,6 +77,12 @@ class RecommendationAgent(BaseAgent):
         except (TypeError, ValueError):
             return MAX_SELECTED_RECOMMENDATIONS
         return max(1, min(parsed, MAX_SELECTED_RECOMMENDATIONS))
+
+    @staticmethod
+    def _has_excluded_genre(item: dict, excluded_genres: set[str]) -> bool:
+        if not excluded_genres:
+            return False
+        return bool(normalize_genre_tokens(item.get("genre")) & excluded_genres)
 
     @staticmethod
     def _to_selected(item: dict, rank: int) -> dict:

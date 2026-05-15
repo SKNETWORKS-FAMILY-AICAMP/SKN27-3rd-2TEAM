@@ -21,6 +21,7 @@ class IntentStateSchema(BaseModel):
     normalized_query: str = ""
     detected_moods: list[str] = Field(default_factory=list)
     detected_genres: list[str] = Field(default_factory=list)
+    detected_artists: list[str] = Field(default_factory=list)
     detected_situations: list[str] = Field(default_factory=list)
     requested_count: int | None = Field(default=None, ge=1)
     disliked_artists: list[str] = Field(default_factory=list)

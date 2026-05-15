@@ -7,6 +7,8 @@ from app.common.constants import (
     ALLOWED_INTENT_TYPES,
     ALLOWED_MOODS,
     ALLOWED_SITUATIONS,
+    ARTIST_ALIAS_MAP,
+    DISCOVERY_KEYWORDS,
     GENRE_KEYWORD_MAP,
     MOOD_KEYWORD_MAP,
 )
@@ -38,17 +40,24 @@ class InputPlannerAgent(BaseAgent):
 
         intent_type = parsed["intent_type"]
         new_dislikes = self._resolve_negative_preferences(parsed)
+        disliked_genres = parsed.get("disliked_genres", [])
+        detected_genres = self._remove_disliked_genres(
+            parsed["detected_genres"],
+            disliked_genres,
+        )
+        detected_artists = self._clean_text_list(parsed.get("detected_artists", []))
         intent_state = IntentStateSchema(
             intent_type=intent_type,
             confidence=parsed["confidence"],
             normalized_query=parsed["normalized_query"],
             detected_moods=parsed["detected_moods"],
-            detected_genres=parsed["detected_genres"],
+            detected_genres=detected_genres,
+            detected_artists=detected_artists,
             detected_situations=parsed["detected_situations"],
             requested_count=parsed.get("requested_count"),
             disliked_artists=new_dislikes["disliked_artists"],
             disliked_tracks=new_dislikes["disliked_tracks"],
-            disliked_genres=parsed.get("disliked_genres", []),
+            disliked_genres=disliked_genres,
             requires_kag=intent_type != "general_chat",
             requires_rag=intent_type != "general_chat",
         )
@@ -56,10 +65,13 @@ class InputPlannerAgent(BaseAgent):
             new_dislikes["disliked_artists"],
             session_context.get("disliked_artists", []),
         )
-        excluded_tracks = self._merge_unique(
-            new_dislikes["disliked_tracks"],
-            session_context.get("disliked_tracks", []),
-        )
+        context_excluded_tracks = session_context.get("disliked_tracks", [])
+        if intent_type == "discovery_recommendation":
+            context_excluded_tracks = self._merge_unique(
+                session_context.get("selected_tracks", []),
+                context_excluded_tracks,
+            )
+        excluded_tracks = self._merge_unique(new_dislikes["disliked_tracks"], context_excluded_tracks)
         excluded_genres = self._merge_unique(
             parsed.get("disliked_genres", []),
             session_context.get("disliked_genres", []),
@@ -72,7 +84,8 @@ class InputPlannerAgent(BaseAgent):
             query_context={
                 "normalized_query": parsed["normalized_query"],
                 "mood_candidates": parsed["detected_moods"],
-                "genre_candidates": parsed["detected_genres"],
+                "genre_candidates": detected_genres,
+                "artist_candidates": detected_artists,
                 "situation_candidates": parsed["detected_situations"],
             },
             constraints={
@@ -88,6 +101,11 @@ class InputPlannerAgent(BaseAgent):
             "intent_state": intent_state.model_dump(),
             "kag_input_json": kag_input.model_dump(),
         }
+
+    @staticmethod
+    def _remove_disliked_genres(detected_genres: list[str], disliked_genres: list[str]) -> list[str]:
+        disliked = set(disliked_genres or [])
+        return [genre for genre in detected_genres if genre not in disliked]
 
     def _parse_with_llm(self, user_input: str, session_context: dict) -> dict | None:
         from app.prompts.input_planner_prompt import OUTPUT_JSON_SCHEMA, SYSTEM_PROMPT
@@ -117,6 +135,7 @@ class InputPlannerAgent(BaseAgent):
             return None
         result["detected_moods"] = [m for m in result.get("detected_moods", []) if m in ALLOWED_MOODS]
         result["detected_genres"] = [g for g in result.get("detected_genres", []) if g in ALLOWED_GENRES]
+        result["detected_artists"] = InputPlannerAgent._clean_text_list(result.get("detected_artists", []))
         result["detected_situations"] = [s for s in result.get("detected_situations", []) if s in ALLOWED_SITUATIONS]
         result["requested_count"] = InputPlannerAgent._normalize_requested_count(result.get("requested_count"))
         result["disliked_artists"] = InputPlannerAgent._clean_text_list(result.get("disliked_artists", []))
@@ -135,6 +154,7 @@ class InputPlannerAgent(BaseAgent):
             "normalized_query": normalized_query,
             "detected_moods": self._detect_candidates(normalized_query, session_context, "recent_moods", ALLOWED_MOODS),
             "detected_genres": self._detect_candidates(normalized_query, session_context, "recent_genres", ALLOWED_GENRES),
+            "detected_artists": self._detect_artist_candidates(normalized_query, session_context),
             "detected_situations": self._detect_situations(normalized_query),
             "requested_count": self._detect_requested_count(normalized_query),
             "disliked_artists": negative_preferences["disliked_artists"],
@@ -146,6 +166,10 @@ class InputPlannerAgent(BaseAgent):
     @staticmethod
     def _decide_intent_type(text: str) -> str:
         lowered = (text or "").lower()
+        if any(keyword in lowered for keyword in DISCOVERY_KEYWORDS):
+            return "discovery_recommendation"
+        if InputPlannerAgent._is_taste_contrast_request(text):
+            return "discovery_recommendation"
         if any(keyword in lowered for keyword in ("latest", "new release", "신곡", "최신", "새로 나온")):
             return "new_release_recommendation"
         if any(keyword in lowered for keyword in ("why", "reason", "이유", "왜")):
@@ -157,6 +181,13 @@ class InputPlannerAgent(BaseAgent):
         if any(keyword in lowered for keyword in ("recommend", "추천")) or text:
             return "personalized_recommendation"
         return "general_chat"
+
+    @staticmethod
+    def _is_taste_contrast_request(text: str) -> bool:
+        compact = (text or "").replace(" ", "")
+        if "다른" not in compact:
+            return False
+        return "취향" in compact or "노래" in compact or "곡" in compact
 
     @staticmethod
     def _detect_candidates(text: str, session_context: dict, context_key: str, allowed: set[str]) -> list[str]:
@@ -174,6 +205,21 @@ class InputPlannerAgent(BaseAgent):
         if any(keyword in lowered for keyword in ("late night", "밤", "야간")):
             return ["late_night"] if "late_night" in ALLOWED_SITUATIONS else []
         return []
+
+    @staticmethod
+    def _detect_artist_candidates(text: str, session_context: dict) -> list[str]:
+        lowered = (text or "").casefold()
+        compact = lowered.replace(" ", "")
+        candidates = []
+        for alias, canonical in ARTIST_ALIAS_MAP.items():
+            normalized_alias = alias.casefold()
+            if normalized_alias in lowered or normalized_alias.replace(" ", "") in compact:
+                candidates.append(canonical)
+        for artist in session_context.get("recent_artists", []) or []:
+            artist_text = str(artist).strip()
+            if artist_text and artist_text.casefold() in lowered:
+                candidates.append(artist_text)
+        return InputPlannerAgent._merge_unique(candidates, [])
 
     @staticmethod
     def _detect_requested_count(text: str) -> int | None:
