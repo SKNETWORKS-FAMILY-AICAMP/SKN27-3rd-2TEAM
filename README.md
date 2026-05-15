@@ -592,3 +592,13 @@ docs/
 - [RecommendationPolicy](docs/policies/RecommendationPolicy.md) — 카테고리 우선순위, 최대 추천 수
 - [RankingPolicy](docs/policies/RankingPolicy.md) — 점수 계산 공식
 - [PromptPolicy](docs/policies/PromptPolicy.md) — LLM 적용 범위, enum 검증, fallback 정책
+
+---
+
+## 개발 후기 
+
+ - 이혜림님 개발 후기 
+ - 이재건님 개발 후기 https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN27-3rd-2TEAM/issues/42
+ - 이성진님 개발 후기 https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN27-3rd-2TEAM/issues/43
+ - 김경수님 개발 후기 https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN27-3rd-2TEAM/issues/38
+ - 김경호님 개발 후기 
