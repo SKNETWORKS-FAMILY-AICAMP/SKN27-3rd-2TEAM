@@ -656,14 +656,66 @@ npm run dev
 
 ---
 
-## 발표 시 강조 포인트
 
-1. 추천은 LLM 단독 생성이 아니라 `KAG 후보 -> RAG 근거 -> Validator` 순서로 제한된다.
-2. RAG 검색은 전체 문서 검색이 아니라 KAG가 만든 `content_id` 후보 안에서만 수행된다.
-3. 추천 결과의 `content_id/title/artist`는 RAG evidence와 다시 대조된다.
-4. 사용자가 "pop은 별로"처럼 말하면 부정 선호로 분리해 이후 추천 후보에서 제외한다.
-5. "아리아나 그란데 노래 추천"처럼 아티스트가 명시되면 일반 팝 fallback보다 artist 조건 후보 생성을 우선한다.
-6. "색다른 음악"처럼 새로운 취향을 찾는 요청은 discovery flow로 분리해 `Q_REC_007` 다양성 추천을 사용한다.
-7. 이미 메인/챗봇에 표시된 추천 곡은 Redis 최신 response state에서 읽어 follow-up 추천의 제외 후보로 병합한다.
-8. Redis는 대화 중 session state를 빠르게 유지하고, PostgreSQL은 세션 종료/flush 시 영속 저장을 담당한다.
-9. 추천 카드에는 원문 trace를 노출하지 않고, 상세 모달의 큐레이션 근거 영역에서 `source`, `evidence_summary`를 확인할 수 있다.
+```text
+app/
+  agents/          Orchestrator, InputPlanner, KAG/RAG Dispatch, Intent, Recommendation, ResponseGenerator, ValidatorController
+  api/             FastAPI routes — chatbot (일반+스트리밍), recommendation, session, music, taste
+  cache/           Redis 클라이언트, redis_keys, session_history_cache, latest_state_cache
+  common/          constants (ALLOWED_MOODS/GENRES 등 enum), default_state (fallback), labels
+  config/          settings.py (환경 변수 로드, prod fail-fast)
+  contracts/       KagStateField, RagStateField, SessionContextField enum
+  core/            logging_config, LoggingMiddleware
+  json_templates/  Agent 간 계약 JSON 스키마 파일
+  kag/             KAG 연결·쿼리·adapters (Mock / Real Neo4j)
+  llm/             OpenAI LLM 클라이언트, response_state_schema
+  policies/        RecommendationPolicy, RankingPolicy (Python)
+  prompts/         LLM 프롬프트 — InputPlanner용 system prompt + JSON schema
+  rag/             RAG adapters (Mock / Real Elasticsearch), services, builders, validators
+  repositories/    BaseRepository, query_constants, PostgreSQL 레포지토리 8개
+  schemas/         Pydantic 스키마 — intent, kag_input, kag_state, rag_input, rag_state, response_state, session_context, music_detail
+  services/        비즈니스 서비스 — chatbot, chatbot_stream, main_recommendation,
+                   session_cache, session_flush, session_context_hydration,
+                   logging, taste_event, negative_preference, music_detail,
+                   compact_state_builder, request_lifecycle_cache
+  validators/      BaseValidator, ContractValidator, ResponseValidator, ProvenanceValidator, DisplayReasonValidator
+
+frontend/src/
+  api/             chatbot (일반+스트리밍+flush), recommendation, musicDetailApi, taste
+  components/
+    background/    DreamBackground, SoftGlowLayer, StaticStarLayer
+    chatbot/       ChatbotHeader, ChatHistory, ChatInput, RelatedRecommendationCards
+    cosmos/        CenterMascotOrb, ConstellationLines, CosmicBackground, FloatingParticles, GlowRing, OrbitNode, StarField
+    home/          ConstellationHome
+    mascot/        MascotCharacter
+    recommendation/ CharacterDjBanner, MusicDetailModal, RecommendationCard, RecommendationSection, TopTasteHeader
+    ui/            DreamButton, GlassPanel
+  hooks/           useRequestId
+  pages/           Home, MainRecommendationPage, ChatbotPage
+  stores/          chatStore (스트리밍 상태 머신), sessionStore, themeStore
+  styles/          theme, motion
+  types/           API 응답 TypeScript 타입 전체
+  utils/           generateRequestId (crypto.randomUUID)
+
+docs/
+  policies/        RecommendationPolicy, RankingPolicy, PromptPolicy
+  rimas_v_4_integrated_design_updated_final_.md
+```
+
+---
+
+## 정책 문서
+
+- [RecommendationPolicy](docs/policies/RecommendationPolicy.md) — 카테고리 우선순위, 최대 추천 수
+- [RankingPolicy](docs/policies/RankingPolicy.md) — 점수 계산 공식
+- [PromptPolicy](docs/policies/PromptPolicy.md) — LLM 적용 범위, enum 검증, fallback 정책
+
+---
+
+## 개발 후기 
+
+ - 이혜림님 개발 후기 https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN27-3rd-2TEAM/issues/45
+ - 이재건님 개발 후기 https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN27-3rd-2TEAM/issues/42
+ - 이성진님 개발 후기 https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN27-3rd-2TEAM/issues/43
+ - 김경수님 개발 후기 https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN27-3rd-2TEAM/issues/38
+ - 김경호님 개발 후기 
