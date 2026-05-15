@@ -56,55 +56,7 @@ flowchart LR
 
 ## 전체 서비스 구조
 
-```mermaid
-flowchart TB
-    subgraph FE["Frontend"]
-        H["Home / ConstellationHome"]
-        MR["MainRecommendationPage"]
-        CP["ChatbotPage"]
-        MD["MusicDetailModal"]
-    end
-
-    subgraph API["FastAPI Routes"]
-        RR["/api/recommendations/main"]
-        CR["/api/chatbot/respond/stream"]
-        DR["/api/music/detail/{content_id}"]
-        SR["/api/sessions"]
-        TR["/api/taste/events"]
-    end
-
-    subgraph AG["Agent Layer"]
-        IP["InputPlanner"]
-        KD["KagDispatch"]
-        RD["RagDispatch"]
-        IA["Intent"]
-        RA["Recommendation"]
-        RG["ResponseGenerator"]
-        VC["Validators"]
-    end
-
-    subgraph DB["Data Stores"]
-        PG["PostgreSQL"]
-        N4J["Neo4j"]
-        ES["Elasticsearch"]
-        RS["Redis"]
-    end
-
-    H --> MR
-    H --> CP
-    MR --> RR
-    CP --> CR
-    MR --> DR
-    MD --> DR
-    MR --> TR
-    CP --> SR
-    RR --> AG
-    CR --> AG
-    AG --> N4J
-    AG --> ES
-    API --> PG
-    API --> RS
-```
+![시스템 아키텍처 다이어그램](docs/image/system_architecture_diagram.png)
 
 ### 주요 모듈 책임
 
