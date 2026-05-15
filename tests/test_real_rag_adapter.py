@@ -145,6 +145,35 @@ def test_real_rag_adapter_filters_excluded_artist():
     assert result["recommended_content_evidence"] == []
 
 
+def test_real_rag_adapter_filters_excluded_genre():
+    retriever = StubRetriever(
+        hits=[
+            ElasticsearchRagHit(
+                content_id="track_001",
+                title="Bad Genre",
+                artist="Artist",
+                album=None,
+                genre=["pop"],
+                mood=["bright"],
+                content="raw evidence",
+                score=1.0,
+                release_type="existing_catalog",
+            )
+        ]
+    )
+
+    result = RealRagAdapter(retriever=retriever).build_state(
+        kag_state={
+            "recommended_content_ids": ["track_001"],
+            "excluded_nodes": [{"type": "genre", "value": "pop"}],
+        },
+        rag_input_json=_rag_input(["track_001"]),
+    )
+
+    assert result["status"] == "fallback"
+    assert result["recommended_content_evidence"] == []
+
+
 def test_elasticsearch_query_filters_all_supported_content_id_fields_and_uses_query_text():
     query = ElasticsearchRagRetriever._build_query(
         query_text="calm indie night",

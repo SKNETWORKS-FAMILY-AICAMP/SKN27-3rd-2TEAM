@@ -10,18 +10,19 @@ ALLOWED_STATUSES = {"success", "partial_match", "empty_result", "timeout", "erro
 ALLOWED_INTENT_TYPES: frozenset[str] = frozenset(get_args(IntentType))
 
 ALLOWED_MOODS = {"calm", "night", "bright", "clean"}
-ALLOWED_GENRES = {"indie", "dream_pop", "ambient", "rnb", "electro_pop"}
+ALLOWED_GENRES = {"indie", "dream_pop", "ambient", "rnb", "electro_pop", "pop"}
 ALLOWED_SITUATIONS = {"late_night"}
 
 MOOD_KEYWORD_MAP: dict[str, list[str]] = {
     "calm": ["calm", "잔잔", "차분"],
     "night": ["night", "밤", "야간"],
-    "bright": ["bright", "밝은"],
+    "bright": ["bright", "밝은", "신나는", "신나"],
     "clean": ["clean", "깔끔"],
 }
 
 GENRE_KEYWORD_MAP: dict[str, list[str]] = {
     "indie": ["indie", "인디"],
+    "pop": ["pop", "팝"],
     "dream_pop": ["dream pop", "드림팝"],
     "ambient": ["ambient", "앰비언트"],
     "rnb": ["rnb", "알앤비"],

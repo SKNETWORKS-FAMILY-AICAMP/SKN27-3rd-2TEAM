@@ -43,7 +43,17 @@
 
 ### 4.1 부정 취향 우선 정책
 
-사용자가 "싫어", "별로", "추천하지 마", "빼줘", "제외해줘", "듣기 싫어"처럼 명시적으로 부정 표현을 하면 해당 아티스트 또는 곡은 부정 취향으로 기록한다.
+사용자가 "싫어", "별로", "추천하지 마", "빼줘", "빼고", "말고", "제외해줘", "제외하고", "듣기 싫어"처럼 명시적으로 부정 표현을 하면 부정 표현 앞의 대상을 부정 취향 후보로 본다.
+
+부정 취향 후보는 장르 부정 표현 또는 `music_catalog` 정확 매칭으로 확인되는 경우에만 저장한다.
+
+매칭 규칙:
+
+- 부정 표현 앞의 마지막 대화 구간에 허용 장르가 포함되면 `disliked_genres`에 저장한다.
+- `artist`와 정확히 일치하면 `disliked_artists`에 저장한다.
+- `title`과 정확히 일치하면 일치하는 모든 `content_id`를 `disliked_tracks`에 저장한다.
+- `artist`와 `title`이 모두 일치하면 아티스트 제외를 우선한다.
+- 장르, 아티스트, 곡 중 어디에도 정확 매칭이 없으면 영구 저장하지 않는다.
 
 부정 취향은 긍정 취향보다 우선한다.
 
@@ -146,10 +156,12 @@ LLM을 사용할 수 없을 때도 로컬 fallback이 raw evidence를 그대로 
 
 - `disliked_artists`는 `list[str]`다.
 - `disliked_tracks`는 `list[str]`다.
+- `disliked_genres`는 `list[str]`다.
 - 값은 중복 없이 유지한다.
 - 세션 컨텍스트에 필드가 없으면 빈 배열로 취급한다.
 - Redis 세션 내 유지와 PostgreSQL 영구 저장을 모두 다룬다.
 - PostgreSQL에 저장된 부정 취향은 새 세션 hydrate 시 SESSION_CONTEXT에 병합한다.
+- 새 부정 취향은 허용 장르 매칭 또는 `music_catalog` 정확 매칭을 통과한 값만 저장한다.
 
 ### 5.2 USER_NEGATIVE_PREFERENCE 저장 계약
 
@@ -316,6 +328,7 @@ def build_display_reason(item: dict) -> str:
 
 - LLM prompt에 "가사 또는 원문 evidence를 직접 인용하지 않는다"는 규칙을 추가한다.
 - deterministic draft를 기반으로 LLM이 사용자 노출용 `display_reason`을 자연스럽게 다듬는다.
+- LLM 결과의 `content_id`, `title`, `artist`가 선택된 추천 결과와 일치하고 추천 이유가 검증을 통과할 때만 LLM `display_reason`을 사용한다.
 - LLM 결과가 검증을 통과하지 못하면 deterministic draft를 사용한다.
 - 로컬 fallback도 `display_reason`을 raw evidence가 아닌 정제 문장으로 구성한다.
 - LLM 응답 검증은 기존 `ResponseValidator`, `ProvenanceValidator`를 유지한다.

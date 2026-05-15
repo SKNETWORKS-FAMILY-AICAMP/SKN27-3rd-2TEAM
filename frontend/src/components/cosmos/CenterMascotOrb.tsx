@@ -24,8 +24,8 @@ export const CenterMascotOrb = memo(function CenterMascotOrb({ layout = "desktop
         <div className="relative z-[1] h-[12.2rem] w-[12.2rem] md:h-[14.2rem] md:w-[14.2rem]">
           <MascotCharacter state="idle" />
         </div>
-        <span className="absolute bottom-7 z-[2] text-[0.95rem] font-black tracking-[0.34em] text-[#fff2dc]/90 drop-shadow-[0_2px_14px_rgba(0,0,0,0.45)] md:bottom-8 md:text-[1.05rem]">
-          RIMAS
+        <span className="absolute bottom-7 z-[2] text-[1.05rem] font-black tracking-[0.18em] text-[#fff2dc]/90 drop-shadow-[0_2px_14px_rgba(0,0,0,0.45)] md:bottom-8 md:text-[1.16rem]">
+          뮤엘
         </span>
       </div>
     </motion.div>

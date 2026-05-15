@@ -169,17 +169,23 @@ class RealKagAdapter(KagAdapter):
         for track in session_context.get("disliked_tracks", []) or []:
             if track:
                 nodes.append({"type": "track", "value": track})
+        for genre in session_context.get("disliked_genres", []) or []:
+            if genre:
+                nodes.append({"type": "genre", "value": genre})
         return nodes
 
     @staticmethod
     def _filter_candidate_tracks(candidates: list[dict], excluded_nodes: list[dict]) -> list[dict]:
         excluded_artists = {node["value"] for node in excluded_nodes if node.get("type") == "artist"}
         excluded_tracks = {node["value"] for node in excluded_nodes if node.get("type") == "track"}
+        excluded_genres = {node["value"] for node in excluded_nodes if node.get("type") == "genre"}
         return [
             candidate
             for candidate in candidates
             if candidate.get("content_id") not in excluded_tracks
             and candidate.get("artist") not in excluded_artists
+            and candidate.get("genre") not in excluded_genres
+            and candidate.get("subgenre") not in excluded_genres
         ]
 
     @staticmethod

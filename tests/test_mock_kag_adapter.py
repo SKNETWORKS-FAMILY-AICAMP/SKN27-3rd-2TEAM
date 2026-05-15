@@ -37,3 +37,15 @@ def test_mock_kag_adapter_records_excluded_nodes_and_respects_limit():
     assert {"type": "artist", "value": "Nova Lane"} in state["excluded_nodes"]
     assert {"type": "track", "value": "track_003"} in state["excluded_nodes"]
     assert len(state["recommended_content_ids"]) <= 2
+
+
+def test_mock_kag_adapter_filters_excluded_genre():
+    state = MockKagAdapter().build_state(
+        "user_001",
+        "추천",
+        {"disliked_genres": ["pop"]},
+        limit=10,
+    )
+
+    assert {"type": "genre", "value": "pop"} in state["excluded_nodes"]
+    assert all("pop" not in candidate.get("genre", []) for candidate in state["candidate_tracks"])

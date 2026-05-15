@@ -1,3 +1,7 @@
+from app.agents.recommendation_agent import build_display_reason
+from app.validators.display_reason_validator import DisplayReasonValidator
+
+
 class CompactStateBuilder:
     """내부 Full State를 API 전송용 Compact State로 변환한다."""
 
@@ -28,8 +32,7 @@ class CompactStateBuilder:
                     "content_id": item.get("content_id"),
                     "title": item.get("title"),
                     "artist": item.get("artist"),
-                    "display_reason": item.get("display_reason")
-                    or item.get("evidence_summary", ""),
+                    "display_reason": _safe_display_reason(item),
                 }
             )
         return {
@@ -47,3 +50,10 @@ class CompactStateBuilder:
             "used_content_ids",
         }
         return {key: value for key, value in response_state.items() if key in allowed}
+
+
+def _safe_display_reason(item: dict) -> str:
+    reason = item.get("display_reason", "")
+    if DisplayReasonValidator().validate(reason, item).get("passed"):
+        return reason
+    return build_display_reason(item)

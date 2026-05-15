@@ -1,4 +1,6 @@
+from app.agents.recommendation_agent import build_display_reason
 from app.schemas.music_detail_schema import MusicDetailViewModelSchema
+from app.validators.display_reason_validator import DisplayReasonValidator
 
 
 class MusicDetailService:
@@ -46,7 +48,7 @@ class MusicDetailService:
             album=evidence.get("album"),
             genre=evidence.get("genre", []),
             mood=evidence.get("mood", []),
-            display_reason=evidence.get("display_reason") or evidence.get("evidence_summary", ""),
+            display_reason=_safe_display_reason(evidence),
             evidence_summary=evidence.get("evidence_summary", ""),
             source="rag_state",
         )
@@ -60,7 +62,19 @@ class MusicDetailService:
             album=item.get("album"),
             genre=item.get("genres", []),
             mood=item.get("moods", []),
-            display_reason=item.get("evidence_summary", ""),
+            display_reason=_safe_display_reason({
+                **item,
+                "genre": item.get("genres", []),
+                "mood": item.get("moods", []),
+                "recommendation_category": item.get("recommendation_category", "personalized_match"),
+            }),
             evidence_summary=item.get("evidence_summary", ""),
             source="music_catalog",
         )
+
+
+def _safe_display_reason(item: dict) -> str:
+    reason = item.get("display_reason", "")
+    if DisplayReasonValidator().validate(reason, item).get("passed"):
+        return reason
+    return build_display_reason(item)

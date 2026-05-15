@@ -42,11 +42,11 @@ export const OrbitNode = memo(function OrbitNode({ feature, onSelect }: Props) {
       onClick={() => onSelect(feature.target)}
       aria-label={`${feature.title} 화면으로 이동`}
     >
-      <span className="relative grid h-[8rem] w-[8rem] place-items-center rounded-full border border-[#ffe6bf]/20 bg-white/[0.07] shadow-[0_0_42px_rgba(255,220,180,0.28),inset_0_0_34px_rgba(255,255,255,0.06)] backdrop-blur-xl transition-[border-color,box-shadow] duration-300 group-hover:border-[#ffe6bf]/55 group-hover:shadow-[0_0_64px_rgba(255,224,184,0.48),inset_0_0_48px_rgba(255,255,255,0.09)] md:h-[8.9rem] md:w-[8.9rem]">
+      <span className="relative grid h-[8rem] w-[8rem] place-items-center rounded-full border border-[#ffe6bf]/20 bg-white/[0.07] shadow-[0_0_42px_rgba(255,220,180,0.28),inset_0_0_34px_rgba(255,255,255,0.06)] backdrop-blur-xl transition-[border-color,box-shadow] duration-300 group-hover:border-[#ffe6bf]/55 group-hover:shadow-[0_0_64px_rgba(255,224,184,0.48),inset_0_0_48px_rgba(255,255,255,0.09)] md:h-[8.7rem] md:w-[8.7rem]">
         <GlowRing className="opacity-90 transition-opacity duration-300 group-hover:opacity-100" />
-        <img className="relative z-[1] h-[68%] w-[68%] object-contain brightness-110 drop-shadow-[0_0_18px_rgba(255,230,180,0.55)] transition-[filter] duration-300 group-hover:brightness-125 group-hover:drop-shadow-[0_0_26px_rgba(255,230,180,0.80)]" src={feature.imageSrc} alt="" aria-hidden="true" />
+        <img className="relative z-[1] h-[78%] w-[78%] object-contain brightness-110 drop-shadow-[0_0_18px_rgba(255,230,180,0.55)] transition-[filter] duration-300 group-hover:brightness-125 group-hover:drop-shadow-[0_0_26px_rgba(255,230,180,0.80)]" src={feature.imageSrc} alt="" aria-hidden="true" />
       </span>
-      <span className="text-[1rem] font-extrabold tracking-[0.01em] text-[#fff1dd]/90 drop-shadow-[0_2px_12px_rgba(0,0,0,0.55)] md:text-[1.14rem]">
+      <span className="max-w-[11.5rem] text-center text-[1rem] font-semibold leading-snug tracking-[0.01em] text-[#fff1dd]/90 drop-shadow-[0_2px_12px_rgba(0,0,0,0.55)] md:text-[1.12rem]">
         {feature.title}
       </span>
     </motion.button>

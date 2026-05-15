@@ -8,7 +8,14 @@ except ImportError:
 
 
 class NegativePreferenceRepository(BaseRepository):
-    def upsert(self, *, user_id: str, disliked_artists: list[str], disliked_tracks: list[str]) -> str:
+    def upsert(
+        self,
+        *,
+        user_id: str,
+        disliked_artists: list[str],
+        disliked_tracks: list[str],
+        disliked_genres: list[str] | None = None,
+    ) -> str:
         if not user_id:
             raise ValueError("user_id is required")
         with self._connection.cursor() as cursor:
@@ -18,6 +25,7 @@ class NegativePreferenceRepository(BaseRepository):
                     "user_id": user_id,
                     "disliked_artists_json": self._json_param(disliked_artists),
                     "disliked_tracks_json": self._json_param(disliked_tracks),
+                    "disliked_genres_json": self._json_param(disliked_genres or []),
                 },
             )
         self._connection.commit()

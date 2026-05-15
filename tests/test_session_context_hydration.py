@@ -52,6 +52,7 @@ def test_hydration_merges_negative_preferences():
                 "user_id": user_id,
                 "disliked_artists_json": ["Billie Eilish"],
                 "disliked_tracks_json": ["track_999"],
+                "disliked_genres_json": ["pop"],
             }
 
     service = SessionContextHydrationService(
@@ -63,6 +64,7 @@ def test_hydration_merges_negative_preferences():
 
     assert ctx["disliked_artists"] == ["Billie Eilish"]
     assert ctx["disliked_tracks"] == ["track_999"]
+    assert ctx["disliked_genres"] == ["pop"]
 
 
 def test_hydration_default_constructor_reads_negative_repository_from_db_connection():
@@ -81,6 +83,7 @@ def test_hydration_default_constructor_reads_negative_repository_from_db_connect
                     "user_id": "user_001",
                     "disliked_artists_json": ["Billie Eilish"],
                     "disliked_tracks_json": ["track_999"],
+                    "disliked_genres_json": ["pop"],
                 }
             return None
 
@@ -110,4 +113,5 @@ def test_hydration_default_constructor_reads_negative_repository_from_db_connect
 
     assert ctx["disliked_artists"] == ["Billie Eilish"]
     assert ctx["disliked_tracks"] == ["track_999"]
+    assert ctx["disliked_genres"] == ["pop"]
     assert connection.closed

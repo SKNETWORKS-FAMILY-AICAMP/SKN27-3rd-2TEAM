@@ -11,6 +11,7 @@ SYSTEM_PROMPT = """\
 - normalized_query는 사용자 입력을 검색에 적합한 짧은 문장으로 정규화합니다.
 - confidence는 0.0~1.0 사이의 float입니다.
 - 절대로 content_id, title, artist, KAG_STATE, RAG_STATE를 생성하지 않습니다.
+- 부정 장르는 disliked_genres에 넣고, 부정 아티스트/곡과 분리합니다.
 
 ## 허용 값
 intent_type: {intent_types}
@@ -39,6 +40,7 @@ OUTPUT_JSON_SCHEMA = {
         "requested_count": {"type": ["integer", "null"], "minimum": 1},
         "disliked_artists": {"type": "array", "items": {"type": "string"}},
         "disliked_tracks": {"type": "array", "items": {"type": "string"}},
+        "disliked_genres": {"type": "array", "items": {"type": "string", "enum": sorted(ALLOWED_GENRES)}},
     },
     "required": [
         "intent_type",
@@ -50,6 +52,7 @@ OUTPUT_JSON_SCHEMA = {
         "requested_count",
         "disliked_artists",
         "disliked_tracks",
+        "disliked_genres",
     ],
     "additionalProperties": False,
 }

@@ -77,6 +77,27 @@
   width: 100%;
 }
 
+.home-screen {
+  font-family: "RimasHome", "Noto Sans KR", system-ui, sans-serif;
+}
+
+.home-screen__eyebrow {
+  display: inline-block;
+  max-width: min(92vw, 720px);
+  padding: 10px 18px;
+  border: 1px solid rgba(255, 232, 196, 0.20);
+  border-radius: 999px;
+  color: rgba(255, 242, 220, 0.92);
+  background: rgba(19, 10, 48, 0.22);
+  box-shadow: 0 10px 34px rgba(9, 5, 32, 0.24);
+  backdrop-filter: blur(10px);
+  font-size: 18px;
+  font-weight: 300;
+  line-height: 1.45;
+  letter-spacing: 0;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.48);
+}
+
 .constellation-home {
   position: relative;
   min-height: 100vh;
@@ -87,6 +108,13 @@
     radial-gradient(circle at 77% 34%, rgba(255, 206, 168, 0.12), transparent 22%),
     radial-gradient(circle at 50% 92%, rgba(194, 118, 255, 0.28), transparent 30%),
     linear-gradient(180deg, #0d0830 0%, #21104f 48%, #342069 100%);
+}
+
+@media (max-width: 768px) {
+  .home-screen__eyebrow {
+    padding: 8px 14px;
+    font-size: 15px;
+  }
 }
 
 .constellation-home::before,

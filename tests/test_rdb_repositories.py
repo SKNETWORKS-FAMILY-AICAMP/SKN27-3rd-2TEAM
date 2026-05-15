@@ -76,6 +76,24 @@ class RdbRepositoryTest(unittest.TestCase):
             ],
         )
 
+    def test_music_catalog_repository_finds_identity_matches_by_title_or_artist(self):
+        expected = [{"content_id": "track_001", "title": "bad guy", "artist": "Billie Eilish"}]
+        connection = FakeConnection(fetchall_result=expected)
+        repository = MusicCatalogRepository(connection)
+
+        result = repository.find_identity_matches("bad guy")
+
+        self.assertEqual(result, expected)
+        self.assertEqual(
+            connection.cursor_instance.executed,
+            [
+                (
+                    query_constants.SELECT_MUSIC_IDENTITY_MATCHES,
+                    {"text": "bad guy"},
+                )
+            ],
+        )
+
     def test_interaction_log_repository_saves_and_commits(self):
         connection = FakeConnection()
         repository = InteractionLogRepository(connection)

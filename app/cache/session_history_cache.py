@@ -80,6 +80,11 @@ def update_context_from_turn(
         ctx.get("disliked_tracks", []),
         limit=50,
     )
+    ctx["disliked_genres"] = merge_unique(
+        new_dislikes.get("disliked_genres", []),
+        ctx.get("disliked_genres", []),
+        limit=50,
+    )
 
     reason = rag_state.get("recommendation_reason", {}).get("summary", "")
     if reason:
@@ -139,6 +144,7 @@ def _empty_context(session_id: str) -> dict:
         "selected_tracks": [],
         "disliked_artists": [],
         "disliked_tracks": [],
+        "disliked_genres": [],
         "conversation_summary": "",
     }
 

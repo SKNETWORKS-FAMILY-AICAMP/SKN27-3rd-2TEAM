@@ -74,13 +74,15 @@ class RealRagAdapter(RagAdapter):
         kag_state: dict | None = None,
         rag_input_json: dict | None = None,
     ) -> list[dict]:
-        excluded_artists, excluded_tracks = RealRagAdapter._excluded_sets(kag_state or {})
+        excluded_artists, excluded_tracks, excluded_genres = RealRagAdapter._excluded_sets(kag_state or {})
         target_section = (rag_input_json or {}).get("target_section", "personalized_section")
         evidence = []
         for hit in hits:
             if hit.content_id not in allowed_ids:
                 continue
             if hit.content_id in excluded_tracks or hit.artist in excluded_artists:
+                continue
+            if set(hit.genre or []) & excluded_genres:
                 continue
             evidence.append(
                 {
@@ -99,9 +101,10 @@ class RealRagAdapter(RagAdapter):
         return evidence
 
     @staticmethod
-    def _excluded_sets(kag_state: dict) -> tuple[set[str], set[str]]:
+    def _excluded_sets(kag_state: dict) -> tuple[set[str], set[str], set[str]]:
         excluded_artists = set()
         excluded_tracks = set()
+        excluded_genres = set()
         for node in kag_state.get("excluded_nodes", []) or []:
             value = node.get("value")
             if not value:
@@ -110,7 +113,9 @@ class RealRagAdapter(RagAdapter):
                 excluded_artists.add(value)
             if node.get("type") == "track":
                 excluded_tracks.add(value)
-        return excluded_artists, excluded_tracks
+            if node.get("type") == "genre":
+                excluded_genres.add(value)
+        return excluded_artists, excluded_tracks, excluded_genres
 
     @staticmethod
     def _recommendation_category(hit: ElasticsearchRagHit, target_section: str) -> str:

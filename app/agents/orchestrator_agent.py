@@ -9,6 +9,9 @@ from app.agents.rag_dispatch_agent import RagDispatchAgent
 from app.agents.recommendation_agent import RecommendationAgent
 from app.agents.response_generator import ResponseGenerator
 from app.common.default_state import FALLBACK_RESPONSE_STATE
+from app.config.settings import create_database_connection
+from app.repositories.music_catalog_repository import MusicCatalogRepository
+from app.services.negative_preference_matcher import NegativePreferenceMatcher
 from app.validators.contract_validator import ContractValidator
 from app.validators.provenance_validator import ProvenanceValidator
 from app.validators.response_validator import ResponseValidator
@@ -198,14 +201,23 @@ class OrchestratorAgent:
 
     @staticmethod
     def _build_input_planner() -> InputPlannerAgent:
+        matcher = OrchestratorAgent._build_negative_preference_matcher()
         try:
             from app.llm.openai_llm_client import MissingOpenAiApiKeyError, OpenAiLlmClient
             llm_client = OpenAiLlmClient()
             logger.info("input_planner_llm_enabled")
-            return InputPlannerAgent(llm_client=llm_client)
+            return InputPlannerAgent(llm_client=llm_client, negative_preference_matcher=matcher)
         except Exception as exc:
             logger.info("input_planner_rule_based_fallback", extra={"reason": str(exc)})
-            return InputPlannerAgent()
+            return InputPlannerAgent(negative_preference_matcher=matcher)
+
+    @staticmethod
+    def _build_negative_preference_matcher():
+        try:
+            return NegativePreferenceMatcher(MusicCatalogRepository(create_database_connection()))
+        except Exception as exc:
+            logger.warning("negative_preference_matcher_unavailable", extra={"error": str(exc)})
+            return None
 
     @staticmethod
     def _new_request_id() -> str:

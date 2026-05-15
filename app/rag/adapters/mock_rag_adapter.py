@@ -96,7 +96,8 @@ class MockRagAdapter(RagAdapter):
         excluded_tracks = {node["value"] for node in excluded_nodes if node.get("type") == "track"}
         return [
             item
-            for item in evidence
-            if item.get("content_id") not in excluded_tracks
-            and item.get("artist") not in excluded_artists
+        for item in evidence
+        if item.get("content_id") not in excluded_tracks
+        and item.get("artist") not in excluded_artists
+        and not (set(item.get("genre", [])) & {node["value"] for node in excluded_nodes if node.get("type") == "genre"})
         ]

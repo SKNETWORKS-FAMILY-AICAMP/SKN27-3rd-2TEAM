@@ -39,9 +39,9 @@ class MockKagAdapter(KagAdapter):
     @staticmethod
     def _mock_candidates() -> list[dict]:
         return [
-            {"content_id": "track_001", "artist": "Nova Lane"},
-            {"content_id": "track_002", "artist": "Luna Field"},
-            {"content_id": "track_003", "artist": "Mira Tone"},
+            {"content_id": "track_001", "artist": "Nova Lane", "genre": ["rnb", "indie"]},
+            {"content_id": "track_002", "artist": "Luna Field", "genre": ["dream_pop", "ambient"]},
+            {"content_id": "track_003", "artist": "Mira Tone", "genre": ["pop", "electro_pop"]},
         ]
 
     @staticmethod
@@ -61,17 +61,22 @@ class MockKagAdapter(KagAdapter):
         for track in session_context.get("disliked_tracks", []) or []:
             if track:
                 nodes.append({"type": "track", "value": track})
+        for genre in session_context.get("disliked_genres", []) or []:
+            if genre:
+                nodes.append({"type": "genre", "value": genre})
         return nodes
 
     @staticmethod
     def _filter_candidates(candidates: list[dict], excluded_nodes: list[dict]) -> list[dict]:
         excluded_artists = {node["value"] for node in excluded_nodes if node.get("type") == "artist"}
         excluded_tracks = {node["value"] for node in excluded_nodes if node.get("type") == "track"}
+        excluded_genres = {node["value"] for node in excluded_nodes if node.get("type") == "genre"}
         return [
             candidate
             for candidate in candidates
             if candidate.get("content_id") not in excluded_tracks
             and candidate.get("artist") not in excluded_artists
+            and not (set(candidate.get("genre", [])) & excluded_genres)
         ]
 
     def _decide_primary_goal(self, user_input: str) -> str:

@@ -20,8 +20,9 @@ logger = logging.getLogger("rimas.agent.input_planner")
 class InputPlannerAgent(BaseAgent):
     """Normalize user input into INTENT_STATE and KAG_INPUT_JSON."""
 
-    def __init__(self, llm_client=None):
+    def __init__(self, llm_client=None, negative_preference_matcher=None):
         self._llm = llm_client
+        self._negative_preference_matcher = negative_preference_matcher
 
     def run(
         self,
@@ -36,6 +37,7 @@ class InputPlannerAgent(BaseAgent):
             parsed = self._parse_with_rules(user_input, session_context)
 
         intent_type = parsed["intent_type"]
+        new_dislikes = self._resolve_negative_preferences(parsed)
         intent_state = IntentStateSchema(
             intent_type=intent_type,
             confidence=parsed["confidence"],
@@ -44,18 +46,23 @@ class InputPlannerAgent(BaseAgent):
             detected_genres=parsed["detected_genres"],
             detected_situations=parsed["detected_situations"],
             requested_count=parsed.get("requested_count"),
-            disliked_artists=parsed.get("disliked_artists", []),
-            disliked_tracks=parsed.get("disliked_tracks", []),
+            disliked_artists=new_dislikes["disliked_artists"],
+            disliked_tracks=new_dislikes["disliked_tracks"],
+            disliked_genres=parsed.get("disliked_genres", []),
             requires_kag=intent_type != "general_chat",
             requires_rag=intent_type != "general_chat",
         )
         excluded_artists = self._merge_unique(
-            parsed.get("disliked_artists", []),
+            new_dislikes["disliked_artists"],
             session_context.get("disliked_artists", []),
         )
         excluded_tracks = self._merge_unique(
-            parsed.get("disliked_tracks", []),
+            new_dislikes["disliked_tracks"],
             session_context.get("disliked_tracks", []),
+        )
+        excluded_genres = self._merge_unique(
+            parsed.get("disliked_genres", []),
+            session_context.get("disliked_genres", []),
         )
         kag_input = KagInputSchema(
             request_id=request_id,
@@ -74,6 +81,7 @@ class InputPlannerAgent(BaseAgent):
                 "max_candidates": parsed.get("requested_count") or 10,
                 "excluded_artists": excluded_artists,
                 "excluded_tracks": excluded_tracks,
+                "excluded_genres": excluded_genres,
             },
         )
         return {
@@ -113,6 +121,7 @@ class InputPlannerAgent(BaseAgent):
         result["requested_count"] = InputPlannerAgent._normalize_requested_count(result.get("requested_count"))
         result["disliked_artists"] = InputPlannerAgent._clean_text_list(result.get("disliked_artists", []))
         result["disliked_tracks"] = InputPlannerAgent._clean_text_list(result.get("disliked_tracks", []))
+        result["disliked_genres"] = [g for g in result.get("disliked_genres", []) if g in ALLOWED_GENRES]
         confidence = result.get("confidence", 0.0)
         result["confidence"] = max(0.0, min(1.0, float(confidence)))
         return result
@@ -130,6 +139,8 @@ class InputPlannerAgent(BaseAgent):
             "requested_count": self._detect_requested_count(normalized_query),
             "disliked_artists": negative_preferences["disliked_artists"],
             "disliked_tracks": negative_preferences["disliked_tracks"],
+            "disliked_genres": negative_preferences["disliked_genres"],
+            "negative_terms": negative_preferences["negative_terms"],
         }
 
     @staticmethod
@@ -193,19 +204,53 @@ class InputPlannerAgent(BaseAgent):
 
     @staticmethod
     def _detect_negative_preferences(text: str) -> dict:
-        markers = ("추천하지 마", "듣기 싫어", "싫어", "싫다", "별로", "빼줘", "제외")
+        markers = ("추천하지 마", "듣기 싫어", "싫어", "싫다", "별로", "빼줘", "빼고", "말고", "제외하고", "제외")
         if not any(marker in text for marker in markers):
-            return {"disliked_artists": [], "disliked_tracks": []}
+            return {"disliked_artists": [], "disliked_tracks": [], "disliked_genres": [], "negative_terms": []}
 
         candidate = text
         for marker in markers:
             if marker in candidate:
                 candidate = candidate.split(marker, maxsplit=1)[0]
-        candidate = candidate.strip(" ,.!?를은이가")
+        negative_scope = InputPlannerAgent._negative_scope(candidate)
+        disliked_genres = InputPlannerAgent._detect_negative_genres(negative_scope)
+        candidate = InputPlannerAgent._clean_negative_candidate(candidate)
         return {
-            "disliked_artists": [candidate] if candidate else [],
+            "disliked_artists": [],
             "disliked_tracks": [],
+            "disliked_genres": disliked_genres,
+            "negative_terms": [candidate] if candidate else [],
         }
+
+    @staticmethod
+    def _negative_scope(value: str) -> str:
+        scope = value or ""
+        for marker in ("근데", "그런데", "하지만", "다만", "but"):
+            if marker in scope:
+                scope = scope.rsplit(marker, maxsplit=1)[-1]
+        return scope
+
+    @staticmethod
+    def _detect_negative_genres(text: str) -> list[str]:
+        compact = (text or "").casefold().replace(" ", "")
+        detected = []
+        for genre, keywords in GENRE_KEYWORD_MAP.items():
+            if genre not in ALLOWED_GENRES:
+                continue
+            for keyword in keywords + [genre]:
+                if keyword.casefold().replace(" ", "") in compact:
+                    detected.append(genre)
+                    break
+        return list(dict.fromkeys(detected))
+
+    @staticmethod
+    def _clean_negative_candidate(value: str) -> str:
+        candidate = InputPlannerAgent._negative_scope(value).strip(" ,.!?를은이가")
+        suffixes = ("음악은", "음악", "장르는", "장르", "노래는", "노래", "곡은", "곡")
+        for suffix in suffixes:
+            if candidate.endswith(suffix):
+                candidate = candidate[: -len(suffix)].strip(" ,.!?를은이가")
+        return candidate
 
     @staticmethod
     def _clean_text_list(values: list) -> list[str]:
@@ -221,3 +266,26 @@ class InputPlannerAgent(BaseAgent):
                 seen.add(text)
                 merged.append(text)
         return merged
+
+    def _resolve_negative_preferences(self, parsed: dict) -> dict:
+        terms = self._merge_unique(
+            parsed.get("negative_terms", []),
+            parsed.get("disliked_artists", []) + parsed.get("disliked_tracks", []),
+        )
+        if not terms or self._negative_preference_matcher is None:
+            return {"disliked_artists": [], "disliked_tracks": []}
+
+        artists: list[str] = []
+        tracks: list[str] = []
+        for term in terms:
+            try:
+                resolved = self._negative_preference_matcher.resolve(term)
+            except Exception as exc:
+                logger.warning("negative_preference_match_failed", extra={"term": term, "error": str(exc)})
+                continue
+            artists.extend(resolved.get("disliked_artists", []))
+            tracks.extend(resolved.get("disliked_tracks", []))
+        return {
+            "disliked_artists": self._merge_unique(artists, []),
+            "disliked_tracks": self._merge_unique(tracks, []),
+        }

@@ -5,7 +5,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { useState, useCallback, useEffect, useRef } from "react";
-import { fetchSessionHistory, flushSession, sendChatMessageStream } from "../api/chatbot";
+import { clearSession, fetchSessionHistory, flushSession, sendChatMessageStream } from "../api/chatbot";
 import { addToTaste } from "../api/taste";
 import { DreamBackground } from "../components/background/DreamBackground";
 import { ChatHistory } from "../components/chatbot/ChatHistory";
@@ -32,6 +32,7 @@ export function ChatbotPage({ onNavigateHome }: Props) {
   const [input, setInput] = useState("");
   const [showExitModal, setShowExitModal] = useState(false);
   const [exitLoading, setExitLoading] = useState(false);
+  const [exitError, setExitError] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const streamingRef = useRef(false);
 
@@ -91,24 +92,36 @@ export function ChatbotPage({ onNavigateHome }: Props) {
 
   const handleSaveAndExit = async () => {
     setExitLoading(true);
+    setExitError("");
     try {
       await flushSession(sessionId, userId);
-    } catch (err) {
-      console.error("[ChatbotPage] flush error", err);
-    } finally {
       clear();
       resetSession();
-      setExitLoading(false);
       setShowExitModal(false);
       onNavigateHome?.();
+    } catch (err) {
+      console.error("[ChatbotPage] flush error", err);
+      setExitError("세션 저장에 실패했습니다. 다시 시도해 주세요.");
+    } finally {
+      setExitLoading(false);
     }
   };
 
-  const handleExitWithoutSave = () => {
-    clear();
-    resetSession();
-    setShowExitModal(false);
-    onNavigateHome?.();
+  const handleExitWithoutSave = async () => {
+    setExitLoading(true);
+    setExitError("");
+    try {
+      await clearSession(sessionId, userId);
+      clear();
+      resetSession();
+      setShowExitModal(false);
+      onNavigateHome?.();
+    } catch (err) {
+      console.error("[ChatbotPage] clear session error", err);
+      setExitError("세션 삭제에 실패했습니다. 다시 시도해 주세요.");
+    } finally {
+      setExitLoading(false);
+    }
   };
 
   const lastTurn = history[history.length - 1];
@@ -144,6 +157,7 @@ export function ChatbotPage({ onNavigateHome }: Props) {
             <div className="exit-modal__backdrop" onClick={() => setShowExitModal(false)} />
             <div className="exit-modal__panel">
               <p className="exit-modal__message">세션을 종료하시겠습니까?</p>
+              {exitError && <p className="exit-modal__error">{exitError}</p>}
               <div className="exit-modal__actions">
                 <button
                   className="exit-modal__btn exit-modal__btn--save"

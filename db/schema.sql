@@ -188,8 +188,12 @@ CREATE TABLE IF NOT EXISTS user_negative_preferences (
     user_id VARCHAR(64) PRIMARY KEY REFERENCES users(user_id),
     disliked_artists_json JSONB NOT NULL DEFAULT '[]'::JSONB,
     disliked_tracks_json JSONB NOT NULL DEFAULT '[]'::JSONB,
+    disliked_genres_json JSONB NOT NULL DEFAULT '[]'::JSONB,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE user_negative_preferences
+ADD COLUMN IF NOT EXISTS disliked_genres_json JSONB NOT NULL DEFAULT '[]'::JSONB;
 
 CREATE INDEX IF NOT EXISTS idx_user_negative_preferences_updated_at
 ON user_negative_preferences(updated_at DESC);

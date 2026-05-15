@@ -8,7 +8,7 @@ import type { HomePageTarget } from "../components/home/ConstellationHome";
 const orbitFeatures: OrbitFeature[] = [
   {
     id: "recommend",
-    title: "개인화 추천",
+    title: "나만의 음악 주파수",
     position: "left-top",
     imageSrc: "/img/icon1.png",
     target: "personalized",
@@ -19,7 +19,7 @@ const orbitFeatures: OrbitFeature[] = [
   },
   {
     id: "discovery",
-    title: "새로운 취향",
+    title: "색다른 선율의 지평선",
     position: "right-top",
     imageSrc: "/img/icon2.png",
     target: "discovery",
@@ -30,7 +30,7 @@ const orbitFeatures: OrbitFeature[] = [
   },
   {
     id: "new-release",
-    title: "신규 발매",
+    title: "신곡 탐사 레이더",
     position: "left-bottom",
     imageSrc: "/img/icon3.png",
     target: "newRelease",
@@ -41,7 +41,7 @@ const orbitFeatures: OrbitFeature[] = [
   },
   {
     id: "chatbot",
-    title: "DJ 챗봇",
+    title: "별빛 큐레이터",
     position: "right-bottom",
     imageSrc: "/img/icon4.png",
     target: "chatbot",
@@ -59,7 +59,11 @@ type Props = {
 export const Home = memo(function Home({ onNavigate }: Props) {
   return (
     <CosmicBackground>
-      <div className="relative mx-auto min-h-screen w-full max-w-[110rem] px-6 max-md:flex max-md:flex-col max-md:items-center max-md:gap-8 max-md:py-12">
+      <div className="home-screen relative mx-auto min-h-screen w-full max-w-[110rem] px-6 max-md:flex max-md:flex-col max-md:items-center max-md:gap-8 max-md:py-12">
+        <div className="pointer-events-none absolute inset-x-6 top-8 z-[8] text-center max-md:static max-md:pointer-events-auto">
+          <p className="home-screen__eyebrow">뮤엘과 함께 오늘의 음악 별자리를 찾아보세요</p>
+        </div>
+
         <div className="hidden max-md:block">
           <CenterMascotOrb layout="mobile" />
         </div>

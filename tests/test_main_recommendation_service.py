@@ -97,7 +97,7 @@ def test_main_recommendation_service_returns_page_view_model(monkeypatch):
 
 def test_main_recommendation_service_deduplicates_and_fills_sections():
     class StubRepo:
-        def find_fallback_new_releases(self, limit, excluded_content_ids, excluded_artists):
+        def find_fallback_new_releases(self, limit, excluded_content_ids, excluded_artists, excluded_genres=None):
             return [
                 {
                     "content_id": "new_001",
@@ -110,7 +110,7 @@ def test_main_recommendation_service_deduplicates_and_fills_sections():
                 }
             ]
 
-        def find_fallback_discovery(self, limit, preferred_genres, excluded_content_ids, excluded_artists):
+        def find_fallback_discovery(self, limit, preferred_genres, excluded_content_ids, excluded_artists, excluded_genres=None):
             return [
                 {
                     "content_id": "disc_001",
@@ -201,10 +201,10 @@ def test_main_recommendation_service_uses_injected_repository_for_runtime_fallba
             pass
 
     class StubRepo:
-        def find_fallback_new_releases(self, limit, excluded_content_ids, excluded_artists):
+        def find_fallback_new_releases(self, limit, excluded_content_ids, excluded_artists, excluded_genres=None):
             return [{"content_id": "new_001", "title": "New", "artist": "Fresh", "genres": ["indie"], "moods": ["bright"]}]
 
-        def find_fallback_discovery(self, limit, preferred_genres, excluded_content_ids, excluded_artists):
+        def find_fallback_discovery(self, limit, preferred_genres, excluded_content_ids, excluded_artists, excluded_genres=None):
             return [{"content_id": "disc_001", "title": "Discover", "artist": "Wide", "genres": ["ambient"], "moods": ["calm"]}]
 
     monkeypatch.setattr("app.services.main_recommendation_service.session_cache_service", StubSessionCache())

@@ -33,12 +33,21 @@ WHERE content_id = %(content_id)s
 LIMIT 1;
 """
 
+SELECT_MUSIC_IDENTITY_MATCHES = """
+SELECT content_id, title, artist
+FROM music_catalog
+WHERE LOWER(title) = LOWER(%(text)s)
+   OR LOWER(artist) = LOWER(%(text)s)
+ORDER BY content_id ASC;
+"""
+
 SELECT_FALLBACK_NEW_RELEASES = """
 SELECT *
 FROM music_catalog
 WHERE release_type = 'new_release'
   AND NOT (content_id = ANY(%(excluded_content_ids)s))
   AND NOT (artist = ANY(%(excluded_artists)s))
+  AND NOT (genres && %(excluded_genres)s::TEXT[])
 ORDER BY created_at DESC, content_id ASC
 LIMIT %(limit)s;
 """
@@ -49,6 +58,7 @@ FROM music_catalog
 WHERE recommendation_category = 'discovery_candidate'
   AND NOT (content_id = ANY(%(excluded_content_ids)s))
   AND NOT (artist = ANY(%(excluded_artists)s))
+  AND NOT (genres && %(excluded_genres)s::TEXT[])
 ORDER BY created_at DESC, content_id ASC
 LIMIT %(limit)s;
 """
@@ -198,16 +208,19 @@ INSERT INTO user_negative_preferences (
     user_id,
     disliked_artists_json,
     disliked_tracks_json,
+    disliked_genres_json,
     updated_at
 ) VALUES (
     %(user_id)s,
     %(disliked_artists_json)s,
     %(disliked_tracks_json)s,
+    %(disliked_genres_json)s,
     NOW()
 )
 ON CONFLICT (user_id) DO UPDATE SET
     disliked_artists_json = EXCLUDED.disliked_artists_json,
     disliked_tracks_json = EXCLUDED.disliked_tracks_json,
+    disliked_genres_json = EXCLUDED.disliked_genres_json,
     updated_at = NOW();
 """
 
@@ -216,6 +229,7 @@ SELECT
     user_id,
     disliked_artists_json,
     disliked_tracks_json,
+    disliked_genres_json,
     updated_at
 FROM user_negative_preferences
 WHERE user_id = %(user_id)s;

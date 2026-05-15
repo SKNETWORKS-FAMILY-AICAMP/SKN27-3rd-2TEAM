@@ -151,6 +151,32 @@ def test_compact_state_builder_removes_internal_trace_fields():
     assert "validator_trace" not in compact["response_state"]
 
 
+def test_compact_state_builder_does_not_expose_raw_evidence_as_display_reason():
+    raw_lyrics = "[Verse 1] raw lyric line raw lyric line raw lyric line"
+
+    compact = CompactStateBuilder().compact_rag_state(
+        {
+            "status": "success",
+            "recommended_content_evidence": [
+                {
+                    "content_id": "track_001",
+                    "title": "Midnight Loop",
+                    "artist": "Nova Lane",
+                    "genre": ["indie"],
+                    "mood": ["calm"],
+                    "recommendation_category": "personalized_match",
+                    "evidence_summary": raw_lyrics,
+                }
+            ],
+        }
+    )
+
+    display_reason = compact["display_recommendations"][0]["display_reason"]
+    assert display_reason != raw_lyrics
+    assert "indie" in display_reason
+    assert "calm" in display_reason
+
+
 def test_request_lifecycle_cache_blocks_duplicate_inflight_request():
     cache = RequestLifecycleCache()
     cache.start("req_001")
@@ -196,7 +222,9 @@ def test_session_context_schema_accepts_negative_preferences():
         session_id="session_001",
         disliked_artists=["Billie Eilish"],
         disliked_tracks=["track_999"],
+        disliked_genres=["pop"],
     )
 
     assert ctx.disliked_artists == ["Billie Eilish"]
     assert ctx.disliked_tracks == ["track_999"]
+    assert ctx.disliked_genres == ["pop"]

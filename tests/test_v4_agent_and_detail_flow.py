@@ -43,7 +43,12 @@ def test_input_planner_extracts_requested_count_from_korean_number():
 
 
 def test_input_planner_extracts_disliked_artist_and_excludes_existing_context():
-    result = InputPlannerAgent().run(
+    class StubNegativePreferenceMatcher:
+        def resolve(self, value):
+            assert value == "Billie Eilish"
+            return {"disliked_artists": ["Billie Eilish"], "disliked_tracks": []}
+
+    result = InputPlannerAgent(negative_preference_matcher=StubNegativePreferenceMatcher()).run(
         user_id="user_001",
         session_id="session_001",
         request_id="req_001",
@@ -53,6 +58,76 @@ def test_input_planner_extracts_disliked_artist_and_excludes_existing_context():
 
     assert "Billie Eilish" in result["intent_state"]["disliked_artists"]
     assert result["kag_input_json"]["constraints"]["excluded_artists"] == ["Billie Eilish", "Adele"]
+
+
+def test_input_planner_extracts_excluded_artist_from_except_phrase():
+    class StubNegativePreferenceMatcher:
+        def resolve(self, value):
+            assert value == "Billie Eilish"
+            return {"disliked_artists": ["Billie Eilish"], "disliked_tracks": []}
+
+    result = InputPlannerAgent(negative_preference_matcher=StubNegativePreferenceMatcher()).run(
+        user_id="user_001",
+        session_id="session_001",
+        request_id="req_001",
+        user_input="Billie Eilish 노래는 빼고 다른걸로 5곡 추천해줘",
+        session_context={"disliked_artists": [], "disliked_tracks": []},
+    )
+
+    assert result["intent_state"]["requested_count"] == 5
+    assert result["intent_state"]["disliked_artists"] == ["Billie Eilish"]
+    assert result["kag_input_json"]["constraints"]["excluded_artists"] == ["Billie Eilish"]
+
+
+def test_input_planner_stores_track_exclusion_when_catalog_matches_title():
+    class StubNegativePreferenceMatcher:
+        def resolve(self, value):
+            assert value == "bad guy"
+            return {"disliked_artists": [], "disliked_tracks": ["track_bad_guy"]}
+
+    result = InputPlannerAgent(negative_preference_matcher=StubNegativePreferenceMatcher()).run(
+        user_id="user_001",
+        session_id="session_001",
+        request_id="req_001",
+        user_input="bad guy 말고 5곡 추천해줘",
+        session_context={"disliked_artists": [], "disliked_tracks": []},
+    )
+
+    assert result["intent_state"]["disliked_artists"] == []
+    assert result["intent_state"]["disliked_tracks"] == ["track_bad_guy"]
+    assert result["kag_input_json"]["constraints"]["excluded_tracks"] == ["track_bad_guy"]
+
+
+def test_input_planner_does_not_store_unmatched_negative_preference():
+    class StubNegativePreferenceMatcher:
+        def resolve(self, value):
+            assert value == "그 노래"
+            return {"disliked_artists": [], "disliked_tracks": []}
+
+    result = InputPlannerAgent(negative_preference_matcher=StubNegativePreferenceMatcher()).run(
+        user_id="user_001",
+        session_id="session_001",
+        request_id="req_001",
+        user_input="그 노래 말고 추천해줘",
+        session_context={"disliked_artists": [], "disliked_tracks": []},
+    )
+
+    assert result["intent_state"]["disliked_artists"] == []
+    assert result["intent_state"]["disliked_tracks"] == []
+
+
+def test_input_planner_extracts_negative_genre_from_contrast_phrase():
+    result = InputPlannerAgent().run(
+        user_id="user_001",
+        session_id="session_001",
+        request_id="req_001",
+        user_input="안녕 오늘은 신나는 음악 듣고 싶다 근데 pop음악은 별로",
+        session_context={"disliked_artists": [], "disliked_tracks": [], "disliked_genres": []},
+    )
+
+    assert result["intent_state"]["detected_moods"] == ["bright"]
+    assert result["intent_state"]["disliked_genres"] == ["pop"]
+    assert result["kag_input_json"]["constraints"]["excluded_genres"] == ["pop"]
 
 
 def test_intent_agent_returns_only_v4_allowed_intent_types():
@@ -291,6 +366,32 @@ def test_music_detail_service_prefers_recent_rag_evidence():
 
     assert result["content_id"] == "track_001"
     assert result["source"] == "rag_state"
+
+
+def test_music_detail_service_does_not_expose_raw_rag_evidence_as_display_reason():
+    raw_lyrics = "[Verse 1] raw lyric line raw lyric line raw lyric line"
+    service = MusicDetailService()
+
+    result = service.get_detail(
+        content_id="track_001",
+        recent_rag_state={
+            "recommended_content_evidence": [
+                {
+                    "content_id": "track_001",
+                    "title": "Midnight Loop",
+                    "artist": "Nova Lane",
+                    "genre": ["indie"],
+                    "mood": ["calm"],
+                    "recommendation_category": "personalized_match",
+                    "evidence_summary": raw_lyrics,
+                }
+            ]
+        },
+    )
+
+    assert result["display_reason"] != raw_lyrics
+    assert "indie" in result["display_reason"]
+    assert "calm" in result["display_reason"]
 
 
 def test_music_detail_service_falls_back_to_music_catalog_when_rag_evidence_missing():

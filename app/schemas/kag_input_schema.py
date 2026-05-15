@@ -29,6 +29,7 @@ class KagInputConstraintsSchema(BaseModel):
     max_candidates: int = Field(default=10, ge=1)
     excluded_artists: list[str] = Field(default_factory=list)
     excluded_tracks: list[str] = Field(default_factory=list)
+    excluded_genres: list[str] = Field(default_factory=list)
 
 
 class KagInputSchema(BaseModel):

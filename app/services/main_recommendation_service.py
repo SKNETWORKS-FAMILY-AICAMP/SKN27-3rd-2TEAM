@@ -6,7 +6,7 @@ from app.agents.recommendation_agent import build_display_reason
 from app.cache import latest_state_cache, redis_client
 from app.config.settings import APP_ENV, create_database_connection
 from app.repositories.music_catalog_repository import MusicCatalogRepository
-from app.cache import session_history_cache
+from app.services import session_cache_service
 
 _DEBUG_ENVS = {"local", "dev", "development"}
 
@@ -27,7 +27,7 @@ class MainRecommendationService:
         start = time.perf_counter()
         session_degraded = not redis_client.is_healthy()
 
-        session_context = session_history_cache.get_context(session_id, user_id=user_id)
+        session_context = session_cache_service.load_context(session_id, user_id=user_id)
 
         result = self._orchestrator.run_recommendation(
             user_id=user_id,
@@ -97,6 +97,7 @@ class MainRecommendationService:
         used_content_ids: set[str] = set()
         disliked_artists = set(session_context.get("disliked_artists", []) or [])
         disliked_tracks = set(session_context.get("disliked_tracks", []) or [])
+        disliked_genres = set(session_context.get("disliked_genres", []) or [])
         for item in evidence:
             target = category_map.get(item.get("recommendation_category"))
             content_id = item.get("content_id")
@@ -106,6 +107,8 @@ class MainRecommendationService:
             if not content_id or content_id in used_content_ids:
                 continue
             if content_id in disliked_tracks or artist in disliked_artists:
+                continue
+            if set(item.get("genre", []) or []) & disliked_genres:
                 continue
             groups[target].append(_to_card(item))
             used_content_ids.add(content_id)
@@ -117,6 +120,7 @@ class MainRecommendationService:
                 session_context=session_context,
                 used_content_ids=used_content_ids,
                 disliked_artists=disliked_artists,
+                disliked_genres=disliked_genres,
             )
 
         taste_badges = (
@@ -153,6 +157,7 @@ def _fill_fallback_sections(
     session_context: dict,
     used_content_ids: set[str],
     disliked_artists: set[str],
+    disliked_genres: set[str],
 ) -> None:
     limit = 3
     if not groups["new_release"]:
@@ -160,6 +165,7 @@ def _fill_fallback_sections(
             limit=limit,
             excluded_content_ids=list(used_content_ids),
             excluded_artists=list(disliked_artists),
+            excluded_genres=list(disliked_genres),
         ):
             _append_fallback_item(groups["new_release"], item, used_content_ids)
 
@@ -169,6 +175,7 @@ def _fill_fallback_sections(
             preferred_genres=session_context.get("recent_genres", []),
             excluded_content_ids=list(used_content_ids),
             excluded_artists=list(disliked_artists),
+            excluded_genres=list(disliked_genres),
         ):
             _append_fallback_item(groups["discovery"], item, used_content_ids)
 

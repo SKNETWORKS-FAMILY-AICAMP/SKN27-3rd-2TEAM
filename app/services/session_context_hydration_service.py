@@ -39,6 +39,7 @@ class SessionContextHydrationService:
             negative_profile = negative_repository.find_by_user_id(user_id) if negative_repository else None
             context["disliked_artists"] = list((negative_profile or {}).get("disliked_artists_json") or [])[:50]
             context["disliked_tracks"] = list((negative_profile or {}).get("disliked_tracks_json") or [])[:50]
+            context["disliked_genres"] = list((negative_profile or {}).get("disliked_genres_json") or [])[:50]
             return context
         except Exception as exc:
             logger.error("session_context_hydration_error", extra={"error": str(exc)}, exc_info=True)
@@ -57,5 +58,6 @@ def _empty_context_shape(session_id: str) -> dict:
         "selected_tracks": [],
         "disliked_artists": [],
         "disliked_tracks": [],
+        "disliked_genres": [],
         "conversation_summary": "",
     }

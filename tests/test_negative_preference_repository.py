@@ -37,6 +37,7 @@ def test_negative_preference_repository_upserts_and_reads_profile():
             "user_id": "user_001",
             "disliked_artists_json": ["Billie Eilish"],
             "disliked_tracks_json": ["track_999"],
+            "disliked_genres_json": ["pop"],
         }
     )
     repo = NegativePreferenceRepository(conn)
@@ -45,9 +46,11 @@ def test_negative_preference_repository_upserts_and_reads_profile():
         user_id="user_001",
         disliked_artists=["Billie Eilish"],
         disliked_tracks=["track_999"],
+        disliked_genres=["pop"],
     )
     profile = repo.find_by_user_id("user_001")
 
     assert conn.committed
     assert profile["disliked_artists_json"] == ["Billie Eilish"]
     assert profile["disliked_tracks_json"] == ["track_999"]
+    assert profile["disliked_genres_json"] == ["pop"]

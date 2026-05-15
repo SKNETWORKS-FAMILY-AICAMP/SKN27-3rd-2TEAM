@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.cache import session_history_cache as _default_cache
+from app.common.list_utils import merge_unique
 
 logger = logging.getLogger("rimas.service.taste_event")
 
@@ -37,8 +38,8 @@ class TasteEventService:
         title = detail.get("title", "")
         recommendation_category = detail.get("recommendation_category", "")
 
-        ctx = self._cache.update_context_from_taste(
-            session_id,
+        ctx = self._update_context(
+            session_id=session_id,
             genre=genre,
             mood=mood,
             artist=artist,
@@ -63,5 +64,35 @@ class TasteEventService:
 
         logger.info("taste_event_added", extra={"user_id": user_id, "content_id": content_id})
         return {"status": "success", "session_context": ctx}
+
+    def _update_context(
+        self,
+        *,
+        session_id: str,
+        genre: list,
+        mood: list,
+        artist: str,
+        content_id: str,
+    ) -> dict:
+        if hasattr(self._cache, "update_context_from_taste"):
+            return self._cache.update_context_from_taste(
+                session_id,
+                genre=genre,
+                mood=mood,
+                artist=artist,
+                content_id=content_id,
+            )
+
+        ctx = self._cache.get_context(session_id)
+        ctx["recent_genres"] = merge_unique(genre, ctx.get("recent_genres", []), limit=5)
+        ctx["recent_moods"] = merge_unique(mood, ctx.get("recent_moods", []), limit=5)
+        ctx["recent_artists"] = merge_unique(
+            [artist] if artist else [],
+            ctx.get("recent_artists", []),
+            limit=5,
+        )
+        ctx["selected_tracks"] = merge_unique([content_id], ctx.get("selected_tracks", []), limit=50)
+        self._cache.set_context(session_id, ctx)
+        return ctx
 
 

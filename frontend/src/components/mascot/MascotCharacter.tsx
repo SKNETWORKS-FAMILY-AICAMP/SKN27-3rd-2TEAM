@@ -103,7 +103,7 @@ export const MascotCharacter = memo(function MascotCharacter({ state = "idle" }:
       <motion.div className="mascot-float" animate={preset.animate} transition={preset.transition}>
         <div className="mascot-body">
           {imageMode === "single" ? (
-            <img src={SINGLE_IMAGE} alt="RIMAS mascot" className="mascot-image" />
+            <img src={SINGLE_IMAGE} alt="뮤엘 mascot" className="mascot-image" />
           ) : imageMode === "layered" ? (
             <>
               <img src={`${BASE}body.png`} alt="" className="mascot-layer" />
@@ -121,7 +121,7 @@ export const MascotCharacter = memo(function MascotCharacter({ state = "idle" }:
               )}
             </>
           ) : (
-            <div className="mascot-placeholder">RIMAS</div>
+            <div className="mascot-placeholder">뮤엘</div>
           )}
         </div>
       </motion.div>

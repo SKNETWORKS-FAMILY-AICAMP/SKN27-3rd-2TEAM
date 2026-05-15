@@ -105,6 +105,8 @@ def test_schema_contains_user_negative_preferences_table():
     assert "CREATE TABLE IF NOT EXISTS user_negative_preferences" in sql
     assert "disliked_artists_json JSONB NOT NULL DEFAULT '[]'::JSONB" in sql
     assert "disliked_tracks_json JSONB NOT NULL DEFAULT '[]'::JSONB" in sql
+    assert "disliked_genres_json JSONB NOT NULL DEFAULT '[]'::JSONB" in sql
+    assert "ADD COLUMN IF NOT EXISTS disliked_genres_json JSONB NOT NULL DEFAULT '[]'::JSONB" in sql
     assert "idx_user_negative_preferences_updated_at" in sql
 
 

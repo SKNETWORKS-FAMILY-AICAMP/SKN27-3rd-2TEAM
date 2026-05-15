@@ -33,6 +33,30 @@ class StubChatbotService:
         }
 
 
+class StubStreamService:
+    def __init__(self):
+        self.calls = []
+
+    def stream_response(self, user_id, session_id, user_input):
+        self.calls.append((user_id, session_id, user_input))
+        yield {"event": "delta", "data": {"text": "응답"}}
+        yield {
+            "event": "final",
+            "data": {
+                "status": "success",
+                "response_state": {
+                    "status": "success",
+                    "response_type": "curator_recommendation",
+                    "chatbot_response": "응답",
+                    "display_recommendations": [],
+                    "used_content_ids": [],
+                },
+                "latency_ms": 1,
+            },
+        }
+        yield {"event": "done", "data": {}}
+
+
 def test_recommendation_route_rejects_duplicate_inflight_request_id(monkeypatch):
     request_id = "req_route_duplicate_main"
     service = StubRecommendationService()
@@ -102,6 +126,48 @@ def test_chatbot_route_finishes_request_id_after_success(monkeypatch):
 
     response = TestClient(app).post(
         "/api/chatbot/respond",
+        json={
+            "user_id": "user_001",
+            "session_id": "session_001",
+            "user_input": "추천해줘",
+            "request_id": request_id,
+        },
+    )
+
+    assert response.status_code == 200
+    request_lifecycle_cache.start(request_id)
+    request_lifecycle_cache.finish(request_id)
+
+
+def test_chatbot_stream_route_rejects_duplicate_inflight_request_id(monkeypatch):
+    request_id = "req_route_duplicate_chat_stream"
+    service = StubStreamService()
+    monkeypatch.setattr(chatbot_routes, "_stream_service", service)
+    request_lifecycle_cache.start(request_id)
+
+    try:
+        response = TestClient(app).post(
+            "/api/chatbot/respond/stream",
+            json={
+                "user_id": "user_001",
+                "session_id": "session_001",
+                "user_input": "추천해줘",
+                "request_id": request_id,
+            },
+        )
+    finally:
+        request_lifecycle_cache.finish(request_id)
+
+    assert response.status_code == 409
+    assert service.calls == []
+
+
+def test_chatbot_stream_route_finishes_request_id_after_success(monkeypatch):
+    request_id = "req_route_finish_chat_stream"
+    monkeypatch.setattr(chatbot_routes, "_stream_service", StubStreamService())
+
+    response = TestClient(app).post(
+        "/api/chatbot/respond/stream",
         json={
             "user_id": "user_001",
             "session_id": "session_001",

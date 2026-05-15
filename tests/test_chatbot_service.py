@@ -339,7 +339,7 @@ def test_chatbot_service_saves_new_negative_preferences_to_context(monkeypatch):
                     "kag_state": {},
                     "rag_state": {},
                     "latency_ms": 1.0,
-                    "new_dislikes": {"disliked_artists": ["Billie Eilish"], "disliked_tracks": []},
+                    "new_dislikes": {"disliked_artists": ["Billie Eilish"], "disliked_tracks": [], "disliked_genres": ["pop"]},
                 },
             }
 
@@ -368,3 +368,4 @@ def test_chatbot_service_saves_new_negative_preferences_to_context(monkeypatch):
 
     assert saved["new_dislikes"]["disliked_artists"] == ["Billie Eilish"]
     assert persisted["new_artists"] == ["Billie Eilish"]
+    assert persisted["new_genres"] == ["pop"]

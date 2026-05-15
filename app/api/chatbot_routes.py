@@ -1,6 +1,5 @@
 import json
 import logging
-from functools import lru_cache
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -13,15 +12,8 @@ from app.services.request_lifecycle_cache import DuplicateRequestError, request_
 logger = logging.getLogger("rimas.api.chatbot")
 router = APIRouter()
 
-
-@lru_cache(maxsize=1)
-def _get_service() -> ChatbotService:
-    return ChatbotService()
-
-
-@lru_cache(maxsize=1)
-def _get_stream_service() -> ChatbotStreamService:
-    return ChatbotStreamService(chatbot_service=_get_service())
+_service = ChatbotService()
+_stream_service = ChatbotStreamService(chatbot_service=_service)
 
 
 class ChatRequest(BaseModel):
@@ -49,7 +41,7 @@ def respond(req: ChatRequest):
         except DuplicateRequestError as exc:
             raise HTTPException(status_code=409, detail="중복 요청이 처리 중입니다.") from exc
     try:
-        result = _get_service().submit_message(
+        result = _service.submit_message(
             user_id=req.user_id,
             session_id=req.session_id,
             user_input=req.user_input,
@@ -66,14 +58,23 @@ def respond(req: ChatRequest):
 @router.post("/respond/stream")
 def respond_stream(req: ChatRequest):
     """챗봇 메시지 처리 — SSE 스트리밍."""
+    if req.request_id:
+        try:
+            request_lifecycle_cache.start(req.request_id)
+        except DuplicateRequestError as exc:
+            raise HTTPException(status_code=409, detail="중복 요청이 처리 중입니다.") from exc
 
     def _to_sse(events):
-        for event in events:
-            yield f"event: {event['event']}\ndata: {json.dumps(event['data'], ensure_ascii=False)}\n\n"
+        try:
+            for event in events:
+                yield f"event: {event['event']}\ndata: {json.dumps(event['data'], ensure_ascii=False)}\n\n"
+        finally:
+            if req.request_id:
+                request_lifecycle_cache.finish(req.request_id)
 
     return StreamingResponse(
         _to_sse(
-            _get_stream_service().stream_response(
+            _stream_service.stream_response(
                 user_id=req.user_id,
                 session_id=req.session_id,
                 user_input=req.user_input,

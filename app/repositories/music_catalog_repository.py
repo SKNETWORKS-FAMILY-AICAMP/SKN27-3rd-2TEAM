@@ -48,17 +48,26 @@ class MusicCatalogRepository(BaseRepository):
             )
             return cursor.fetchone()
 
-    def find_fallback_new_releases(self, limit, excluded_content_ids, excluded_artists):
+    def find_identity_matches(self, text):
+        if not text:
+            return []
+        return self._fetch_all(
+            query_constants.SELECT_MUSIC_IDENTITY_MATCHES,
+            {"text": text},
+        )
+
+    def find_fallback_new_releases(self, limit, excluded_content_ids, excluded_artists, excluded_genres=None):
         return self._fetch_all(
             query_constants.SELECT_FALLBACK_NEW_RELEASES,
             {
                 "limit": limit,
                 "excluded_content_ids": excluded_content_ids or [],
                 "excluded_artists": excluded_artists or [],
+                "excluded_genres": excluded_genres or [],
             },
         )
 
-    def find_fallback_discovery(self, limit, preferred_genres, excluded_content_ids, excluded_artists):
+    def find_fallback_discovery(self, limit, preferred_genres, excluded_content_ids, excluded_artists, excluded_genres=None):
         return self._fetch_all(
             query_constants.SELECT_FALLBACK_DISCOVERY,
             {
@@ -66,6 +75,7 @@ class MusicCatalogRepository(BaseRepository):
                 "preferred_genres": preferred_genres or [],
                 "excluded_content_ids": excluded_content_ids or [],
                 "excluded_artists": excluded_artists or [],
+                "excluded_genres": excluded_genres or [],
             },
         )
 

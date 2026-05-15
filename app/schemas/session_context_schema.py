@@ -9,4 +9,5 @@ class SessionContextSchema(BaseModel):
     selected_tracks: list[str] = Field(default_factory=list)
     disliked_artists: list[str] = Field(default_factory=list)
     disliked_tracks: list[str] = Field(default_factory=list)
+    disliked_genres: list[str] = Field(default_factory=list)
     conversation_summary: str = ""
