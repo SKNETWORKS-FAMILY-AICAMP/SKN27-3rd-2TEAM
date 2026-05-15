@@ -7,7 +7,7 @@
 
 ### 팀 명: 테일즈비트
 
-| ![title](./docs/image/이혜림.png) | ![title](./docs/image/김경수.png)| ![title](./docs/image/이성진.png) | ![title](./docs/image/이재건.png)| ![title](./docs/image/김경호.png)|
+|  ||  | ||
 | :---: | :---: | :---: | :---: | :---: | 
 | **이혜림(팀장)** | **김경수** | **이성진** | &emsp;**이재건**&emsp; | &emsp;**김경호**&emsp; |  
 | 프론트엔드, <br>DB, LLM| KAGneo4j <br>연결 및 관리| KAG데이터 <br>라벨링 및 구조 | RAG 총괄 | RAG |
