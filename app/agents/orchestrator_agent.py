@@ -75,6 +75,17 @@ class OrchestratorAgent:
         kag_input_json = planned_input["kag_input_json"]
         new_dislikes = self._build_new_dislikes(intent_state)
 
+        input_contract_result = self._contract.validate_kag_input(kag_input_json)
+        if not input_contract_result["passed"]:
+            logger.warning("kag_input_contract_validation_failed", extra={"errors": input_contract_result["errors"]})
+            return self._fallback("CONTRACT_VALIDATION_FAILED", {}, {}, new_dislikes=new_dislikes)
+
+        # KAG/RAG 실행 전에 사용자 의도를 먼저 확정한다.
+        intent_result = self._intent.run(
+            user_input=user_input,
+            intent_state=intent_state,
+        )
+
         # 2. KAG — KAG_INPUT_JSON 기준으로 추천 방향을 결정한다.
         kag_state = self._kag.run(
             user_id,
@@ -103,14 +114,12 @@ class OrchestratorAgent:
         if rag_state.get("status") == "error":
             return self._fallback("RAG_DISPATCH_FAILED", kag_state, rag_state, new_dislikes=new_dislikes)
 
-        # 5. Intent Agent — Input Planner 결과를 검증/확정한다.
-        intent_result = self._intent.run(
-            user_input=user_input,
-            kag_state=kag_state,
-            rag_state=rag_state,
-            intent_state=intent_state,
-        )
+        rag_contract_result = self._contract.validate_rag_state(rag_state)
+        if not rag_contract_result["passed"]:
+            logger.warning("rag_state_contract_validation_failed", extra={"errors": rag_contract_result["errors"]})
+            return self._fallback("CONTRACT_VALIDATION_FAILED", kag_state, rag_state, new_dislikes=new_dislikes)
 
+        # 5. Intent Agent — Input Planner 결과를 검증/확정한다.
         # 6. Recommendation Agent
         selected = self._rec.run(intent_result=intent_result, rag_state=rag_state)
         if not selected.get("selected_recommendations"):
@@ -168,6 +177,16 @@ class OrchestratorAgent:
             user_input="",
             session_context=session_context,
         )
+        intent_state = planned_input["intent_state"]
+        input_contract_result = self._contract.validate_kag_input(planned_input["kag_input_json"])
+        if not input_contract_result["passed"]:
+            logger.warning("kag_input_contract_validation_failed", extra={"errors": input_contract_result["errors"]})
+            return {"status": "error", "kag_state": {}, "rag_state": {}, "error_type": "CONTRACT_VALIDATION_FAILED"}
+
+        self._intent.run(
+            user_input="",
+            intent_state=intent_state,
+        )
 
         kag_state = self._kag.run(
             user_id,
@@ -183,7 +202,7 @@ class OrchestratorAgent:
             user_id=user_id,
             session_id=session_id,
             request_id=request_id,
-            intent_state=planned_input["intent_state"],
+            intent_state=intent_state,
             kag_input_json=planned_input["kag_input_json"],
         )
 

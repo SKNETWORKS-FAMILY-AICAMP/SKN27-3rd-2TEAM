@@ -6,6 +6,7 @@ from app.agents.recommendation_agent import build_display_reason
 from app.cache import latest_state_cache, redis_client
 from app.config.settings import APP_ENV, create_database_connection
 from app.repositories.music_catalog_repository import MusicCatalogRepository
+from app.services.logging_service import LoggingService
 from app.services import session_cache_service
 
 _DEBUG_ENVS = {"local", "dev", "development"}
@@ -19,9 +20,15 @@ class MainRecommendationService:
     RDB 쿼리는 RAG builder 내부에서만 발생하므로 중복 조회 없음.
     """
 
-    def __init__(self, orchestrator: OrchestratorAgent | None = None, music_catalog_repository=None):
+    def __init__(
+        self,
+        orchestrator: OrchestratorAgent | None = None,
+        music_catalog_repository=None,
+        logging_service: LoggingService | None = None,
+    ):
         self._orchestrator = orchestrator or OrchestratorAgent()
         self._music_catalog_repository = music_catalog_repository
+        self._logging_service = logging_service or LoggingService()
 
     def get_page_view_model(self, user_id: str, session_id: str) -> tuple[dict, bool]:
         start = time.perf_counter()
@@ -63,7 +70,42 @@ class MainRecommendationService:
                 "latency_ms": ms,
             },
         )
+        self._save_interaction_log(
+            user_id=user_id,
+            session_id=session_id,
+            session_context=session_context,
+            kag_state=kag_state,
+            rag_state=rag_state,
+            response_state=view_model,
+            latency_ms=ms,
+        )
         return view_model, session_degraded
+
+    def _save_interaction_log(
+        self,
+        *,
+        user_id: str,
+        session_id: str,
+        session_context: dict,
+        kag_state: dict,
+        rag_state: dict,
+        response_state: dict,
+        latency_ms: float,
+    ) -> None:
+        try:
+            self._logging_service.save(
+                user_id=user_id,
+                session_id=session_id,
+                user_input="",
+                session_context=session_context,
+                kag_state=kag_state,
+                rag_state=rag_state,
+                response_state=response_state,
+                latency_ms=latency_ms,
+                page_type="main_recommendation_page",
+            )
+        except Exception as exc:
+            logger.error("main_recommendation_log_save_error", extra={"error": str(exc)}, exc_info=True)
 
     def _get_music_catalog_repository(self):
         if self._music_catalog_repository is not None:

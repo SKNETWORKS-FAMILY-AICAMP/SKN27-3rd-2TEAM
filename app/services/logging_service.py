@@ -23,6 +23,7 @@ class LoggingService:
         rag_state: dict,
         response_state: dict,
         latency_ms: float,
+        page_type: str = "chatbot_page",
     ) -> None:
         start = time.perf_counter()
         try:
@@ -38,7 +39,7 @@ class LoggingService:
                             "user_id": user_id,
                             "session_id": session_id,
                             "user_input": user_input,
-                            "page_type": "chatbot_page",
+                            "page_type": page_type,
                             "status": response_state.get("status", "error"),
                             "response_type": response_state.get("response_type"),
                             "intent_type": response_state.get("intent_type"),

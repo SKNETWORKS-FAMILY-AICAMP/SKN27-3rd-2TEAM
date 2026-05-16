@@ -22,7 +22,7 @@ class ChatbotService:
         negative_preference_service: NegativePreferenceService | None = None,
     ):
         self._orchestrator = orchestrator or OrchestratorAgent()
-        self._logging_service = logging_service
+        self._logging_service = logging_service or LoggingService()
         self._negative_preference_service = negative_preference_service
 
     def submit_message(self, user_id: str, session_id: str, user_input: str) -> dict:

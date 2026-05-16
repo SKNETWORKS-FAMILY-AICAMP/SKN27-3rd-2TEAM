@@ -2,6 +2,10 @@ import logging
 
 from app.common.constants import ALLOWED_STATUSES
 from app.contracts.fields import KagStateField, RagStateField, SessionContextField
+from app.schemas.kag_input_schema import KagInputSchema
+from app.schemas.rag_input_schema import RagInputSchema
+from app.schemas.response_state_schema import ResponseStateSchema
+from app.schemas.session_context_schema import SessionContextSchema
 from app.validators.base_validator import BaseValidator
 
 logger = logging.getLogger("rimas.validator.contract")
@@ -26,9 +30,9 @@ _RAG_OPTIONAL_TYPES = {
 class ContractValidator(BaseValidator):
     def validate(self, session_context: dict, kag_state: dict, rag_state: dict) -> dict:
         results = [
-            self._validate_session_context(session_context),
-            self._validate_kag(kag_state),
-            self._validate_rag(rag_state),
+            self.validate_session_context(session_context),
+            self.validate_kag_state(kag_state),
+            self.validate_rag_state(rag_state),
         ]
         errors = [e for r in results for e in r["errors"]]
         passed = not errors
@@ -36,7 +40,10 @@ class ContractValidator(BaseValidator):
             logger.warning("contract_invalid", extra={"errors": errors})
         return {"passed": passed, "errors": errors}
 
-    def _validate_session_context(self, ctx: dict) -> dict:
+    def validate_session_context(self, ctx: dict) -> dict:
+        schema_result = self._validate_schema(ctx, SessionContextSchema, "SESSION_CONTEXT")
+        if not schema_result["passed"]:
+            return schema_result
         if not isinstance(ctx, dict):
             return {"passed": False, "errors": ["session_context must be a dict"]}
         required = (SessionContextField.SESSION_ID,)
@@ -45,7 +52,16 @@ class ContractValidator(BaseValidator):
             return {"passed": False, "errors": [f"{missing[0]} is required in session_context"]}
         return {"passed": True, "errors": []}
 
-    def _validate_kag(self, kag_state: dict) -> dict:
+    def validate_kag_input(self, kag_input_json: dict) -> dict:
+        return self._validate_schema(kag_input_json, KagInputSchema, "KAG_INPUT_JSON")
+
+    def validate_rag_input(self, rag_input_json: dict) -> dict:
+        return self._validate_schema(rag_input_json, RagInputSchema, "RAG_INPUT_JSON")
+
+    def validate_response_state_contract(self, response_state: dict) -> dict:
+        return self._validate_schema(response_state, ResponseStateSchema, "RESPONSE_STATE")
+
+    def validate_kag_state(self, kag_state: dict) -> dict:
         result = self._check_fields(kag_state, _KAG_REQUIRED)
         if not result["passed"]:
             return result
@@ -64,7 +80,7 @@ class ContractValidator(BaseValidator):
                 return f"{field_name} must be a {expected_type.__name__}"
         return None
 
-    def _validate_rag(self, rag_state: dict) -> dict:
+    def validate_rag_state(self, rag_state: dict) -> dict:
         if not rag_state:
             return {"passed": True, "errors": []}
         result = self._check_fields(rag_state, _RAG_REQUIRED)
@@ -80,6 +96,14 @@ class ContractValidator(BaseValidator):
         if optional_type_error:
             return {"passed": False, "errors": [optional_type_error]}
         return result
+
+    @staticmethod
+    def _validate_schema(payload: dict, schema_class, contract_name: str) -> dict:
+        try:
+            schema_class.model_validate(payload)
+        except Exception as exc:
+            return {"passed": False, "errors": [f"{contract_name} invalid: {exc}"]}
+        return {"passed": True, "errors": []}
 
     def _validate_optional_rag_types(self, rag_state: dict) -> str | None:
         for field_name, expected_type in _RAG_OPTIONAL_TYPES.items():

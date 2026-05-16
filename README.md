@@ -9,11 +9,11 @@
 | 구분 | 핵심 내용 |
 |---|---|
 | 서비스 목표 | 자연어 요청과 사용자 취향을 반영해 개인화 음악 추천, 신규 음악 탐색, 챗봇 기반 추천을 제공 |
-| 추천 구조 | `InputPlanner -> KAG -> ContractValidator -> RAG -> Intent -> Recommendation -> ResponseGenerator -> Validator` |
+| 추천 구조 | `InputPlanner -> Intent -> KAG -> ContractValidator -> RAG -> ContractValidator -> Recommendation -> ResponseGenerator -> Validator` |
 | 데이터 저장소 | PostgreSQL(RDB), Neo4j(GraphDB), Elasticsearch(Vector/Search DB), Redis(Session Cache) |
 | 환각 방지 | KAG 후보 `content_id` 안에서만 RAG 검색, RAG 근거와 응답 결과의 `content_id/title/artist` 일치 검증 |
 | 출처 표시 | 상세 조회 모델의 `source`, `evidence_summary`를 상세 모달의 큐레이션 근거 영역에 노출. 추천 카드에는 원문 trace를 직접 노출하지 않음 |
-| 검증 상태 | Backend pytest 20건 통과, Frontend build/lint 통과, `app.main` import smoke 통과 |
+| 검증 상태 | Backend pytest 29건 통과, Frontend build 통과, 설계-구현 추적표 작성 완료 |
 
 ```mermaid
 flowchart LR
@@ -21,13 +21,13 @@ flowchart LR
     FE --> API["FastAPI API"]
     API --> ORCH["OrchestratorAgent"]
     ORCH --> IP["InputPlannerAgent"]
-    IP --> KAG["KagDispatchAgent"]
+    IP --> INTENT["IntentAgent"]
+    INTENT --> KAG["KagDispatchAgent"]
     KAG --> NEO["Neo4j GraphDB"]
     KAG --> CV["ContractValidator"]
     CV --> RAG["RagDispatchAgent"]
     RAG --> ES["Elasticsearch"]
-    RAG --> INTENT["IntentAgent"]
-    INTENT --> REC["RecommendationAgent"]
+    RAG --> REC["RecommendationAgent"]
     REC --> GEN["ResponseGenerator"]
     GEN --> VAL["ResponseValidator + ProvenanceValidator"]
     VAL --> FE
@@ -49,6 +49,10 @@ flowchart LR
 | 아티스트 지정 추천 | "아리아나 그란데 노래 추천"처럼 아티스트가 명시된 요청을 `artist_candidates`로 정규화하고, Real KAG에서 해당 artist 조건을 `Q_REC_006`에 우선 반영 |
 | Discovery flow | "색다른", "새로운 취향", "안 듣던", "다른 분위기" 계열 요청을 `discovery_recommendation`으로 분류하고, Real KAG에서 `Q_REC_007` 다양성 추천과 `discovery_section`으로 라우팅 |
 | 중복 추천 방지 | 챗봇 follow-up 추천 전에 Redis의 최신 response state에서 이미 표시된 추천 `content_id`를 읽어 `selected_tracks`에 병합 |
+| 설계-구현 추적 | `docs/superpowers/specs/2026-05-16-design-implementation-traceability.md`에 설계 목표, 테스트 기준, 완료 기준의 구현 상태를 정리 |
+| Orchestrator 순서 정렬 | 설계서 기준에 맞춰 `IntentAgent`를 KAG/RAG 실행 전에 배치하고, KAG 입력/RAG 상태 contract 검증을 경계에서 수행 |
+| interaction log 저장 | 챗봇과 메인 추천 기본 실행 경로에서 `LoggingService`를 통해 compact KAG/RAG/Response state를 `interaction_logs` 저장 경로로 전달 |
+| Frontend 라우팅 정리 | `MusicDetailPage`, `NotFoundPage`를 추가하고 `/recommendations`, `/chatbot`, `/music?detail=...` URL 기반 SPA 라우팅을 적용 |
 | Docker 개발 환경 | backend `uvicorn --reload` 감시 범위를 `--reload-dir app`으로 제한해 불필요한 reload와 로그 노이즈를 줄임 |
 | 임시 산출물 정리 | `.pytest_cache`, Python `__pycache__`, `frontend/dist`, `tmp` 등 재생성 가능한 캐시/빌드 산출물 제거 |
 
@@ -70,6 +74,16 @@ flowchart LR
 | `app/validators` | state contract, 응답 구조, provenance 검증 |
 | `app/repositories` | PostgreSQL 접근 계층 |
 | `frontend/src` | React 화면, API client, session/chat store |
+
+### 로깅 구조
+
+| 구성 | 책임 | 구현 위치 |
+|---|---|---|
+| 애플리케이션 로그 설정 | Python `logging`의 출력 형식, 레벨, JSON formatter를 설정. 콘솔/서버 로그 관찰용 | `app/core/logging_config.py` |
+| HTTP 요청 로그 | 요청 ID, method/path, status, latency를 애플리케이션 로그로 남김 | `app/core/middleware.py` |
+| interaction log 저장 | KAG/RAG/Response compact state를 PostgreSQL `interaction_logs` 테이블에 저장. 운영 추적과 디버깅 근거 보존용 | `app/services/logging_service.py` |
+
+`LoggingService`는 콘솔 로그 설정 서비스가 아니라 DB 영속화 서비스입니다. 따라서 `ChatbotService`와 `MainRecommendationService`는 기본 실행 경로에서 이 서비스를 생성해 `interaction_logs` 저장을 시도하고, 저장 실패는 사용자 응답을 막지 않도록 격리합니다.
 
 ---
 
@@ -103,6 +117,7 @@ flowchart LR
 | 응답 재구성 | LLM 응답의 추천 카드가 그대로 노출되지 않고, 선택된 추천 목록 기준으로 `content_id/title/artist`를 다시 구성 | `app/agents/response_generator.py` |
 | 추천 이유 검증 | `display_reason`이 비어 있거나 너무 길거나 raw evidence를 복사하면 deterministic reason으로 대체 | `app/validators/display_reason_validator.py` |
 | 출처 일치 검증 | 응답의 `used_content_ids`와 카드의 `title/artist`가 RAG evidence와 일치해야 통과 | `app/validators/provenance_validator.py` |
+| Contract 경계 검증 | `KAG_INPUT_JSON`이 깨지면 KAG를 실행하지 않고, `RAG_STATE`가 깨지면 Recommendation 단계로 넘기지 않음 | `app/validators/contract_validator.py`, `app/agents/orchestrator_agent.py` |
 
 ### 출처 표시 상태
 
@@ -526,7 +541,7 @@ flowchart LR
 | FastAPI import smoke | `.venv\Scripts\python.exe -c "import app.main; print('import_app_main_ok')"` | `import_app_main_ok` |
 | Frontend lint | `npm run lint` in `frontend` | 통과 |
 | Frontend build | `npm run build` in `frontend` | 통과 |
-| Backend unit test | `C:\Python314\python.exe -m pytest -v` | `20 passed` |
+| Backend unit test | `C:\Python314\python.exe -m pytest -q` | `29 passed` |
 
 ### 테스트 시나리오
 
@@ -540,6 +555,11 @@ flowchart LR
 | `tests/test_artist_recommendation_flow.py` | 아티스트 지정 요청에서 alias 정규화, KAG context 전달, artist 조건 기반 Real KAG 라우팅을 검증 |
 | `tests/test_discovery_recommendation_flow.py` | 새로운/다른 느낌의 요청을 discovery flow로 분류하고, 다양성 추천 쿼리와 기존 표시 추천 제외를 적용하는지 검증 |
 | `tests/test_curator_ui_contract.py` | KAG/RAG 구현을 변경하지 않고 상세 모달의 큐레이션 근거 노출, 챗봇 카드 문구, README 출처 설명 계약을 검증 |
+| `tests/test_orchestrator_session_dislikes.py` | Orchestrator가 `InputPlanner -> Intent -> KAG` 순서를 지키고, KAG 입력/RAG 상태 contract 실패 시 다음 단계로 진행하지 않는지 검증 |
+| `tests/test_orchestrator_session_dislikes.py` | ResponseGenerator가 RAG에 없는 `content_id`를 반환하면 ProvenanceValidator 실패로 fallback 되는지 검증 |
+| `tests/test_interaction_logging_flow.py` | 챗봇과 메인 추천 기본 실행 경로에서 `interaction_logs` 저장 서비스가 호출되는지 검증 |
+| `tests/test_request_lifecycle_cache.py` | 동일 `request_id`가 처리 중이면 Main Recommendation API가 409로 중복 요청을 차단하는지 검증 |
+| `tests/test_frontend_routing_contract.py` | `MusicDetailPage`, `NotFoundPage`, `/music?detail=...` 기반 프론트 라우팅 계약을 검증 |
 
 ### 최근 통과 확인된 Artist Flow
 
@@ -564,6 +584,11 @@ flowchart LR
 | 항목 | 상태 | 반영 내용 |
 |---|---|---|
 | 사용자 노출 출처 | 해결 | KAG/RAG 후보 생성과 검색 계약은 변경하지 않고 상세 모달에 근거 출처/검색 근거 요약 섹션 추가 |
+| 설계-구현 추적표 | 해결 | 20개 시스템 목표, 12개 테스트 기준, 완료 기준을 구현됨/부분 구현/미구현/의도적 변경 기준으로 정리 |
+| Orchestrator 흐름 | 해결 | `IntentAgent`가 KAG/RAG 전에 실행되도록 챗봇/메인 추천 흐름을 정렬 |
+| Contract 검증 | 해결 | `KAG_INPUT_JSON`과 `RAG_STATE`를 Orchestrator 경계에서 검증해 깨진 state가 다음 단계로 넘어가지 않도록 차단 |
+| interaction log 저장 | 해결 | `ChatbotService`, `MainRecommendationService` 기본 경로에서 `LoggingService`를 통해 compact state 저장 경로를 호출 |
+| Frontend 라우팅 | 해결 | `MusicDetailPage`, `NotFoundPage`, URL path 기반 SPA 라우팅 계약을 추가 |
 
 ### 확인된 한계
 
